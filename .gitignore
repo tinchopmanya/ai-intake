@@ -7,10 +7,21 @@ __pycache__/
 *.pyd
 .pytest_cache/
 .mypy_cache/
-# VS Code (opcional)
+
+# Node / Next
+node_modules/
+.next/
+out/
+coverage/
+
+# Env
+.env
+.env.*
+
+# VS Code
 .vscode/
 !.vscode/launch.json
-# Python
-__pycache__/
-*.pyc
-.venv/
+
+# OS
+.DS_Store
+Thumbs.db
