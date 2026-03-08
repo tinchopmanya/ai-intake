@@ -8,23 +8,37 @@ from main import conversations
 from providers.base import AIProviderError
 from providers.fallback import UNCONFIGURED_PROVIDER_MESSAGE
 from providers.fallback import UnconfiguredAIProvider
+from routers.advisor import advisor_service
 from routers.chat import chat_service
 
 
 class FakeAIProvider:
     def generate_answer(self, message: str) -> str:
+        if "Responde EXCLUSIVAMENTE en JSON valido" in message:
+            return (
+                '{"analysis":"Hay tension emocional y necesidad de claridad.",'
+                '"main_suggestion":"Entiendo lo que sentis y quiero hablarlo con calma.",'
+                '"variants":['
+                '{"tone":"empathetic","text":"Te escucho y me importa que podamos hablar bien."},'
+                '{"tone":"firm","text":"Podemos hablar, pero necesito respeto en la conversacion."},'
+                '{"tone":"brief","text":"Quiero hablarlo con calma y resolverlo."}'
+                "]}"
+            )
         return f"fake-ai: {message}"
 
 
 class TestAPI(unittest.TestCase):
     def setUp(self):
         conversations.clear()
-        self.original_provider = chat_service._provider
+        self.original_chat_provider = chat_service._provider
+        self.original_advisor_provider = advisor_service._provider
         chat_service._provider = FakeAIProvider()
+        advisor_service._provider = FakeAIProvider()
         self.client = TestClient(app)
 
     def tearDown(self):
-        chat_service._provider = self.original_provider
+        chat_service._provider = self.original_chat_provider
+        advisor_service._provider = self.original_advisor_provider
 
     def test_health_ok(self):
         response = self.client.get("/health")
@@ -135,6 +149,38 @@ class TestAPI(unittest.TestCase):
             provider.generate_answer("hola"),
             UNCONFIGURED_PROVIDER_MESSAGE,
         )
+
+    def test_advisor_returns_analysis_main_and_variants(self):
+        response = self.client.post(
+            "/v1/advisor",
+            json={
+                "conversation_text": "A: Nunca me escuchas\nB: Me siento atacado",
+                "context": "es mi ex",
+                "tone": "empathetic",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertIn("analysis", body)
+        self.assertIn("main_suggestion", body)
+        self.assertIn("variants", body)
+        self.assertGreaterEqual(len(body["variants"]), 2)
+
+    def test_advisor_fallback_when_provider_fails(self):
+        class BrokenProvider:
+            def generate_answer(self, message: str) -> str:
+                raise AIProviderError("boom")
+
+        advisor_service._provider = BrokenProvider()
+        response = self.client.post(
+            "/v1/advisor",
+            json={"conversation_text": "A: hola\nB: chau", "tone": "firm"},
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertIn("analysis", body)
+        self.assertIn("main_suggestion", body)
+        self.assertEqual(len(body["variants"]), 3)
 
 
 if __name__ == "__main__":
