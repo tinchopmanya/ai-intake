@@ -1,0 +1,25 @@
+{
+  "name": "ai-intake",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "concurrently \"powershell -NoExit -Command cd api; .\\\\.venv\\\\Scripts\\\\Activate.ps1; uvicorn main:app --reload --port 8000\" \"cd web && npm run dev\"",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tinchopmanya/ai-intake.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/tinchopmanya/ai-intake/issues"
+  },
+  "homepage": "https://github.com/tinchopmanya/ai-intake#readme",
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
