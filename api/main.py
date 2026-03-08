@@ -16,11 +16,14 @@ app.add_middleware(
 
 
 class ChatRequest(BaseModel):
+    conversation_id: str | None = None
     message: str
+    channel: str = "web"
 
 
 class ChatResponse(BaseModel):
-    echo: str
+    conversation_id: str
+    answer: str
 
 
 @app.get("/health")
@@ -30,4 +33,8 @@ def health():
 
 @app.post("/v1/chat", response_model=ChatResponse)
 def chat(payload: ChatRequest) -> ChatResponse:
-    return ChatResponse(echo=payload.message)
+    conversation_id = payload.conversation_id or "new-conversation"
+    return ChatResponse(
+        conversation_id=conversation_id,
+        answer=f"echo: {payload.message}",
+    )
