@@ -8,6 +8,8 @@ type AdvisorVariant = {
 };
 
 type AdvisorResponse = {
+  advisor_id: string;
+  advisor_name: string;
   analysis: string;
   main_suggestion: string;
   variants: AdvisorVariant[];
@@ -21,6 +23,7 @@ export default function AdvisorPage() {
   const [conversationText, setConversationText] = useState("");
   const [context, setContext] = useState("");
   const [tone, setTone] = useState("empathetic");
+  const [advisorId, setAdvisorId] = useState("laura");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AdvisorResponse | null>(null);
@@ -41,6 +44,7 @@ export default function AdvisorPage() {
           conversation_text: text,
           context: context.trim(),
           tone,
+          advisor_id: advisorId,
         }),
       });
 
@@ -100,6 +104,22 @@ export default function AdvisorPage() {
 
         <div>
           <label className="mb-2 block text-sm font-semibold text-gray-800">
+            Consejero
+          </label>
+          <select
+            value={advisorId}
+            onChange={(event) => setAdvisorId(event.target.value)}
+            className="w-full rounded border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-800 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400/25"
+            disabled={loading}
+          >
+            <option value="laura">Laura - Psicologa</option>
+            <option value="robert">Robert - Abogado</option>
+            <option value="lidia">Lidia - Coach</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="mb-2 block text-sm font-semibold text-gray-800">
             Tono principal
           </label>
           <select
@@ -129,6 +149,9 @@ export default function AdvisorPage() {
       {result && (
         <section className="space-y-4 rounded border border-gray-200 bg-gray-50/70 p-4">
           <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">
+              Consejero: {result.advisor_name}
+            </p>
             <h2 className="text-lg font-semibold text-gray-900">Analisis</h2>
             <p className="mt-1 text-sm leading-6 text-gray-800">{result.analysis}</p>
           </div>

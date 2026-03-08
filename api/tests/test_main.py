@@ -157,14 +157,61 @@ class TestAPI(unittest.TestCase):
                 "conversation_text": "A: Nunca me escuchas\nB: Me siento atacado",
                 "context": "es mi ex",
                 "tone": "empathetic",
+                "advisor_id": "laura",
             },
         )
         self.assertEqual(response.status_code, 200)
         body = response.json()
+        self.assertEqual(body["advisor_id"], "laura")
+        self.assertEqual(body["advisor_name"], "Laura")
         self.assertIn("analysis", body)
         self.assertIn("main_suggestion", body)
         self.assertIn("variants", body)
         self.assertGreaterEqual(len(body["variants"]), 2)
+
+    def test_advisor_uses_selected_profile(self):
+        response = self.client.post(
+            "/v1/advisor",
+            json={
+                "conversation_text": "A: mensaje\nB: respuesta",
+                "tone": "firm",
+                "advisor_id": "robert",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["advisor_id"], "robert")
+        self.assertEqual(body["advisor_name"], "Robert")
+
+    def test_advisor_prompt_includes_skills(self):
+        class InspectProvider:
+            def __init__(self):
+                self.last_prompt = ""
+
+            def generate_answer(self, message: str) -> str:
+                self.last_prompt = message
+                return (
+                    '{"analysis":"ok",'
+                    '"main_suggestion":"ok",'
+                    '"variants":['
+                    '{"tone":"empathetic","text":"ok1"},'
+                    '{"tone":"firm","text":"ok2"}'
+                    "]}"
+                )
+
+        inspect_provider = InspectProvider()
+        advisor_service._provider = inspect_provider
+        response = self.client.post(
+            "/v1/advisor",
+            json={
+                "conversation_text": "A: hola\nB: chau",
+                "advisor_id": "lidia",
+                "tone": "brief",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Habilidades activas:", inspect_provider.last_prompt)
+        self.assertIn("Evita respuestas impulsivas", inspect_provider.last_prompt)
 
     def test_advisor_fallback_when_provider_fails(self):
         class BrokenProvider:

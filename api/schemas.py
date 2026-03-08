@@ -27,6 +27,7 @@ class AdvisorRequest(BaseModel):
     conversation_text: str
     context: str = ""
     tone: str = "empathetic"
+    advisor_id: str = "laura"
 
 
 class AdvisorVariant(BaseModel):
@@ -35,6 +36,8 @@ class AdvisorVariant(BaseModel):
 
 
 class AdvisorResponse(BaseModel):
+    advisor_id: str
+    advisor_name: str
     analysis: str
     main_suggestion: str
     variants: list[AdvisorVariant]
