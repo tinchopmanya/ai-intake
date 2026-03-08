@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
 type Message = {
   id: string;
@@ -13,7 +13,29 @@ type ChatResponse = {
   answer: string;
 };
 
-const API_URL = "http://localhost:8000/v1/chat";
+type HistoryMessage = {
+  role: "user" | "assistant";
+  message: string;
+  channel: string;
+};
+
+type HistoryResponse = {
+  conversation_id: string;
+  messages: HistoryMessage[];
+};
+
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+const CHAT_URL = `${API_BASE_URL}/v1/chat`;
+const STORAGE_KEY = "conversation_id";
+
+function mapHistoryToMessages(history: HistoryMessage[]): Message[] {
+  return history.map((item, index) => ({
+    id: `${index}-${item.role}`,
+    role: item.role,
+    text: item.message,
+  }));
+}
 
 export default function ChatPage() {
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -21,6 +43,78 @@ export default function ChatPage() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  async function loadConversationHistory(id: string): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/v1/conversations/${id}`, {
+      cache: "no-store",
+    });
+
+    if (response.status === 404) {
+      setMessages([]);
+      return;
+    }
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const data: HistoryResponse = await response.json();
+    setMessages(mapHistoryToMessages(data.messages));
+  }
+
+  useEffect(() => {
+    const storedConversationId = window.localStorage.getItem(STORAGE_KEY);
+    if (storedConversationId) {
+      setConversationId(storedConversationId);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!conversationId) {
+      window.localStorage.removeItem(STORAGE_KEY);
+      return;
+    }
+
+    window.localStorage.setItem(STORAGE_KEY, conversationId);
+
+    let cancelled = false;
+
+    async function syncHistory() {
+      try {
+        setError(null);
+        const response = await fetch(
+          `${API_BASE_URL}/v1/conversations/${conversationId}`,
+          { cache: "no-store" },
+        );
+
+        if (response.status === 404) {
+          if (!cancelled) {
+            setMessages([]);
+          }
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data: HistoryResponse = await response.json();
+        if (!cancelled) {
+          setMessages(mapHistoryToMessages(data.messages));
+        }
+      } catch {
+        if (!cancelled) {
+          setError("No se pudo cargar el historial.");
+        }
+      }
+    }
+
+    syncHistory();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [conversationId]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -31,15 +125,8 @@ export default function ChatPage() {
     setInput("");
     setLoading(true);
 
-    const userMessage: Message = {
-      id: `${Date.now()}-user`,
-      role: "user",
-      text: message,
-    };
-    setMessages((prev) => [...prev, userMessage]);
-
     try {
-      const response = await fetch(API_URL, {
+      const response = await fetch(CHAT_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -55,15 +142,9 @@ export default function ChatPage() {
 
       const data: ChatResponse = await response.json();
       setConversationId(data.conversation_id);
-
-      const assistantMessage: Message = {
-        id: `${Date.now()}-assistant`,
-        role: "assistant",
-        text: data.answer,
-      };
-      setMessages((prev) => [...prev, assistantMessage]);
+      await loadConversationHistory(data.conversation_id);
     } catch {
-      setError("No se pudo enviar el mensaje. Intentá de nuevo.");
+      setError("No se pudo enviar el mensaje. Intenta de nuevo.");
     } finally {
       setLoading(false);
     }
@@ -75,7 +156,7 @@ export default function ChatPage() {
 
       <section className="flex-1 rounded border border-gray-200 p-4">
         {messages.length === 0 ? (
-          <p className="text-sm text-gray-500">Todavía no hay mensajes.</p>
+          <p className="text-sm text-gray-500">Todavia no hay mensajes.</p>
         ) : (
           <ul className="space-y-3">
             {messages.map((message) => (
@@ -98,7 +179,7 @@ export default function ChatPage() {
           type="text"
           value={input}
           onChange={(event) => setInput(event.target.value)}
-          placeholder="Escribí un mensaje..."
+          placeholder="Escribi un mensaje..."
           className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm"
           disabled={loading}
         />
