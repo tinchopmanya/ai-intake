@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel
 from pydantic import Field
 
@@ -49,3 +51,16 @@ class AdvisorConversationHistoryResponse(BaseModel):
     messages: list[Message]
     analysis: str | None = None
     results: list[AdvisorResult]
+
+
+class AdvisorConversationSummary(BaseModel):
+    conversation_id: str
+    contact_id: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    analysis_preview: str | None = None
+    advisors_count: int = 0
+
+
+class AdvisorConversationListResponse(BaseModel):
+    conversations: list[AdvisorConversationSummary]

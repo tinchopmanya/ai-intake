@@ -4,6 +4,7 @@ from fastapi import HTTPException
 from providers.factory import build_provider
 from repositories.in_memory_persistence import persistence_store
 from schemas import AdvisorConversationHistoryResponse
+from schemas import AdvisorConversationListResponse
 from schemas import AdvisorRequest
 from schemas import AdvisorResponse
 from services.advisor_service import AdvisorService
@@ -15,6 +16,17 @@ advisor_service = AdvisorService(build_provider(), persistence_store)
 @router.post("/v1/advisor", response_model=AdvisorResponse)
 def advisor(payload: AdvisorRequest) -> AdvisorResponse:
     return advisor_service.advise(payload)
+
+
+@router.get(
+    "/v1/advisor/conversations",
+    response_model=AdvisorConversationListResponse,
+)
+def list_advisor_conversations(
+    user_id: str = "user-main",
+    contact_id: str | None = None,
+) -> AdvisorConversationListResponse:
+    return advisor_service.list_conversations(user_id=user_id, contact_id=contact_id)
 
 
 @router.get(

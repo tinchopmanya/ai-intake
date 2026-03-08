@@ -47,6 +47,14 @@ class PersistenceStore(Protocol):
     def get_conversation(self, conversation_id: str) -> Conversation | None:
         ...
 
+    def list_conversations(
+        self,
+        channel: str,
+        owner_user_id: str | None = None,
+        contact_id: str | None = None,
+    ) -> list[Conversation]:
+        ...
+
     def append_message(
         self, conversation_id: str, role: str, message: str, channel: str
     ) -> StoredMessage:

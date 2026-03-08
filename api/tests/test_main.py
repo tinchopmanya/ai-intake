@@ -291,6 +291,67 @@ class TestAPI(unittest.TestCase):
         self.assertGreaterEqual(len(history["messages"]), 2)
         self.assertGreaterEqual(len(history["results"]), 1)
 
+    def test_advisor_conversation_list_endpoint(self):
+        first = self.client.post(
+            "/v1/advisor",
+            json={
+                "conversation_id": "advisor-session-a",
+                "conversation_text": "A: test\nB: test",
+                "user_id": "user-main",
+                "contact_id": "contact-ex",
+            },
+        )
+        second = self.client.post(
+            "/v1/advisor",
+            json={
+                "conversation_id": "advisor-session-b",
+                "conversation_text": "A: test2\nB: test2",
+                "user_id": "user-main",
+                "contact_id": "contact-colleague",
+            },
+        )
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 200)
+
+        response = self.client.get("/v1/advisor/conversations")
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertIn("conversations", body)
+        self.assertEqual(len(body["conversations"]), 2)
+        self.assertEqual(body["conversations"][0]["conversation_id"], "advisor-session-b")
+        self.assertEqual(body["conversations"][1]["conversation_id"], "advisor-session-a")
+        self.assertIn("analysis_preview", body["conversations"][0])
+        self.assertEqual(body["conversations"][0]["advisors_count"], 3)
+
+    def test_advisor_conversation_list_filter_by_contact(self):
+        self.client.post(
+            "/v1/advisor",
+            json={
+                "conversation_id": "advisor-session-a",
+                "conversation_text": "A: test\nB: test",
+                "user_id": "user-main",
+                "contact_id": "contact-ex",
+            },
+        )
+        self.client.post(
+            "/v1/advisor",
+            json={
+                "conversation_id": "advisor-session-b",
+                "conversation_text": "A: test2\nB: test2",
+                "user_id": "user-main",
+                "contact_id": "contact-colleague",
+            },
+        )
+
+        response = self.client.get(
+            "/v1/advisor/conversations",
+            params={"contact_id": "contact-ex"},
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(len(body["conversations"]), 1)
+        self.assertEqual(body["conversations"][0]["conversation_id"], "advisor-session-a")
+
 
 if __name__ == "__main__":
     unittest.main()

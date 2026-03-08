@@ -9,6 +9,8 @@ from domain.entities import AdvisorOutput
 from providers.base import AIProvider
 from repositories.persistence import PersistenceStore
 from schemas import AdvisorConversationHistoryResponse
+from schemas import AdvisorConversationListResponse
+from schemas import AdvisorConversationSummary
 from schemas import AdvisorRequest
 from schemas import AdvisorResponse
 from schemas import AdvisorResult
@@ -134,6 +136,37 @@ class AdvisorService:
             results=results,
         )
 
+    def list_conversations(
+        self,
+        user_id: str = "user-main",
+        contact_id: str | None = None,
+    ) -> AdvisorConversationListResponse:
+        conversations = self._store.list_conversations(
+            channel="advisor",
+            owner_user_id=user_id,
+            contact_id=contact_id,
+        )
+        summaries: list[AdvisorConversationSummary] = []
+        for conversation in conversations:
+            outputs = self._store.list_advisor_outputs(conversation.id)
+            first_output = outputs[-1] if outputs else None
+            analysis_preview = None
+            if first_output is not None:
+                analysis_preview = self._truncate_analysis(first_output.analysis_snapshot)
+
+            advisor_ids = {output.advisor_id for output in outputs}
+            summaries.append(
+                AdvisorConversationSummary(
+                    conversation_id=conversation.id,
+                    contact_id=conversation.contact_id,
+                    created_at=conversation.created_at,
+                    updated_at=conversation.updated_at,
+                    analysis_preview=analysis_preview,
+                    advisors_count=len(advisor_ids),
+                )
+            )
+        return AdvisorConversationListResponse(conversations=summaries)
+
     def _build_session_input_message(self, payload: AdvisorRequest) -> str:
         context_text = payload.context.strip() or "Sin contexto adicional."
         return (
@@ -242,3 +275,9 @@ class AdvisorService:
                 created_at=datetime.now(UTC),
             )
             self._store.save_advisor_output(output)
+
+    def _truncate_analysis(self, analysis: str, max_length: int = 140) -> str:
+        normalized = " ".join(analysis.split())
+        if len(normalized) <= max_length:
+            return normalized
+        return f"{normalized[: max_length - 3].rstrip()}..."

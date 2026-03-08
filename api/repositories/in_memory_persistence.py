@@ -268,6 +268,29 @@ class InMemoryPersistenceStore(PersistenceStore):
     def get_conversation(self, conversation_id: str) -> Conversation | None:
         return self.conversations.get(conversation_id)
 
+    def list_conversations(
+        self,
+        channel: str,
+        owner_user_id: str | None = None,
+        contact_id: str | None = None,
+    ) -> list[Conversation]:
+        items = [
+            conversation
+            for conversation in self.conversations.values()
+            if conversation.channel == channel
+        ]
+        if owner_user_id is not None:
+            items = [
+                conversation
+                for conversation in items
+                if conversation.owner_user_id == owner_user_id
+            ]
+        if contact_id is not None:
+            items = [
+                conversation for conversation in items if conversation.contact_id == contact_id
+            ]
+        return sorted(items, key=lambda conversation: conversation.updated_at, reverse=True)
+
     def append_message(
         self, conversation_id: str, role: str, message: str, channel: str
     ) -> StoredMessage:
