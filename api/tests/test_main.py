@@ -45,6 +45,8 @@ class TestAPI(unittest.TestCase):
     def setUp(self):
         conversations.clear()
         persistence_store.advisor_outputs.clear()
+        persistence_store.messages.clear()
+        persistence_store.conversations.clear()
         self.original_chat_provider = chat_service._provider
         self.original_advisor_provider = advisor_service._provider
         self.fake_committee_provider = FakeCommitteeProvider()
@@ -152,8 +154,37 @@ class TestAPI(unittest.TestCase):
         body = response.json()
         self.assertIn("analysis", body)
         self.assertIn("results", body)
+        self.assertIn("conversation_id", body)
         self.assertGreaterEqual(len(body["results"]), 1)
         self.assertEqual(self.fake_committee_provider.calls, 1)
+
+    def test_advisor_generates_conversation_id_if_missing(self):
+        response = self.client.post(
+            "/v1/advisor",
+            json={
+                "conversation_text": "A: hola\nB: chau",
+                "user_id": "user-main",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        conversation_id = response.json()["conversation_id"]
+        self.assertIsInstance(conversation_id, str)
+        self.assertTrue(conversation_id)
+        self.assertIn(conversation_id, persistence_store.conversations)
+
+    def test_advisor_reuses_conversation_id_if_provided(self):
+        conversation_id = "advisor-conv-123"
+        response = self.client.post(
+            "/v1/advisor",
+            json={
+                "conversation_id": conversation_id,
+                "conversation_text": "A: hola\nB: chau",
+                "user_id": "user-main",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["conversation_id"], conversation_id)
+        self.assertIn(conversation_id, persistence_store.conversations)
 
     def test_advisor_resolution_priority_contact_group_user(self):
         response = self.client.post(
@@ -231,9 +262,30 @@ class TestAPI(unittest.TestCase):
             },
         )
         self.assertEqual(response.status_code, 200)
+        conversation_id = response.json()["conversation_id"]
         self.assertEqual(len(persistence_store.advisor_outputs), 3)
         stored_ids = [item.advisor_id for item in persistence_store.advisor_outputs]
         self.assertEqual(stored_ids, ["laura", "lidia", "robert"])
+        self.assertTrue(
+            all(item.conversation_id == conversation_id for item in persistence_store.advisor_outputs)
+        )
+
+    def test_advisor_history_endpoint(self):
+        create_response = self.client.post(
+            "/v1/advisor",
+            json={
+                "conversation_text": "A: test\nB: test",
+                "user_id": "user-main",
+                "contact_id": "contact-ex",
+            },
+        )
+        conversation_id = create_response.json()["conversation_id"]
+        history_response = self.client.get(f"/v1/advisor/conversations/{conversation_id}")
+        self.assertEqual(history_response.status_code, 200)
+        history = history_response.json()
+        self.assertEqual(history["conversation_id"], conversation_id)
+        self.assertGreaterEqual(len(history["messages"]), 2)
+        self.assertGreaterEqual(len(history["results"]), 1)
 
 
 if __name__ == "__main__":

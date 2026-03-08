@@ -232,6 +232,42 @@ class InMemoryPersistenceStore(PersistenceStore):
         ]
         return [self.advisors[advisor_id] for advisor_id in advisor_ids if advisor_id in self.advisors]
 
+    def ensure_conversation(
+        self,
+        conversation_id: str | None,
+        owner_user_id: str,
+        contact_id: str | None,
+        channel: str,
+    ) -> Conversation:
+        now = datetime.now(UTC)
+        resolved_id = conversation_id or str(uuid4())
+        current = self.conversations.get(resolved_id)
+        if current is None:
+            created = Conversation(
+                id=resolved_id,
+                owner_user_id=owner_user_id,
+                contact_id=contact_id,
+                channel=channel,
+                created_at=now,
+                updated_at=now,
+            )
+            self.conversations[resolved_id] = created
+            return created
+
+        updated = Conversation(
+            id=current.id,
+            owner_user_id=current.owner_user_id,
+            contact_id=current.contact_id,
+            channel=current.channel,
+            created_at=current.created_at,
+            updated_at=now,
+        )
+        self.conversations[resolved_id] = updated
+        return updated
+
+    def get_conversation(self, conversation_id: str) -> Conversation | None:
+        return self.conversations.get(conversation_id)
+
     def append_message(
         self, conversation_id: str, role: str, message: str, channel: str
     ) -> StoredMessage:
@@ -272,6 +308,13 @@ class InMemoryPersistenceStore(PersistenceStore):
 
     def save_advisor_output(self, output: AdvisorOutput) -> None:
         self.advisor_outputs.append(output)
+
+    def list_advisor_outputs(self, conversation_id: str) -> list[AdvisorOutput]:
+        return [
+            output
+            for output in self.advisor_outputs
+            if output.conversation_id == conversation_id
+        ]
 
     def dump_state(self) -> dict[str, object]:
         return {

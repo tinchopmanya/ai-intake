@@ -29,6 +29,7 @@ class AdvisorRequest(BaseModel):
     context: str = ""
     user_id: str = "user-main"
     contact_id: str | None = None
+    conversation_id: str | None = None
 
 
 class AdvisorResult(BaseModel):
@@ -38,6 +39,7 @@ class AdvisorResult(BaseModel):
 
 
 class AdvisorResponse(BaseModel):
+    conversation_id: str
     analysis: str
     results: list[AdvisorResult]
     # Temporary compatibility fields for current frontend.
@@ -45,3 +47,10 @@ class AdvisorResponse(BaseModel):
     advisor_name: str | None = None
     main_suggestion: str | None = None
     variants: list[dict[str, str]] | None = None
+
+
+class AdvisorConversationHistoryResponse(BaseModel):
+    conversation_id: str
+    messages: list[Message]
+    analysis: str | None = None
+    results: list[AdvisorResult]

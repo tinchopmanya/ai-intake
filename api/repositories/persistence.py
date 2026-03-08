@@ -7,6 +7,7 @@ from domain.entities import Group
 from domain.entities import Skill
 from domain.entities import StoredMessage
 from domain.entities import User
+from domain.entities import Conversation
 
 
 class PersistenceStore(Protocol):
@@ -34,6 +35,18 @@ class PersistenceStore(Protocol):
     def list_user_default_advisors(self, user_id: str) -> list[Advisor]:
         ...
 
+    def ensure_conversation(
+        self,
+        conversation_id: str | None,
+        owner_user_id: str,
+        contact_id: str | None,
+        channel: str,
+    ) -> Conversation:
+        ...
+
+    def get_conversation(self, conversation_id: str) -> Conversation | None:
+        ...
+
     def append_message(
         self, conversation_id: str, role: str, message: str, channel: str
     ) -> StoredMessage:
@@ -43,4 +56,7 @@ class PersistenceStore(Protocol):
         ...
 
     def save_advisor_output(self, output: AdvisorOutput) -> None:
+        ...
+
+    def list_advisor_outputs(self, conversation_id: str) -> list[AdvisorOutput]:
         ...
