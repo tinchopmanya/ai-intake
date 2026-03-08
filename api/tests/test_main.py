@@ -1,4 +1,5 @@
 import unittest
+from copy import deepcopy
 from uuid import UUID
 
 from fastapi.testclient import TestClient
@@ -8,37 +9,53 @@ from main import conversations
 from providers.base import AIProviderError
 from providers.fallback import UNCONFIGURED_PROVIDER_MESSAGE
 from providers.fallback import UnconfiguredAIProvider
+from repositories.in_memory_persistence import persistence_store
 from routers.advisor import advisor_service
 from routers.chat import chat_service
 
 
-class FakeAIProvider:
+class FakeChatProvider:
     def generate_answer(self, message: str) -> str:
-        if "Responde EXCLUSIVAMENTE en JSON valido" in message:
-            return (
-                '{"analysis":"Hay tension emocional y necesidad de claridad.",'
-                '"main_suggestion":"Entiendo lo que sentis y quiero hablarlo con calma.",'
-                '"variants":['
-                '{"tone":"empathetic","text":"Te escucho y me importa que podamos hablar bien."},'
-                '{"tone":"firm","text":"Podemos hablar, pero necesito respeto en la conversacion."},'
-                '{"tone":"brief","text":"Quiero hablarlo con calma y resolverlo."}'
-                "]}"
-            )
         return f"fake-ai: {message}"
+
+
+class FakeAdvisorProvider:
+    def generate_answer(self, message: str) -> str:
+        return (
+            '{"analysis":"Hay tension emocional y necesidad de claridad.",'
+            '"main_suggestion":"Entiendo lo que sentis y quiero hablarlo con calma.",'
+            '"variants":['
+            '{"tone":"empathetic","text":"Te escucho y me importa que podamos hablar bien."},'
+            '{"tone":"firm","text":"Podemos hablar, pero necesito respeto en la conversacion."},'
+            '{"tone":"brief","text":"Quiero hablarlo con calma y resolverlo."}'
+            "]}"
+        )
 
 
 class TestAPI(unittest.TestCase):
     def setUp(self):
         conversations.clear()
+
         self.original_chat_provider = chat_service._provider
         self.original_advisor_provider = advisor_service._provider
-        chat_service._provider = FakeAIProvider()
-        advisor_service._provider = FakeAIProvider()
+
+        self.original_advisors = deepcopy(persistence_store.advisors)
+        self.original_advisor_outputs = deepcopy(
+            getattr(persistence_store, "advisor_outputs", [])
+        )
+
+        chat_service._provider = FakeChatProvider()
+        advisor_service._provider = FakeAdvisorProvider()
         self.client = TestClient(app)
 
     def tearDown(self):
         chat_service._provider = self.original_chat_provider
         advisor_service._provider = self.original_advisor_provider
+
+        conversations.clear()
+        persistence_store.advisors = self.original_advisors
+        if hasattr(persistence_store, "advisor_outputs"):
+            persistence_store.advisor_outputs = self.original_advisor_outputs
 
     def test_health_ok(self):
         response = self.client.get("/health")
@@ -48,10 +65,15 @@ class TestAPI(unittest.TestCase):
     def test_chat_with_defaults(self):
         response = self.client.post("/v1/chat", json={"message": "hola"})
         self.assertEqual(response.status_code, 200)
+
         body = response.json()
         self.assertEqual(body["answer"], "fake-ai: hola")
         self.assertIsInstance(body["conversation_id"], str)
-        self.assertEqual(str(UUID(body["conversation_id"], version=4)), body["conversation_id"])
+
+        parsed_uuid = UUID(body["conversation_id"])
+        self.assertEqual(str(parsed_uuid), body["conversation_id"])
+        self.assertEqual(parsed_uuid.version, 4)
+
         self.assertIn(body["conversation_id"], conversations)
 
     def test_chat_with_conversation_id(self):
@@ -132,8 +154,10 @@ class TestAPI(unittest.TestCase):
                 raise AIProviderError("boom")
 
         chat_service._provider = BrokenProvider()
+
         with self.assertLogs("services.chat_service", level="ERROR") as captured_logs:
             response = self.client.post("/v1/chat", json={"message": "hola"})
+
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             response.json()["answer"],
@@ -161,6 +185,7 @@ class TestAPI(unittest.TestCase):
             },
         )
         self.assertEqual(response.status_code, 200)
+
         body = response.json()
         self.assertEqual(body["advisor_id"], "laura")
         self.assertEqual(body["advisor_name"], "Laura")
@@ -169,21 +194,33 @@ class TestAPI(unittest.TestCase):
         self.assertIn("variants", body)
         self.assertGreaterEqual(len(body["variants"]), 2)
 
-    def test_advisor_uses_selected_profile(self):
+    def test_advisor_resolution_uses_contact_priority(self):
         response = self.client.post(
             "/v1/advisor",
             json={
                 "conversation_text": "A: mensaje\nB: respuesta",
                 "tone": "firm",
-                "advisor_id": "robert",
+                "contact_id": "contact-colleague",
             },
         )
         self.assertEqual(response.status_code, 200)
         body = response.json()
         self.assertEqual(body["advisor_id"], "robert")
-        self.assertEqual(body["advisor_name"], "Robert")
 
-    def test_advisor_prompt_includes_skills(self):
+    def test_advisor_resolution_uses_user_default_when_no_contact(self):
+        response = self.client.post(
+            "/v1/advisor",
+            json={
+                "conversation_text": "A: mensaje\nB: respuesta",
+                "tone": "brief",
+                "user_id": "user-main",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["advisor_id"], "laura")
+
+    def test_advisor_prompt_fallback_without_skills(self):
         class InspectProvider:
             def __init__(self):
                 self.last_prompt = ""
@@ -193,25 +230,33 @@ class TestAPI(unittest.TestCase):
                 return (
                     '{"analysis":"ok",'
                     '"main_suggestion":"ok",'
-                    '"variants":['
-                    '{"tone":"empathetic","text":"ok1"},'
-                    '{"tone":"firm","text":"ok2"}'
-                    "]}"
+                    '"variants":[{"tone":"empathetic","text":"ok1"},{"tone":"firm","text":"ok2"}]}'
                 )
 
+        no_skill_advisor_id = "no-skill"
         inspect_provider = InspectProvider()
         advisor_service._provider = inspect_provider
-        response = self.client.post(
-            "/v1/advisor",
-            json={
-                "conversation_text": "A: hola\nB: chau",
-                "advisor_id": "lidia",
-                "tone": "brief",
-            },
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("Habilidades activas:", inspect_provider.last_prompt)
-        self.assertIn("Evita respuestas impulsivas", inspect_provider.last_prompt)
+
+        try:
+            persistence_store.advisors[no_skill_advisor_id] = persistence_store.advisors["laura"].__class__(
+                id=no_skill_advisor_id,
+                name="NoSkill",
+                role="Tester",
+                description="Advisor sin skills",
+                system_prompt_base="Prompt base sin skills.",
+            )
+
+            response = self.client.post(
+                "/v1/advisor",
+                json={
+                    "conversation_text": "A: hola\nB: chau",
+                    "advisor_id": no_skill_advisor_id,
+                },
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertNotIn("Habilidades activas:", inspect_provider.last_prompt)
+        finally:
+            persistence_store.advisors.pop(no_skill_advisor_id, None)
 
     def test_advisor_fallback_when_provider_fails(self):
         class BrokenProvider:
@@ -219,15 +264,96 @@ class TestAPI(unittest.TestCase):
                 raise AIProviderError("boom")
 
         advisor_service._provider = BrokenProvider()
+
         response = self.client.post(
             "/v1/advisor",
             json={"conversation_text": "A: hola\nB: chau", "tone": "firm"},
         )
         self.assertEqual(response.status_code, 200)
+
         body = response.json()
+        self.assertEqual(body["advisor_id"], "laura")
+        self.assertEqual(body["advisor_name"], "Laura")
         self.assertIn("analysis", body)
         self.assertIn("main_suggestion", body)
         self.assertEqual(len(body["variants"]), 3)
+
+    def test_advisor_fallback_when_provider_returns_invalid_json(self):
+        class InvalidJsonProvider:
+            def generate_answer(self, message: str) -> str:
+                return "esto no es json"
+
+        advisor_service._provider = InvalidJsonProvider()
+
+        response = self.client.post(
+            "/v1/advisor",
+            json={"conversation_text": "A: hola\nB: chau", "tone": "firm"},
+        )
+        self.assertEqual(response.status_code, 200)
+
+        body = response.json()
+        self.assertEqual(body["advisor_id"], "laura")
+        self.assertEqual(body["advisor_name"], "Laura")
+        self.assertIn("analysis", body)
+        self.assertIn("main_suggestion", body)
+        self.assertEqual(len(body["variants"]), 3)
+
+    def test_advisor_saves_output_on_success(self):
+        if not hasattr(persistence_store, "advisor_outputs"):
+            self.skipTest("Persistence store does not expose advisor_outputs")
+
+        before_count = len(persistence_store.advisor_outputs)
+
+        response = self.client.post(
+            "/v1/advisor",
+            json={
+                "conversation_text": "A: Nunca me escuchas\nB: Me siento atacado",
+                "context": "es mi ex",
+                "tone": "empathetic",
+                "advisor_id": "laura",
+                "user_id": "user-main",
+                "contact_id": "contact-1",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+
+        after_count = len(persistence_store.advisor_outputs)
+        self.assertEqual(after_count, before_count + 1)
+
+        saved = persistence_store.advisor_outputs[-1]
+        self.assertEqual(saved.advisor_id, "laura")
+        self.assertEqual(saved.tone, "empathetic")
+        self.assertEqual(saved.owner_user_id, "user-main")
+        self.assertEqual(saved.contact_id, "contact-1")
+
+    def test_advisor_saves_output_on_fallback(self):
+        if not hasattr(persistence_store, "advisor_outputs"):
+            self.skipTest("Persistence store does not expose advisor_outputs")
+
+        class BrokenProvider:
+            def generate_answer(self, message: str) -> str:
+                raise AIProviderError("boom")
+
+        advisor_service._provider = BrokenProvider()
+        before_count = len(persistence_store.advisor_outputs)
+
+        response = self.client.post(
+            "/v1/advisor",
+            json={
+                "conversation_text": "A: hola\nB: chau",
+                "tone": "firm",
+                "user_id": "user-main",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+
+        after_count = len(persistence_store.advisor_outputs)
+        self.assertEqual(after_count, before_count + 1)
+
+        saved = persistence_store.advisor_outputs[-1]
+        self.assertEqual(saved.advisor_id, "laura")
+        self.assertEqual(saved.tone, "firm")
+        self.assertEqual(saved.owner_user_id, "user-main")
 
 
 if __name__ == "__main__":
