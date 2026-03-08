@@ -96,11 +96,10 @@ class StoredMessage:
 @dataclass(frozen=True)
 class AdvisorOutput:
     id: str
+    conversation_id: str | None
     owner_user_id: str
     contact_id: str | None
     advisor_id: str
-    tone: str
-    analysis: str
-    main_suggestion: str
-    variants_json: str
+    suggestions_json: str
+    analysis_snapshot: str
     created_at: datetime

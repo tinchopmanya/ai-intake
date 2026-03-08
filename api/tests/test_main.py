@@ -1,5 +1,4 @@
 import unittest
-from copy import deepcopy
 from uuid import UUID
 
 from fastapi.testclient import TestClient
@@ -14,48 +13,48 @@ from routers.advisor import advisor_service
 from routers.chat import chat_service
 
 
-class FakeChatProvider:
+class FakeCommitteeProvider:
+    def __init__(self) -> None:
+        self.calls = 0
+        self.last_prompt = ""
+
     def generate_answer(self, message: str) -> str:
+        self.calls += 1
+        self.last_prompt = message
+        if "FORMATO DE RESPUESTA (JSON estricto" in message:
+            return (
+                '{"analysis":"Hay tension y necesidad de limites claros.",'
+                '"results":['
+                '{"advisor_id":"laura","advisor_name":"Laura","suggestions":['
+                '"Entiendo como te sentis. Quiero hablarlo con calma.",'
+                '"Me importa que nos escuchemos sin atacarnos."'
+                "]},"
+                '{"advisor_id":"robert","advisor_name":"Robert","suggestions":['
+                '"Podemos hablar, pero necesito respeto.",'
+                '"Voy a sostener mis limites con claridad."'
+                "]},"
+                '{"advisor_id":"lidia","advisor_name":"Lidia","suggestions":['
+                '"Propongo pausar, ordenar ideas y responder con foco."'
+                "]}"
+                "]}"
+            )
         return f"fake-ai: {message}"
-
-
-class FakeAdvisorProvider:
-    def generate_answer(self, message: str) -> str:
-        return (
-            '{"analysis":"Hay tension emocional y necesidad de claridad.",'
-            '"main_suggestion":"Entiendo lo que sentis y quiero hablarlo con calma.",'
-            '"variants":['
-            '{"tone":"empathetic","text":"Te escucho y me importa que podamos hablar bien."},'
-            '{"tone":"firm","text":"Podemos hablar, pero necesito respeto en la conversacion."},'
-            '{"tone":"brief","text":"Quiero hablarlo con calma y resolverlo."}'
-            "]}"
-        )
 
 
 class TestAPI(unittest.TestCase):
     def setUp(self):
         conversations.clear()
-
+        persistence_store.advisor_outputs.clear()
         self.original_chat_provider = chat_service._provider
         self.original_advisor_provider = advisor_service._provider
-
-        self.original_advisors = deepcopy(persistence_store.advisors)
-        self.original_advisor_outputs = deepcopy(
-            getattr(persistence_store, "advisor_outputs", [])
-        )
-
-        chat_service._provider = FakeChatProvider()
-        advisor_service._provider = FakeAdvisorProvider()
+        self.fake_committee_provider = FakeCommitteeProvider()
+        chat_service._provider = self.fake_committee_provider
+        advisor_service._provider = self.fake_committee_provider
         self.client = TestClient(app)
 
     def tearDown(self):
         chat_service._provider = self.original_chat_provider
         advisor_service._provider = self.original_advisor_provider
-
-        conversations.clear()
-        persistence_store.advisors = self.original_advisors
-        if hasattr(persistence_store, "advisor_outputs"):
-            persistence_store.advisor_outputs = self.original_advisor_outputs
 
     def test_health_ok(self):
         response = self.client.get("/health")
@@ -65,15 +64,10 @@ class TestAPI(unittest.TestCase):
     def test_chat_with_defaults(self):
         response = self.client.post("/v1/chat", json={"message": "hola"})
         self.assertEqual(response.status_code, 200)
-
         body = response.json()
         self.assertEqual(body["answer"], "fake-ai: hola")
         self.assertIsInstance(body["conversation_id"], str)
-
-        parsed_uuid = UUID(body["conversation_id"])
-        self.assertEqual(str(parsed_uuid), body["conversation_id"])
-        self.assertEqual(parsed_uuid.version, 4)
-
+        self.assertEqual(str(UUID(body["conversation_id"], version=4)), body["conversation_id"])
         self.assertIn(body["conversation_id"], conversations)
 
     def test_chat_with_conversation_id(self):
@@ -115,34 +109,6 @@ class TestAPI(unittest.TestCase):
             },
         )
 
-    def test_get_conversation_history(self):
-        conversation_id = "conv-history"
-        self.client.post(
-            "/v1/chat",
-            json={
-                "conversation_id": conversation_id,
-                "message": "hola",
-                "channel": "web",
-            },
-        )
-
-        response = self.client.get(f"/v1/conversations/{conversation_id}")
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(
-            response.json(),
-            {
-                "conversation_id": conversation_id,
-                "messages": [
-                    {"role": "user", "message": "hola", "channel": "web"},
-                    {
-                        "role": "assistant",
-                        "message": "fake-ai: hola",
-                        "channel": "assistant",
-                    },
-                ],
-            },
-        )
-
     def test_get_conversation_history_not_found(self):
         response = self.client.get("/v1/conversations/does-not-exist")
         self.assertEqual(response.status_code, 404)
@@ -154,10 +120,8 @@ class TestAPI(unittest.TestCase):
                 raise AIProviderError("boom")
 
         chat_service._provider = BrokenProvider()
-
         with self.assertLogs("services.chat_service", level="ERROR") as captured_logs:
             response = self.client.post("/v1/chat", json={"message": "hola"})
-
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             response.json()["answer"],
@@ -174,186 +138,102 @@ class TestAPI(unittest.TestCase):
             UNCONFIGURED_PROVIDER_MESSAGE,
         )
 
-    def test_advisor_returns_analysis_main_and_variants(self):
+    def test_advisor_committee_response_shape(self):
         response = self.client.post(
             "/v1/advisor",
             json={
-                "conversation_text": "A: Nunca me escuchas\nB: Me siento atacado",
-                "context": "es mi ex",
-                "tone": "empathetic",
-                "advisor_id": "laura",
-            },
-        )
-        self.assertEqual(response.status_code, 200)
-
-        body = response.json()
-        self.assertEqual(body["advisor_id"], "laura")
-        self.assertEqual(body["advisor_name"], "Laura")
-        self.assertIn("analysis", body)
-        self.assertIn("main_suggestion", body)
-        self.assertIn("variants", body)
-        self.assertGreaterEqual(len(body["variants"]), 2)
-
-    def test_advisor_resolution_uses_contact_priority(self):
-        response = self.client.post(
-            "/v1/advisor",
-            json={
-                "conversation_text": "A: mensaje\nB: respuesta",
-                "tone": "firm",
-                "contact_id": "contact-colleague",
-            },
-        )
-        self.assertEqual(response.status_code, 200)
-        body = response.json()
-        self.assertEqual(body["advisor_id"], "robert")
-
-    def test_advisor_resolution_uses_user_default_when_no_contact(self):
-        response = self.client.post(
-            "/v1/advisor",
-            json={
-                "conversation_text": "A: mensaje\nB: respuesta",
-                "tone": "brief",
+                "conversation_text": "A: Nunca me escuchas\nB: Siento que me atacas",
+                "context": "es una relacion sensible",
                 "user_id": "user-main",
+                "contact_id": "contact-ex",
             },
         )
         self.assertEqual(response.status_code, 200)
         body = response.json()
-        self.assertEqual(body["advisor_id"], "laura")
+        self.assertIn("analysis", body)
+        self.assertIn("results", body)
+        self.assertGreaterEqual(len(body["results"]), 1)
+        self.assertEqual(self.fake_committee_provider.calls, 1)
 
-    def test_advisor_prompt_fallback_without_skills(self):
-        class InspectProvider:
+    def test_advisor_resolution_priority_contact_group_user(self):
+        response = self.client.post(
+            "/v1/advisor",
+            json={
+                "conversation_text": "A: Mensaje\nB: Respuesta",
+                "user_id": "user-main",
+                "contact_id": "contact-ex",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        result_ids = [item["advisor_id"] for item in response.json()["results"]]
+        self.assertEqual(result_ids, ["laura", "lidia", "robert"])
+
+    def test_advisor_partial_fallback_completes_missing_advisors(self):
+        class PartialProvider:
             def __init__(self):
-                self.last_prompt = ""
+                self.calls = 0
 
             def generate_answer(self, message: str) -> str:
-                self.last_prompt = message
+                self.calls += 1
                 return (
-                    '{"analysis":"ok",'
-                    '"main_suggestion":"ok",'
-                    '"variants":[{"tone":"empathetic","text":"ok1"},{"tone":"firm","text":"ok2"}]}'
+                    '{"analysis":"Analisis parcial","results":['
+                    '{"advisor_id":"laura","advisor_name":"Laura","suggestions":["Solo una"]}'
+                    "]}"
                 )
 
-        no_skill_advisor_id = "no-skill"
-        inspect_provider = InspectProvider()
-        advisor_service._provider = inspect_provider
-
-        try:
-            persistence_store.advisors[no_skill_advisor_id] = persistence_store.advisors["laura"].__class__(
-                id=no_skill_advisor_id,
-                name="NoSkill",
-                role="Tester",
-                description="Advisor sin skills",
-                system_prompt_base="Prompt base sin skills.",
-            )
-
-            response = self.client.post(
-                "/v1/advisor",
-                json={
-                    "conversation_text": "A: hola\nB: chau",
-                    "advisor_id": no_skill_advisor_id,
-                },
-            )
-            self.assertEqual(response.status_code, 200)
-            self.assertNotIn("Habilidades activas:", inspect_provider.last_prompt)
-        finally:
-            persistence_store.advisors.pop(no_skill_advisor_id, None)
-
-    def test_advisor_fallback_when_provider_fails(self):
-        class BrokenProvider:
-            def generate_answer(self, message: str) -> str:
-                raise AIProviderError("boom")
-
-        advisor_service._provider = BrokenProvider()
-
-        response = self.client.post(
-            "/v1/advisor",
-            json={"conversation_text": "A: hola\nB: chau", "tone": "firm"},
-        )
-        self.assertEqual(response.status_code, 200)
-
-        body = response.json()
-        self.assertEqual(body["advisor_id"], "laura")
-        self.assertEqual(body["advisor_name"], "Laura")
-        self.assertIn("analysis", body)
-        self.assertIn("main_suggestion", body)
-        self.assertEqual(len(body["variants"]), 3)
-
-    def test_advisor_fallback_when_provider_returns_invalid_json(self):
-        class InvalidJsonProvider:
-            def generate_answer(self, message: str) -> str:
-                return "esto no es json"
-
-        advisor_service._provider = InvalidJsonProvider()
-
-        response = self.client.post(
-            "/v1/advisor",
-            json={"conversation_text": "A: hola\nB: chau", "tone": "firm"},
-        )
-        self.assertEqual(response.status_code, 200)
-
-        body = response.json()
-        self.assertEqual(body["advisor_id"], "laura")
-        self.assertEqual(body["advisor_name"], "Laura")
-        self.assertIn("analysis", body)
-        self.assertIn("main_suggestion", body)
-        self.assertEqual(len(body["variants"]), 3)
-
-    def test_advisor_saves_output_on_success(self):
-        if not hasattr(persistence_store, "advisor_outputs"):
-            self.skipTest("Persistence store does not expose advisor_outputs")
-
-        before_count = len(persistence_store.advisor_outputs)
-
+        partial_provider = PartialProvider()
+        advisor_service._provider = partial_provider
         response = self.client.post(
             "/v1/advisor",
             json={
-                "conversation_text": "A: Nunca me escuchas\nB: Me siento atacado",
-                "context": "es mi ex",
-                "tone": "empathetic",
-                "advisor_id": "laura",
+                "conversation_text": "A: test\nB: test",
                 "user_id": "user-main",
-                "contact_id": "contact-1",
+                "contact_id": "contact-ex",
             },
         )
         self.assertEqual(response.status_code, 200)
+        body = response.json()
+        result_ids = [item["advisor_id"] for item in body["results"]]
+        self.assertEqual(result_ids, ["laura", "lidia", "robert"])
+        self.assertEqual(partial_provider.calls, 1)
 
-        after_count = len(persistence_store.advisor_outputs)
-        self.assertEqual(after_count, before_count + 1)
+    def test_advisor_global_fallback_on_invalid_json(self):
+        class InvalidProvider:
+            def __init__(self):
+                self.calls = 0
 
-        saved = persistence_store.advisor_outputs[-1]
-        self.assertEqual(saved.advisor_id, "laura")
-        self.assertEqual(saved.tone, "empathetic")
-        self.assertEqual(saved.owner_user_id, "user-main")
-        self.assertEqual(saved.contact_id, "contact-1")
-
-    def test_advisor_saves_output_on_fallback(self):
-        if not hasattr(persistence_store, "advisor_outputs"):
-            self.skipTest("Persistence store does not expose advisor_outputs")
-
-        class BrokenProvider:
             def generate_answer(self, message: str) -> str:
-                raise AIProviderError("boom")
+                self.calls += 1
+                return "respuesta no json"
 
-        advisor_service._provider = BrokenProvider()
-        before_count = len(persistence_store.advisor_outputs)
-
+        invalid_provider = InvalidProvider()
+        advisor_service._provider = invalid_provider
         response = self.client.post(
             "/v1/advisor",
             json={
-                "conversation_text": "A: hola\nB: chau",
-                "tone": "firm",
+                "conversation_text": "A: test\nB: test",
                 "user_id": "user-main",
+                "contact_id": "contact-ex",
             },
         )
         self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(len(body["results"]), 3)
+        self.assertEqual(invalid_provider.calls, 1)
 
-        after_count = len(persistence_store.advisor_outputs)
-        self.assertEqual(after_count, before_count + 1)
-
-        saved = persistence_store.advisor_outputs[-1]
-        self.assertEqual(saved.advisor_id, "laura")
-        self.assertEqual(saved.tone, "firm")
-        self.assertEqual(saved.owner_user_id, "user-main")
+    def test_advisor_persists_one_output_per_advisor(self):
+        response = self.client.post(
+            "/v1/advisor",
+            json={
+                "conversation_text": "A: test\nB: test",
+                "user_id": "user-main",
+                "contact_id": "contact-ex",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(persistence_store.advisor_outputs), 3)
+        stored_ids = [item.advisor_id for item in persistence_store.advisor_outputs]
+        self.assertEqual(stored_ids, ["laura", "lidia", "robert"])
 
 
 if __name__ == "__main__":

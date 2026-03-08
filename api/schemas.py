@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from pydantic import Field
 
 
 class ChatRequest(BaseModel):
@@ -24,21 +25,23 @@ class ConversationHistoryResponse(BaseModel):
 
 
 class AdvisorRequest(BaseModel):
-    conversation_text: str
+    conversation_text: str = Field(min_length=1)
     context: str = ""
-    tone: str = "empathetic"
     user_id: str = "user-main"
     contact_id: str | None = None
-    advisor_id: str = "laura"
-    
-class AdvisorVariant(BaseModel):
-    tone: str
-    text: str
+
+
+class AdvisorResult(BaseModel):
+    advisor_id: str
+    advisor_name: str
+    suggestions: list[str]
 
 
 class AdvisorResponse(BaseModel):
-    advisor_id: str
-    advisor_name: str
     analysis: str
-    main_suggestion: str
-    variants: list[AdvisorVariant]
+    results: list[AdvisorResult]
+    # Temporary compatibility fields for current frontend.
+    advisor_id: str | None = None
+    advisor_name: str | None = None
+    main_suggestion: str | None = None
+    variants: list[dict[str, str]] | None = None
