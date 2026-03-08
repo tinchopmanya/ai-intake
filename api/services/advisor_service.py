@@ -14,10 +14,12 @@ from schemas import AdvisorConversationSummary
 from schemas import AdvisorRequest
 from schemas import AdvisorResponse
 from schemas import AdvisorResult
+from schemas import ContactResolutionMetadata
 from schemas import Message
 from services.advisor_committee_parser import parse_committee_response
 from services.advisor_committee_prompt_builder import build_committee_prompt
 from services.advisor_resolution_service import AdvisorResolutionService
+from services.contact_resolution_service import ContactResolutionService
 
 logger = logging.getLogger(__name__)
 
@@ -27,12 +29,14 @@ class AdvisorService:
         self._provider = provider
         self._store = store
         self._resolver = AdvisorResolutionService(store)
+        self._contact_resolver = ContactResolutionService(store)
 
     def advise(self, payload: AdvisorRequest) -> AdvisorResponse:
+        resolved_contact_id, resolution_metadata = self._resolve_contact_for_request(payload)
         conversation = self._store.ensure_conversation(
             conversation_id=payload.conversation_id,
             owner_user_id=payload.user_id,
-            contact_id=payload.contact_id,
+            contact_id=resolved_contact_id,
             channel="advisor",
         )
         self._store.append_message(
@@ -44,7 +48,7 @@ class AdvisorService:
 
         advisors = self._resolver.resolve_for_session(
             user_id=payload.user_id,
-            contact_id=payload.contact_id,
+            contact_id=resolved_contact_id,
             max_advisors=3,
         )
         if not advisors:
@@ -63,7 +67,8 @@ class AdvisorService:
                 self._build_global_fallback_response(advisors),
                 conversation.id,
             )
-            self._persist_outputs(payload, response)
+            response = self._attach_contact_resolution(response, resolution_metadata)
+            self._persist_outputs(payload, response, resolved_contact_id)
             self._store.append_message(
                 conversation_id=conversation.id,
                 role="assistant",
@@ -78,7 +83,8 @@ class AdvisorService:
                 self._build_global_fallback_response(advisors),
                 conversation.id,
             )
-            self._persist_outputs(payload, response)
+            response = self._attach_contact_resolution(response, resolution_metadata)
+            self._persist_outputs(payload, response, resolved_contact_id)
             self._store.append_message(
                 conversation_id=conversation.id,
                 role="assistant",
@@ -92,7 +98,8 @@ class AdvisorService:
             completed,
             conversation.id,
         )
-        self._persist_outputs(payload, response)
+        response = self._attach_contact_resolution(response, resolution_metadata)
+        self._persist_outputs(payload, response, resolved_contact_id)
         self._store.append_message(
             conversation_id=conversation.id,
             role="assistant",
@@ -260,21 +267,73 @@ class AdvisorService:
             conversation_id=conversation_id,
             analysis=response.analysis,
             results=response.results,
+            contact_resolution=response.contact_resolution,
         )
 
-    def _persist_outputs(self, payload: AdvisorRequest, response: AdvisorResponse) -> None:
+    def _attach_contact_resolution(
+        self,
+        response: AdvisorResponse,
+        resolution_metadata: ContactResolutionMetadata,
+    ) -> AdvisorResponse:
+        return AdvisorResponse(
+            conversation_id=response.conversation_id,
+            analysis=response.analysis,
+            results=response.results,
+            contact_resolution=resolution_metadata,
+        )
+
+    def _persist_outputs(
+        self,
+        payload: AdvisorRequest,
+        response: AdvisorResponse,
+        resolved_contact_id: str | None,
+    ) -> None:
         for result in response.results:
             output = AdvisorOutput(
                 id=str(uuid4()),
                 conversation_id=response.conversation_id,
                 owner_user_id=payload.user_id,
-                contact_id=payload.contact_id,
+                contact_id=resolved_contact_id,
                 advisor_id=result.advisor_id,
                 suggestions_json=json.dumps(result.suggestions),
                 analysis_snapshot=response.analysis,
                 created_at=datetime.now(UTC),
             )
             self._store.save_advisor_output(output)
+
+    def _resolve_contact_for_request(
+        self, payload: AdvisorRequest
+    ) -> tuple[str | None, ContactResolutionMetadata]:
+        if payload.contact_id:
+            explicit_contact = self._store.get_contact(payload.contact_id)
+            if explicit_contact is not None and explicit_contact.owner_user_id == payload.user_id:
+                return (
+                    explicit_contact.id,
+                    ContactResolutionMetadata(
+                        resolved_contact_id=explicit_contact.id,
+                        resolved_contact_name=explicit_contact.name,
+                        resolution_mode="exact_match",
+                        confidence=1.0,
+                    ),
+                )
+            return (
+                None,
+                ContactResolutionMetadata(
+                    resolution_mode="unresolved",
+                ),
+            )
+
+        metadata = self._contact_resolver.resolve(
+            user_id=payload.user_id,
+            conversation_text=payload.conversation_text,
+        )
+        if (
+            metadata.resolved_contact_id is not None
+            and metadata.resolution_mode in {"exact_match", "fuzzy_match"}
+            and (metadata.confidence or 0) >= 0.75
+        ):
+            return metadata.resolved_contact_id, metadata
+        return None, metadata
 
     def _truncate_analysis(self, analysis: str, max_length: int = 140) -> str:
         normalized = " ".join(analysis.split())

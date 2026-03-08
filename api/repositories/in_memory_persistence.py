@@ -1,6 +1,7 @@
 from dataclasses import asdict
 from datetime import UTC
 from datetime import datetime
+import re
 from uuid import uuid4
 
 from domain.entities import Advisor
@@ -194,6 +195,22 @@ class InMemoryPersistenceStore(PersistenceStore):
     def get_contact(self, contact_id: str) -> Contact | None:
         return self.contacts.get(contact_id)
 
+    def list_contacts_by_user(self, user_id: str) -> list[Contact]:
+        contacts = [
+            contact for contact in self.contacts.values() if contact.owner_user_id == user_id
+        ]
+        return sorted(contacts, key=lambda contact: contact.name.lower())
+
+    def search_contacts_by_name(self, user_id: str, query: str) -> list[Contact]:
+        normalized_query = self._normalize_name(query)
+        if not normalized_query:
+            return []
+        return [
+            contact
+            for contact in self.list_contacts_by_user(user_id)
+            if normalized_query in self._normalize_name(contact.name)
+        ]
+
     def get_group(self, group_id: str) -> Group | None:
         return self.groups.get(group_id)
 
@@ -257,7 +274,7 @@ class InMemoryPersistenceStore(PersistenceStore):
         updated = Conversation(
             id=current.id,
             owner_user_id=current.owner_user_id,
-            contact_id=current.contact_id,
+            contact_id=contact_id if contact_id is not None else current.contact_id,
             channel=current.channel,
             created_at=current.created_at,
             updated_at=now,
@@ -338,6 +355,22 @@ class InMemoryPersistenceStore(PersistenceStore):
             for output in self.advisor_outputs
             if output.conversation_id == conversation_id
         ]
+
+    def list_recent_contact_conversations(
+        self, user_id: str, contact_id: str, channel: str, limit: int = 5
+    ) -> list[Conversation]:
+        matches = [
+            conversation
+            for conversation in self.conversations.values()
+            if conversation.owner_user_id == user_id
+            and conversation.contact_id == contact_id
+            and conversation.channel == channel
+        ]
+        matches.sort(key=lambda conversation: conversation.updated_at, reverse=True)
+        return matches[:limit]
+
+    def _normalize_name(self, value: str) -> str:
+        return re.sub(r"\s+", " ", value.strip().lower())
 
     def dump_state(self) -> dict[str, object]:
         return {

@@ -155,6 +155,7 @@ class TestAPI(unittest.TestCase):
         self.assertIn("analysis", body)
         self.assertIn("results", body)
         self.assertIn("conversation_id", body)
+        self.assertIn("contact_resolution", body)
         self.assertNotIn("main_suggestion", body)
         self.assertNotIn("variants", body)
         self.assertNotIn("advisor_id", body)
@@ -255,6 +256,56 @@ class TestAPI(unittest.TestCase):
         body = response.json()
         self.assertEqual(len(body["results"]), 3)
         self.assertEqual(invalid_provider.calls, 1)
+
+    def test_advisor_contact_resolution_exact_name(self):
+        response = self.client.post(
+            "/v1/advisor",
+            json={
+                "conversation_text": "Yo: hola\nEx Pareja: te leo",
+                "user_id": "user-main",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["contact_resolution"]["resolved_contact_id"], "contact-ex")
+        self.assertEqual(body["contact_resolution"]["resolution_mode"], "exact_match")
+        conversation_id = body["conversation_id"]
+        self.assertEqual(
+            persistence_store.conversations[conversation_id].contact_id,
+            "contact-ex",
+        )
+
+    def test_advisor_contact_resolution_unresolved_ambiguous(self):
+        response = self.client.post(
+            "/v1/advisor",
+            json={
+                "conversation_text": "Ex Pareja: hola\nColega: te leo",
+                "user_id": "user-main",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertIsNone(body["contact_resolution"]["resolved_contact_id"])
+        self.assertEqual(body["contact_resolution"]["resolution_mode"], "unresolved")
+
+    def test_advisor_explicit_contact_id_has_priority(self):
+        response = self.client.post(
+            "/v1/advisor",
+            json={
+                "conversation_text": "Yo: hola\nEx Pareja: te leo",
+                "user_id": "user-main",
+                "contact_id": "contact-colleague",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(
+            body["contact_resolution"]["resolved_contact_id"],
+            "contact-colleague",
+        )
+        self.assertEqual(body["contact_resolution"]["resolution_mode"], "exact_match")
+        result_ids = [item["advisor_id"] for item in body["results"]]
+        self.assertEqual(result_ids[0], "robert")
 
     def test_advisor_persists_one_output_per_advisor(self):
         response = self.client.post(

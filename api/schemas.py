@@ -40,10 +40,27 @@ class AdvisorResult(BaseModel):
     suggestions: list[str]
 
 
+class ContactResolutionCandidate(BaseModel):
+    contact_id: str
+    contact_name: str
+    match_mode: str
+    confidence: float
+
+
+class ContactResolutionMetadata(BaseModel):
+    resolved_contact_id: str | None = None
+    resolved_contact_name: str | None = None
+    resolution_mode: str = "unresolved"
+    candidate_contacts: list[ContactResolutionCandidate] = Field(default_factory=list)
+    owner_detected_name: str | None = None
+    confidence: float | None = None
+
+
 class AdvisorResponse(BaseModel):
     conversation_id: str
     analysis: str
     results: list[AdvisorResult]
+    contact_resolution: ContactResolutionMetadata | None = None
 
 
 class AdvisorConversationHistoryResponse(BaseModel):
