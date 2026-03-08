@@ -57,9 +57,9 @@ class AdvisorService:
             raw = self._provider.generate_answer(prompt)
         except Exception:
             logger.exception("Failed to generate advisor committee response")
-            response = self._build_response_with_compat(
+            response = self._attach_conversation_id(
                 self._build_global_fallback_response(advisors),
-                conversation_id=conversation.id,
+                conversation.id,
             )
             self._persist_outputs(payload, response)
             self._store.append_message(
@@ -72,9 +72,9 @@ class AdvisorService:
 
         parsed = parse_committee_response(raw, advisors)
         if parsed is None:
-            response = self._build_response_with_compat(
+            response = self._attach_conversation_id(
                 self._build_global_fallback_response(advisors),
-                conversation_id=conversation.id,
+                conversation.id,
             )
             self._persist_outputs(payload, response)
             self._store.append_message(
@@ -86,9 +86,9 @@ class AdvisorService:
             return response
 
         completed = self._complete_partial_response(parsed, advisors)
-        response = self._build_response_with_compat(
+        response = self._attach_conversation_id(
             completed,
-            conversation_id=conversation.id,
+            conversation.id,
         )
         self._persist_outputs(payload, response)
         self._store.append_message(
@@ -220,27 +220,13 @@ class AdvisorService:
             suggestions=suggestions[:2],
         )
 
-    def _build_response_with_compat(
+    def _attach_conversation_id(
         self, response: AdvisorResponse, conversation_id: str
     ) -> AdvisorResponse:
-        if not response.results:
-            return AdvisorResponse(
-                conversation_id=conversation_id,
-                analysis=response.analysis,
-                results=[],
-            )
-
-        first_result = response.results[0]
-        main_suggestion = first_result.suggestions[0] if first_result.suggestions else None
-        variants = [{"tone": "alternativa", "text": text} for text in first_result.suggestions]
         return AdvisorResponse(
             conversation_id=conversation_id,
             analysis=response.analysis,
             results=response.results,
-            advisor_id=first_result.advisor_id,
-            advisor_name=first_result.advisor_name,
-            main_suggestion=main_suggestion,
-            variants=variants,
         )
 
     def _persist_outputs(self, payload: AdvisorRequest, response: AdvisorResponse) -> None:

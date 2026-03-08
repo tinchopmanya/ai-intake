@@ -42,11 +42,6 @@ class AdvisorResponse(BaseModel):
     conversation_id: str
     analysis: str
     results: list[AdvisorResult]
-    # Temporary compatibility fields for current frontend.
-    advisor_id: str | None = None
-    advisor_name: str | None = None
-    main_suggestion: str | None = None
-    variants: list[dict[str, str]] | None = None
 
 
 class AdvisorConversationHistoryResponse(BaseModel):

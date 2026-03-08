@@ -155,6 +155,10 @@ class TestAPI(unittest.TestCase):
         self.assertIn("analysis", body)
         self.assertIn("results", body)
         self.assertIn("conversation_id", body)
+        self.assertNotIn("main_suggestion", body)
+        self.assertNotIn("variants", body)
+        self.assertNotIn("advisor_id", body)
+        self.assertNotIn("advisor_name", body)
         self.assertGreaterEqual(len(body["results"]), 1)
         self.assertEqual(self.fake_committee_provider.calls, 1)
 
