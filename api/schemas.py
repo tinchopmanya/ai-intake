@@ -1,10 +1,13 @@
 from pydantic import BaseModel
 
+from assistant_profiles import DEFAULT_ASSISTANT_PROFILE
+
 
 class ChatRequest(BaseModel):
     conversation_id: str | None = None
     message: str
     channel: str = "web"
+    assistant_profile: str = DEFAULT_ASSISTANT_PROFILE
 
 
 class ChatResponse(BaseModel):

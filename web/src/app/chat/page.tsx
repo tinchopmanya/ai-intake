@@ -28,6 +28,7 @@ const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 const CHAT_URL = `${API_BASE_URL}/v1/chat`;
 const STORAGE_KEY = "conversation_id";
+const DEFAULT_ASSISTANT_PROFILE = "general";
 
 function mapHistoryToMessages(history: HistoryMessage[]): Message[] {
   return history.map((item, index) => ({
@@ -140,6 +141,7 @@ export default function ChatPage() {
           conversation_id: conversationId ?? null,
           message,
           channel: "web",
+          assistant_profile: DEFAULT_ASSISTANT_PROFILE,
         }),
       });
 
@@ -196,7 +198,7 @@ export default function ChatPage() {
           value={input}
           onChange={(event) => setInput(event.target.value)}
           placeholder="Escribi un mensaje..."
-          className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm"
+          className="flex-1 rounded border border-gray-500 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-600 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20"
           disabled={loading}
         />
         <button

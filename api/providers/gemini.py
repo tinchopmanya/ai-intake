@@ -3,6 +3,8 @@ from urllib import error
 from urllib import parse
 from urllib import request
 
+from assistant_profiles import build_profile_prompt
+from assistant_profiles import normalize_assistant_profile
 from providers.base import AIProvider
 from providers.base import AIProviderError
 
@@ -13,7 +15,9 @@ class GeminiAIProvider(AIProvider):
         self._model = model
         self._timeout_seconds = timeout_seconds
 
-    def generate_answer(self, message: str) -> str:
+    def generate_answer(self, message: str, assistant_profile: str) -> str:
+        normalized_profile = normalize_assistant_profile(assistant_profile)
+        prompt = build_profile_prompt(message, normalized_profile)
         endpoint = (
             "https://generativelanguage.googleapis.com/v1beta/models/"
             f"{self._model}:generateContent?key={parse.quote(self._api_key)}"
@@ -23,7 +27,7 @@ class GeminiAIProvider(AIProvider):
             "contents": [
                 {
                     "role": "user",
-                    "parts": [{"text": message}],
+                    "parts": [{"text": prompt}],
                 }
             ]
         }
