@@ -5,28 +5,42 @@ from fastapi.testclient import TestClient
 
 from main import app
 from main import conversations
+from providers.base import AIProviderError
+from providers.fallback import UNCONFIGURED_PROVIDER_MESSAGE
+from providers.fallback import UnconfiguredAIProvider
+from routers.chat import chat_service
+
+
+class FakeAIProvider:
+    def generate_answer(self, message: str) -> str:
+        return f"fake-ai: {message}"
 
 
 class TestAPI(unittest.TestCase):
     def setUp(self):
         conversations.clear()
+        self.original_provider = chat_service._provider
+        chat_service._provider = FakeAIProvider()
         self.client = TestClient(app)
+
+    def tearDown(self):
+        chat_service._provider = self.original_provider
 
     def test_health_ok(self):
         response = self.client.get("/health")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"ok": True})
 
-    def test_chat_echo_with_defaults(self):
+    def test_chat_with_defaults(self):
         response = self.client.post("/v1/chat", json={"message": "hola"})
         self.assertEqual(response.status_code, 200)
         body = response.json()
-        self.assertEqual(body["answer"], "echo: hola")
+        self.assertEqual(body["answer"], "fake-ai: hola")
         self.assertIsInstance(body["conversation_id"], str)
         self.assertEqual(str(UUID(body["conversation_id"], version=4)), body["conversation_id"])
         self.assertIn(body["conversation_id"], conversations)
 
-    def test_chat_echo_with_conversation_id(self):
+    def test_chat_with_conversation_id(self):
         response = self.client.post(
             "/v1/chat",
             json={
@@ -40,7 +54,7 @@ class TestAPI(unittest.TestCase):
             response.json(),
             {
                 "conversation_id": "conv-123",
-                "answer": "echo: hello",
+                "answer": "fake-ai: hello",
             },
         )
 
@@ -58,7 +72,7 @@ class TestAPI(unittest.TestCase):
                     {"role": "user", "message": "first", "channel": "web"},
                     {
                         "role": "assistant",
-                        "message": "echo: first",
+                        "message": "fake-ai: first",
                         "channel": "assistant",
                     },
                 ],
@@ -86,7 +100,7 @@ class TestAPI(unittest.TestCase):
                     {"role": "user", "message": "hola", "channel": "web"},
                     {
                         "role": "assistant",
-                        "message": "echo: hola",
+                        "message": "fake-ai: hola",
                         "channel": "assistant",
                     },
                 ],
@@ -97,6 +111,30 @@ class TestAPI(unittest.TestCase):
         response = self.client.get("/v1/conversations/does-not-exist")
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json()["detail"], "Conversation not found")
+
+    def test_chat_fallback_when_provider_unavailable(self):
+        class BrokenProvider:
+            def generate_answer(self, message: str) -> str:
+                raise AIProviderError("boom")
+
+        chat_service._provider = BrokenProvider()
+        with self.assertLogs("services.chat_service", level="ERROR") as captured_logs:
+            response = self.client.post("/v1/chat", json={"message": "hola"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["answer"],
+            "No pude generar una respuesta de IA en este momento. Intenta de nuevo.",
+        )
+        self.assertTrue(
+            any("Failed to generate chat answer" in message for message in captured_logs.output)
+        )
+
+    def test_unconfigured_provider_message(self):
+        provider = UnconfiguredAIProvider()
+        self.assertEqual(
+            provider.generate_answer("hola"),
+            UNCONFIGURED_PROVIDER_MESSAGE,
+        )
 
 
 if __name__ == "__main__":
