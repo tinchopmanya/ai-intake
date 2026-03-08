@@ -24,6 +24,7 @@ class TestAPI(unittest.TestCase):
         self.assertEqual(body["answer"], "echo: hola")
         self.assertIsInstance(body["conversation_id"], str)
         self.assertEqual(str(UUID(body["conversation_id"], version=4)), body["conversation_id"])
+        self.assertIn(body["conversation_id"], conversations)
 
     def test_chat_echo_with_conversation_id(self):
         response = self.client.post(
@@ -40,6 +41,27 @@ class TestAPI(unittest.TestCase):
             {
                 "conversation_id": "conv-123",
                 "answer": "echo: hello",
+            },
+        )
+
+    def test_generated_conversation_id_history(self):
+        response = self.client.post("/v1/chat", json={"message": "first"})
+        conversation_id = response.json()["conversation_id"]
+
+        history_response = self.client.get(f"/v1/conversations/{conversation_id}")
+        self.assertEqual(history_response.status_code, 200)
+        self.assertEqual(
+            history_response.json(),
+            {
+                "conversation_id": conversation_id,
+                "messages": [
+                    {"role": "user", "message": "first", "channel": "web"},
+                    {
+                        "role": "assistant",
+                        "message": "echo: first",
+                        "channel": "assistant",
+                    },
+                ],
             },
         )
 

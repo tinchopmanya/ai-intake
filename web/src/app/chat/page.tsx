@@ -44,6 +44,13 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  function handleNewConversation() {
+    setConversationId(null);
+    setMessages([]);
+    setError(null);
+    window.localStorage.removeItem(STORAGE_KEY);
+  }
+
   async function loadConversationHistory(id: string): Promise<void> {
     const response = await fetch(`${API_BASE_URL}/v1/conversations/${id}`, {
       cache: "no-store",
@@ -152,7 +159,16 @@ export default function ChatPage() {
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-4 p-6">
-      <h1 className="text-2xl font-bold">Chat</h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold">Chat</h1>
+        <button
+          type="button"
+          onClick={handleNewConversation}
+          className="rounded border border-gray-300 px-3 py-2 text-sm"
+        >
+          Nueva conversacion
+        </button>
+      </div>
 
       <section className="flex-1 rounded border border-gray-200 p-4">
         {messages.length === 0 ? (
