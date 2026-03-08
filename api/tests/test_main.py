@@ -8,6 +8,7 @@ from main import conversations
 from providers.base import AIProviderError
 from providers.fallback import UNCONFIGURED_PROVIDER_MESSAGE
 from providers.fallback import UnconfiguredAIProvider
+from repositories.in_memory_persistence import persistence_store
 from routers.advisor import advisor_service
 from routers.chat import chat_service
 
@@ -161,10 +162,73 @@ class TestAPI(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 200)
         body = response.json()
+        self.assertEqual(body["advisor_id"], "laura")
+        self.assertEqual(body["advisor_name"], "Laura")
         self.assertIn("analysis", body)
         self.assertIn("main_suggestion", body)
         self.assertIn("variants", body)
         self.assertGreaterEqual(len(body["variants"]), 2)
+
+    def test_advisor_resolution_uses_contact_priority(self):
+        response = self.client.post(
+            "/v1/advisor",
+            json={
+                "conversation_text": "A: mensaje\nB: respuesta",
+                "tone": "firm",
+                "contact_id": "contact-colleague",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["advisor_id"], "robert")
+
+    def test_advisor_resolution_uses_user_default_when_no_contact(self):
+        response = self.client.post(
+            "/v1/advisor",
+            json={
+                "conversation_text": "A: mensaje\nB: respuesta",
+                "tone": "brief",
+                "user_id": "user-main",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["advisor_id"], "laura")
+
+    def test_advisor_prompt_fallback_without_skills(self):
+        class InspectProvider:
+            def __init__(self):
+                self.last_prompt = ""
+
+            def generate_answer(self, message: str) -> str:
+                self.last_prompt = message
+                return (
+                    '{"analysis":"ok",'
+                    '"main_suggestion":"ok",'
+                    '"variants":[{"tone":"empathetic","text":"ok1"},{"tone":"firm","text":"ok2"}]}'
+                )
+
+        no_skill_advisor_id = "no-skill"
+        persistence_store.advisors[no_skill_advisor_id] = persistence_store.advisors["laura"].__class__(
+            id=no_skill_advisor_id,
+            name="NoSkill",
+            role="Tester",
+            description="Advisor sin skills",
+            system_prompt_base="Prompt base sin skills.",
+        )
+        inspect_provider = InspectProvider()
+        advisor_service._provider = inspect_provider
+
+        response = self.client.post(
+            "/v1/advisor",
+            json={
+                "conversation_text": "A: hola\nB: chau",
+                "advisor_id": no_skill_advisor_id,
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("Habilidades activas:", inspect_provider.last_prompt)
+        persistence_store.advisors.pop(no_skill_advisor_id, None)
 
     def test_advisor_fallback_when_provider_fails(self):
         class BrokenProvider:
@@ -178,6 +242,8 @@ class TestAPI(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 200)
         body = response.json()
+        self.assertEqual(body["advisor_id"], "laura")
+        self.assertEqual(body["advisor_name"], "Laura")
         self.assertIn("analysis", body)
         self.assertIn("main_suggestion", body)
         self.assertEqual(len(body["variants"]), 3)
