@@ -160,24 +160,24 @@ export default function ChatPage() {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-4 p-6">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">Chat</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Chat</h1>
         <button
           type="button"
           onClick={handleNewConversation}
-          className="rounded border border-gray-300 px-3 py-2 text-sm"
+          className="rounded border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-800"
         >
           Nueva conversacion
         </button>
       </div>
 
-      <section className="flex-1 rounded border border-gray-200 p-4">
+      <section className="flex-1 rounded border border-gray-200 bg-gray-50/70 p-4">
         {messages.length === 0 ? (
-          <p className="text-sm text-gray-500">Todavia no hay mensajes.</p>
+          <p className="text-sm text-gray-600">Todavia no hay mensajes.</p>
         ) : (
           <ul className="space-y-3">
             {messages.map((message) => (
-              <li key={message.id} className="text-sm">
-                <span className="font-semibold">
+              <li key={message.id} className="text-sm text-gray-800">
+                <span className="font-semibold text-gray-900">
                   {message.role === "user" ? "Vos" : "Bot"}:
                 </span>{" "}
                 <span>{message.text}</span>
@@ -187,8 +187,8 @@ export default function ChatPage() {
         )}
       </section>
 
-      {loading && <p className="text-sm text-gray-500">Enviando...</p>}
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {loading && <p className="text-sm text-gray-600">Enviando...</p>}
+      {error && <p className="text-sm text-red-700">{error}</p>}
 
       <form onSubmit={handleSubmit} className="flex gap-2">
         <input
@@ -196,13 +196,13 @@ export default function ChatPage() {
           value={input}
           onChange={(event) => setInput(event.target.value)}
           placeholder="Escribi un mensaje..."
-          className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm"
+          className="flex-1 rounded border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-500 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400/25"
           disabled={loading}
         />
         <button
           type="submit"
           disabled={loading || input.trim().length === 0}
-          className="rounded bg-black px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded bg-gray-900 px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60"
         >
           Enviar
         </button>

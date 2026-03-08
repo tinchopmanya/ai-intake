@@ -1,6 +1,7 @@
 import logging
 from uuid import uuid4
 
+from assistant_profiles import normalize_assistant_profile
 from providers.base import AIProvider
 from repositories.in_memory import InMemoryConversationRepository
 from schemas import ChatRequest
@@ -22,7 +23,8 @@ class ChatService:
 
     def chat(self, payload: ChatRequest) -> ChatResponse:
         conversation_id = payload.conversation_id or str(uuid4())
-        answer = self._generate_answer(payload.message)
+        assistant_profile = normalize_assistant_profile(payload.assistant_profile)
+        answer = self._generate_answer(payload.message, assistant_profile)
 
         self._repository.append_message(
             conversation_id,
@@ -43,13 +45,14 @@ class ChatService:
 
         return ChatResponse(conversation_id=conversation_id, answer=answer)
 
-    def _generate_answer(self, message: str) -> str:
+    def _generate_answer(self, message: str, assistant_profile: str) -> str:
         try:
-            return self._provider.generate_answer(message)
+            return self._provider.generate_answer(message, assistant_profile)
         except Exception:
             logger.exception(
-                "Failed to generate chat answer with provider=%s",
+                "Failed to generate chat answer with provider=%s profile=%s",
                 type(self._provider).__name__,
+                assistant_profile,
             )
             return "No pude generar una respuesta de IA en este momento. Intenta de nuevo."
 

@@ -6,5 +6,5 @@ class AIProviderError(Exception):
 
 
 class AIProvider(Protocol):
-    def generate_answer(self, message: str) -> str:
+    def generate_answer(self, message: str, assistant_profile: str) -> str:
         ...

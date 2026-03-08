@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
 from repositories.in_memory import conversation_repository
+from routers.advisor import router as advisor_router
 from routers.chat import router as chat_router
 from routers.health import router as health_router
 
@@ -18,6 +19,7 @@ app.add_middleware(
 
 app.include_router(health_router)
 app.include_router(chat_router)
+app.include_router(advisor_router)
 
 # Backward compatibility with existing tests/imports.
 conversations = conversation_repository.conversations
