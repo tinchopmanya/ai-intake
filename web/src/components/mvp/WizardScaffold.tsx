@@ -21,9 +21,6 @@ export function WizardScaffold() {
   const [messageText, setMessageText] = useState("");
   const [mode, setMode] = useState<UsageMode>("reactive");
   const [quickMode, setQuickMode] = useState(false);
-  const [loadingQuickResponse, setLoadingQuickResponse] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [quickResponseResult, setQuickResponseResult] = useState<AdvisorResponse | null>(null);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResponse | null>(null);
   const [analysisId, setAnalysisId] = useState<string | null>(null);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
@@ -33,27 +30,35 @@ export function WizardScaffold() {
   const [advisorError, setAdvisorError] = useState<string | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
-  async function handleQuickResponse() {
+  async function requestAdvisor(params: { quickMode: boolean; analysisId?: string | null }) {
     const text = messageText.trim();
-    if (!text || loadingQuickResponse) return;
+    if (!text || loadingAdvisor) return;
 
-    setLoadingQuickResponse(true);
-    setError(null);
-    setQuickResponseResult(null);
+    setLoadingAdvisor(true);
+    setAdvisorError(null);
+    setAdvisorResult(null);
+    setCopiedIndex(null);
 
     try {
       const result = await postAdvisor({
         message_text: text,
         mode,
-        relationship_type: "familia",
-        quick_mode: true,
+        relationship_type: "otro",
+        quick_mode: params.quickMode,
+        analysis_id: params.analysisId ?? undefined,
       });
-      setQuickResponseResult(result);
+      setAdvisorResult(result);
+      setCurrentStep(3);
     } catch {
-      setError("No se pudo generar respuesta rapida.");
+      setAdvisorError("No se pudo generar respuestas de advisor.");
     } finally {
-      setLoadingQuickResponse(false);
+      setLoadingAdvisor(false);
     }
+  }
+
+  async function handleQuickResponse() {
+    setAnalysisError(null);
+    await requestAdvisor({ quickMode: true });
   }
 
   function handleContinue() {
@@ -90,28 +95,8 @@ export function WizardScaffold() {
   }
 
   async function handleContinueToStep3() {
-    const text = messageText.trim();
-    if (!text || !analysisId || loadingAdvisor) return;
-
-    setLoadingAdvisor(true);
-    setAdvisorError(null);
-    setAdvisorResult(null);
-    setCopiedIndex(null);
-
-    try {
-      const result = await postAdvisor({
-        message_text: text,
-        mode,
-        analysis_id: analysisId,
-        relationship_type: "otro",
-      });
-      setAdvisorResult(result);
-      setCurrentStep(3);
-    } catch {
-      setAdvisorError("No se pudo generar respuestas de advisor.");
-    } finally {
-      setLoadingAdvisor(false);
-    }
+    if (!analysisId) return;
+    await requestAdvisor({ quickMode: false, analysisId });
   }
 
   async function handleCopy(text: string, index: number) {
@@ -192,28 +177,13 @@ export function WizardScaffold() {
             <button
               type="button"
               onClick={handleQuickResponse}
-              disabled={!messageText.trim() || loadingQuickResponse}
+              disabled={!messageText.trim() || loadingAdvisor}
               className="rounded border border-black px-4 py-2 text-sm disabled:opacity-50"
             >
-              {loadingQuickResponse ? "Generando..." : "Respuesta rapida"}
+              {loadingAdvisor ? "Generando..." : "Respuesta rapida"}
             </button>
           </div>
-
-          {error && <p className="text-sm text-red-700">{error}</p>}
-
-          {quickResponseResult && (
-            <div className="rounded border border-gray-200 bg-gray-50 p-3">
-              <p className="text-sm font-medium">Respuesta rapida generada</p>
-              <p className="mt-1 text-xs text-gray-600">
-                session_id: {quickResponseResult.session_id}
-              </p>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
-                {quickResponseResult.responses.map((item, index) => (
-                  <li key={`${item.emotion_label}-${index}`}>{item.text}</li>
-                ))}
-              </ul>
-            </div>
-          )}
+          {advisorError && <p className="text-sm text-red-700">{advisorError}</p>}
         </>
       ) : currentStep === 2 ? (
         <div className="space-y-3">
