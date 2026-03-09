@@ -21,21 +21,16 @@ class FakeCommitteeProvider:
     def generate_answer(self, message: str) -> str:
         self.calls += 1
         self.last_prompt = message
-        if "FORMATO DE RESPUESTA (JSON estricto" in message:
+        if "RETURN STRICT JSON ONLY" in message:
             return (
                 '{"analysis":"Hay tension y necesidad de limites claros.",'
-                '"results":['
-                '{"advisor_id":"laura","advisor_name":"Laura","suggestions":['
-                '"Entiendo como te sentis. Quiero hablarlo con calma.",'
-                '"Me importa que nos escuchemos sin atacarnos."'
-                "]},"
-                '{"advisor_id":"robert","advisor_name":"Robert","suggestions":['
-                '"Podemos hablar, pero necesito respeto.",'
-                '"Voy a sostener mis limites con claridad."'
-                "]},"
-                '{"advisor_id":"lidia","advisor_name":"Lidia","suggestions":['
-                '"Propongo pausar, ordenar ideas y responder con foco."'
-                "]}"
+                '"perspectives":['
+                '{"advisor":"Laura","reflection":"Podria haber tension emocional.",'
+                '"suggested_reply":"Podriamos hablar esto con calma y escucharnos mejor."},'
+                '{"advisor":"Robert","reflection":"Podria ayudar marcar limites claros.",'
+                '"suggested_reply":"Podemos hablar, pero necesito mantener respeto mutuo."},'
+                '{"advisor":"Lidia","reflection":"Quizas conviene simplificar la respuesta.",'
+                '"suggested_reply":"Propongo pausar y responder con foco en lo concreto."}'
                 "]}"
             )
         return f"fake-ai: {message}"

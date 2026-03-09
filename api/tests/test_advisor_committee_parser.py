@@ -95,6 +95,41 @@ class TestAdvisorCommitteeParser(unittest.TestCase):
         assert parsed is not None
         self.assertEqual(parsed.results[0].advisor_id, "laura")
 
+    def test_parse_valid_perspectives_shape(self):
+        raw = (
+            '{"analysis":"ok","perspectives":['
+            '{"advisor":"Laura","reflection":"r1","suggested_reply":"s1"},'
+            '{"advisor":"Robert","reflection":"r2","suggested_reply":"s2"}'
+            "]}"
+        )
+        parsed = parse_committee_response(raw, _advisors())
+        self.assertIsNotNone(parsed)
+        assert parsed is not None
+        self.assertEqual([result.advisor_id for result in parsed.results], ["laura", "robert"])
+        self.assertEqual(parsed.results[0].suggestions[0], "s1")
+        self.assertTrue(parsed.results[0].suggestions[1].startswith("Reflexion: "))
+
+    def test_parse_perspectives_discards_unknown_advisor(self):
+        raw = (
+            '{"analysis":"ok","perspectives":['
+            '{"advisor":"Ghost","reflection":"r1","suggested_reply":"s1"},'
+            '{"advisor":"Lidia","reflection":"r2","suggested_reply":"s2"}'
+            "]}"
+        )
+        parsed = parse_committee_response(raw, _advisors())
+        self.assertIsNotNone(parsed)
+        assert parsed is not None
+        self.assertEqual([result.advisor_id for result in parsed.results], ["lidia"])
+
+    def test_parse_perspectives_requires_suggested_reply(self):
+        raw = (
+            '{"analysis":"ok","perspectives":['
+            '{"advisor":"Laura","reflection":"r1","suggested_reply":""}'
+            "]}"
+        )
+        parsed = parse_committee_response(raw, _advisors())
+        self.assertIsNone(parsed)
+
 
 if __name__ == "__main__":
     unittest.main()
