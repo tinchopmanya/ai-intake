@@ -1,7 +1,6 @@
 from uuid import UUID
 
 from pydantic import BaseModel
-from pydantic import EmailStr
 from pydantic import Field
 
 
@@ -11,7 +10,7 @@ class GoogleAuthRequest(BaseModel):
 
 class UserSummary(BaseModel):
     id: UUID
-    email: EmailStr
+    email: str = Field(min_length=3, max_length=320)
     name: str | None = None
     memory_opt_in: bool = False
 
