@@ -26,9 +26,21 @@ type PerspectiveContent = {
   suggestedReply: string | null;
 };
 
+type RecentPerson = {
+  id: string;
+  name: string;
+  context: string;
+};
+
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 const ADVISOR_URL = `${API_BASE_URL}/v1/advisor`;
+
+const RECENT_PEOPLE: RecentPerson[] = [
+  { id: "marcela", name: "Marcela", context: "Ex pareja" },
+  { id: "maria", name: "Maria", context: "Amiga" },
+  { id: "julio", name: "Julio", context: "Jefe" },
+];
 
 function getPerspectiveContent(result: AdvisorResult | undefined): PerspectiveContent {
   if (!result || result.suggestions.length === 0) {
@@ -58,6 +70,7 @@ export default function AdvisorPage() {
   const [expandedAdvisorId, setExpandedAdvisorId] = useState<string | null>("laura");
   const [copiedAdvisorId, setCopiedAdvisorId] = useState<string | null>(null);
   const [profileModalAdvisorId, setProfileModalAdvisorId] = useState<string | null>(null);
+  const [selectedRecentPersonId, setSelectedRecentPersonId] = useState<string | null>(null);
 
   const resultsByAdvisorId = useMemo(() => {
     const map = new Map<string, AdvisorResult>();
@@ -70,6 +83,8 @@ export default function AdvisorPage() {
   const selectedProfile = profileModalAdvisorId
     ? advisorProfileById[profileModalAdvisorId]
     : null;
+  const selectedRecentPerson =
+    RECENT_PEOPLE.find((person) => person.id === selectedRecentPersonId) ?? null;
 
   useEffect(() => {
     function handleEscape(event: KeyboardEvent) {
@@ -132,30 +147,43 @@ export default function AdvisorPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-4 p-5 md:p-6">
-      <div className="grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
-        <aside className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-          <h2 className="mb-4 text-sm font-semibold text-gray-800">
+    <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-4 bg-gray-100/60 p-5 md:p-6">
+      <div className="grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)] lg:items-stretch">
+        <aside className="h-full rounded-2xl border border-gray-200 bg-gray-100/80 p-4 shadow-sm lg:min-h-[560px]">
+          <h2 className="mb-4 truncate text-xs font-normal text-gray-700">
             Tus consejeros estan listos para responder
           </h2>
           <div className="space-y-4">
             {ADVISOR_PROFILES.map((advisor) => (
               <article
                 key={advisor.id}
-                className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-3"
+                className="rounded-xl border border-gray-200 bg-gray-200/60 px-3 py-3"
               >
                 <div className="flex items-center gap-3">
-                  <Image
-                    src={advisor.avatar128}
-                    alt={advisor.name}
-                    width={96}
-                    height={96}
-                    className="h-24 w-24 rounded-xl border border-gray-200 object-cover"
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setProfileModalAdvisorId(advisor.id)}
+                    className="shrink-0"
+                    aria-label={`Abrir perfil de ${advisor.name}`}
+                  >
+                    <Image
+                      src={advisor.avatar128}
+                      alt={advisor.name}
+                      width={96}
+                      height={96}
+                      className="h-24 w-24 rounded-xl border border-gray-200 object-cover"
+                    />
+                  </button>
                   <div>
-                    <p className="text-sm font-semibold text-gray-900">{advisor.name}</p>
-                    <p className="text-xs text-gray-600">{advisor.role}</p>
-                    <p className="mt-1 text-xs text-gray-500">{advisor.age} anos</p>
+                    <button
+                      type="button"
+                      onClick={() => setProfileModalAdvisorId(advisor.id)}
+                      className="text-left text-sm font-semibold text-gray-800 hover:underline"
+                    >
+                      {advisor.name}
+                    </button>
+                    <p className="text-xs text-gray-700">{advisor.role}</p>
+                    <p className="mt-1 text-xs text-gray-600">{advisor.age} anos</p>
                   </div>
                 </div>
               </article>
@@ -164,33 +192,66 @@ export default function AdvisorPage() {
         </aside>
 
         <section className="space-y-4">
-          <header className="rounded-2xl border border-slate-700 bg-slate-900 px-5 py-4">
-            <h1 className="text-2xl font-bold text-slate-100">Consejero de conversaciones</h1>
-            <p className="mt-1 text-sm text-slate-300">
+          <header className="rounded-2xl border border-gray-200 bg-gray-100/80 px-5 py-4 shadow-sm">
+            <h1 className="text-2xl font-bold text-gray-800">Consejero de conversaciones</h1>
+            <p className="mt-1 text-sm text-gray-700">
               Pega una conversacion dificil y revisa tres perspectivas antes de responder.
             </p>
           </header>
 
           <form
             onSubmit={handleSubmit}
-            className="space-y-3 rounded-2xl border border-gray-200 bg-gray-50/80 p-4"
+            className="space-y-3 rounded-2xl border border-gray-200 bg-gray-100/80 p-4 shadow-sm"
           >
-            <div>
-              <label className="mb-1.5 block text-sm font-semibold text-gray-800">
-                Conversacion
-              </label>
-              <textarea
-                value={conversationText}
-                onChange={(event) => setConversationText(event.target.value)}
-                placeholder={"Persona A: ...\nPersona B: ..."}
-                rows={5}
-                className="w-full rounded-xl border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-500 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400/25"
-                disabled={loading}
-              />
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px] lg:items-start">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                  Conversacion
+                </label>
+                <textarea
+                  value={conversationText}
+                  onChange={(event) => setConversationText(event.target.value)}
+                  placeholder={"Persona A: ...\nPersona B: ..."}
+                  rows={5}
+                  className="w-full rounded-xl border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-500 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400/25 lg:max-w-3xl"
+                  disabled={loading}
+                />
+              </div>
+
+              <aside className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Personas recientes
+                </p>
+                <ul className="mt-2 space-y-1.5">
+                  {RECENT_PEOPLE.map((person) => {
+                    const isSelected = selectedRecentPersonId === person.id;
+                    return (
+                      <li key={person.id}>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedRecentPersonId(person.id)}
+                          className={`w-full rounded-lg border px-2.5 py-1.5 text-left text-xs transition ${
+                            isSelected
+                              ? "border-gray-300 bg-gray-200/70 text-gray-800"
+                              : "border-transparent bg-transparent text-gray-700 hover:border-gray-200 hover:bg-gray-100"
+                          }`}
+                        >
+                          {person.name} - {person.context}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {selectedRecentPerson && (
+                  <p className="mt-2 text-xs text-gray-600">
+                    Asociado a: {selectedRecentPerson.name} - {selectedRecentPerson.context}
+                  </p>
+                )}
+              </aside>
             </div>
 
             <div>
-              <label className="mb-1.5 block text-sm font-semibold text-gray-800">
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
                 Contexto opcional
               </label>
               <input
@@ -206,7 +267,7 @@ export default function AdvisorPage() {
             <button
               type="submit"
               disabled={loading || conversationText.trim().length === 0}
-              className="rounded-xl bg-gray-900 px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-xl bg-gray-800 px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? "Analizando..." : "Analizar conversacion"}
             </button>
@@ -216,8 +277,8 @@ export default function AdvisorPage() {
 
           {result && (
             <section className="space-y-3">
-              <article className="rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+              <article className="rounded-2xl border border-gray-200 bg-gray-100/80 px-4 py-3 shadow-sm">
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
                   Analisis general
                 </p>
                 <p className="mt-1 text-sm leading-6 text-gray-800">{result.analysis}</p>
@@ -232,7 +293,7 @@ export default function AdvisorPage() {
                   return (
                     <article
                       key={advisor.id}
-                      className="rounded-2xl border border-gray-200 bg-white shadow-sm"
+                      className="rounded-2xl border border-gray-200 bg-gray-100/80 shadow-sm"
                     >
                       <div
                         onClick={() => toggleAdvisor(advisor.id)}
@@ -264,16 +325,16 @@ export default function AdvisorPage() {
                                 event.stopPropagation();
                                 setProfileModalAdvisorId(advisor.id);
                               }}
-                              className="truncate text-sm font-semibold text-gray-900 hover:underline"
+                              className="truncate text-sm font-semibold text-gray-800 hover:underline"
                             >
                               {advisor.name}
                             </button>
                             <span className="text-xs text-gray-400">•</span>
-                            <p className="truncate text-xs text-gray-600">{advisor.role}</p>
+                            <p className="truncate text-xs text-gray-700">{advisor.role}</p>
                           </div>
                         </div>
                         <span className="text-sm font-semibold text-gray-600" aria-hidden="true">
-                          {isExpanded ? "▼" : "▶"}
+                          {isExpanded ? "v" : ">"}
                         </span>
                       </div>
 
@@ -281,7 +342,7 @@ export default function AdvisorPage() {
                         <div className="space-y-2.5 border-t border-gray-100 px-4 py-3">
                           <p className="text-xs text-gray-600">{advisor.description}</p>
                           <div>
-                            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
                               Reflexion
                             </p>
                             <p className="mt-1 text-sm leading-5 text-gray-800">
@@ -290,10 +351,10 @@ export default function AdvisorPage() {
                             </p>
                           </div>
                           <div>
-                            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
                               Respuesta sugerida
                             </p>
-                            <p className="mt-1 text-sm leading-5 text-gray-900">
+                            <p className="mt-1 text-sm leading-5 text-gray-800">
                               {perspective.suggestedReply ??
                                 "Una opcion podria ser pausar y responder de forma clara y respetuosa."}
                             </p>
@@ -304,7 +365,7 @@ export default function AdvisorPage() {
                               onClick={() =>
                                 handleCopyReply(advisor.id, perspective.suggestedReply)
                               }
-                              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100"
+                              className="rounded-md border border-gray-300 bg-gray-50 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-200/70"
                             >
                               {copiedAdvisorId === advisor.id
                                 ? "Copiado"
@@ -324,19 +385,19 @@ export default function AdvisorPage() {
 
       {selectedProfile && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
           onClick={() => setProfileModalAdvisorId(null)}
         >
           <div
-            className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl"
+            className="w-full max-w-md rounded-2xl border border-gray-200 bg-gray-100 p-5 shadow-xl"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3">
-              <h3 className="text-lg font-semibold text-gray-900">Perfil del consejero</h3>
+              <h3 className="text-lg font-semibold text-gray-800">Perfil del consejero</h3>
               <button
                 type="button"
                 onClick={() => setProfileModalAdvisorId(null)}
-                className="rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-700 hover:bg-gray-100"
+                className="rounded-md border border-gray-300 bg-gray-50 px-2 py-1 text-xs text-gray-700 hover:bg-gray-200/70"
               >
                 Cerrar
               </button>
@@ -350,13 +411,13 @@ export default function AdvisorPage() {
                 height={256}
                 className="h-48 w-48 rounded-2xl border border-gray-200 object-cover md:h-56 md:w-56"
               />
-              <p className="mt-3 text-lg font-semibold text-gray-900">{selectedProfile.name}</p>
+              <p className="mt-3 text-lg font-semibold text-gray-800">{selectedProfile.name}</p>
               <p className="text-sm text-gray-600">{selectedProfile.age} anos</p>
               <p className="mt-1 text-sm font-medium text-gray-700">{selectedProfile.role}</p>
               <p className="mt-3 text-sm leading-6 text-gray-700">
                 {selectedProfile.description}
               </p>
-              <p className="mt-3 rounded-xl bg-gray-50 px-3 py-2 text-xs leading-5 text-gray-600">
+              <p className="mt-3 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs leading-5 text-gray-600">
                 {ADVISOR_NOTICE}
               </p>
             </div>
