@@ -139,7 +139,7 @@ export default function AdvisorPage() {
             value={conversationText}
             onChange={(event) => setConversationText(event.target.value)}
             placeholder={"Persona A: ...\nPersona B: ..."}
-            rows={6}
+            rows={5}
             className="w-full rounded-xl border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-500 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400/25"
             disabled={loading}
           />
@@ -194,7 +194,7 @@ export default function AdvisorPage() {
                   <button
                     type="button"
                     onClick={() => toggleAdvisor(advisor.id)}
-                    className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left"
+                    className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left"
                     title={advisor.description}
                   >
                     <div className="flex min-w-0 items-center gap-3">
@@ -205,26 +205,27 @@ export default function AdvisorPage() {
                         height={44}
                         className="rounded-lg border border-gray-200 bg-gray-100"
                       />
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex items-center gap-2">
                         <p className="truncate text-sm font-semibold text-gray-900">
                           {advisor.name}
                         </p>
+                        <span className="text-xs text-gray-400">•</span>
                         <p className="truncate text-xs text-gray-600">{role}</p>
                       </div>
                     </div>
-                    <span className="text-xs font-medium text-gray-600">
-                      {isExpanded ? "Ocultar" : "Ver"}
+                    <span className="text-sm font-semibold text-gray-600" aria-hidden="true">
+                      {isExpanded ? "▼" : "▶"}
                     </span>
                   </button>
 
                   {isExpanded && (
-                    <div className="space-y-3 border-t border-gray-100 px-4 py-3">
+                    <div className="space-y-2.5 border-t border-gray-100 px-4 py-3">
                       <p className="text-xs text-gray-600">{advisor.description}</p>
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                           Reflexion
                         </p>
-                        <p className="mt-1 text-sm leading-6 text-gray-800">
+                        <p className="mt-1 text-sm leading-5 text-gray-800">
                           {perspective.reflection ??
                             "Podria haber varias interpretaciones; quizas conviene responder con prudencia."}
                         </p>
@@ -233,7 +234,7 @@ export default function AdvisorPage() {
                         <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                           Respuesta sugerida
                         </p>
-                        <p className="mt-1 text-sm leading-6 text-gray-900">
+                        <p className="mt-1 text-sm leading-5 text-gray-900">
                           {perspective.suggestedReply ??
                             "Una opcion podria ser pausar y responder de forma clara y respetuosa."}
                         </p>
