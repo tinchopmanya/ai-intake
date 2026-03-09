@@ -11,6 +11,7 @@ from app.services.analysis_registry import StoredAnalysis
 from app.services.analysis_registry import analysis_registry
 from app.services.emotional_linter import extract_risk_codes
 from app.services.emotional_linter import run_emotional_linter
+from app.services.user_identity import resolve_user_id
 
 router = APIRouter(prefix="/v1/analysis", tags=["analysis"])
 
@@ -22,6 +23,8 @@ router = APIRouter(prefix="/v1/analysis", tags=["analysis"])
 )
 async def create_analysis(payload: AnalysisRequest) -> AnalysisResponse:
     analysis_skipped = payload.quick_mode
+    context = payload.context or {}
+    user_id = resolve_user_id(context.get("user_id"))
     linter_result = run_emotional_linter(
         payload.message_text,
         quick_mode=analysis_skipped,
@@ -65,11 +68,13 @@ async def create_analysis(payload: AnalysisRequest) -> AnalysisResponse:
     analysis_registry.put(
         StoredAnalysis(
             analysis_id=response.analysis_id,
+            user_id=user_id,
             summary=response.summary,
             risk_flags=[item.model_dump() for item in response.risk_flags],
             emotional_context=response.emotional_context.model_dump(),
             ui_alerts=[item.model_dump() for item in response.ui_alerts],
             created_at=response.created_at,
+            expires_at=analysis_registry.build_expires_at(response.created_at),
         )
     )
     return response

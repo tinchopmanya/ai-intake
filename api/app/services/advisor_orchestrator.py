@@ -7,8 +7,6 @@ from datetime import UTC
 from datetime import datetime
 from uuid import UUID
 from uuid import uuid4
-from uuid import uuid5
-from uuid import NAMESPACE_URL
 
 from app.prompts import ADVISOR_SYSTEM_PROMPT
 from app.prompts import build_advisor_prompt_variables
@@ -19,10 +17,16 @@ from app.schemas.advisor import AdvisorResponse
 from app.schemas.advisor import AnalysisSnapshot
 from app.schemas.advisor import PersistenceMetadata
 from app.schemas.advisor import SuggestedResponse
+from app.services.analysis_registry import AnalysisOwnershipError
 from app.services.analysis_registry import analysis_registry
 from app.services.emotional_linter import run_emotional_linter
+from app.services.user_identity import resolve_user_id
 from providers.base import AIProvider
 from providers.base import AIProviderError
+
+
+class AnalysisNotFoundError(Exception):
+    pass
 
 
 @dataclass
@@ -166,7 +170,7 @@ class AdvisorOrchestrator:
 
     def _build_context(self, payload: AdvisorRequest, *, uow: UnitOfWork | None) -> OrchestrationContext:
         context = payload.context or {}
-        user_id = _resolve_user_id(context.get("user_id"))
+        user_id = resolve_user_id(context.get("user_id"))
         memory_opt_in = bool(context.get("memory_opt_in", False))
         user_style = str(context.get("user_style") or "neutral_claro")
 
@@ -189,17 +193,22 @@ class AdvisorOrchestrator:
         emotional_context: str | None = None
         analysis = None
         if payload.analysis_id is not None:
-            stored = analysis_registry.get(payload.analysis_id)
-            if stored is not None:
-                risk_flags = [str(item.get("code", "")) for item in stored.risk_flags if item.get("code")]
-                tone = stored.emotional_context.get("tone") if stored.emotional_context else None
-                intent = (
-                    stored.emotional_context.get("intent_guess")
-                    if stored.emotional_context
-                    else None
-                )
-                emotional_context = _compose_emotional_context(tone=tone, intent_guess=intent)
-                analysis = AnalysisSnapshot(summary=stored.summary, risk_flags=risk_flags)
+            try:
+                stored = analysis_registry.get_for_user(payload.analysis_id, user_id)
+            except AnalysisOwnershipError:
+                raise
+            if stored is None:
+                raise AnalysisNotFoundError("analysis_id not found or expired")
+
+            risk_flags = [str(item.get("code", "")) for item in stored.risk_flags if item.get("code")]
+            tone = stored.emotional_context.get("tone") if stored.emotional_context else None
+            intent = (
+                stored.emotional_context.get("intent_guess")
+                if stored.emotional_context
+                else None
+            )
+            emotional_context = _compose_emotional_context(tone=tone, intent_guess=intent)
+            analysis = AnalysisSnapshot(summary=stored.summary, risk_flags=risk_flags)
 
         if not risk_flags:
             inline_linter = run_emotional_linter(payload.message_text, quick_mode=payload.quick_mode)
@@ -352,15 +361,6 @@ def _sanitize_message(value: str) -> str:
     without_controls = re.sub(r"[\x00-\x1F\x7F]", " ", value)
     normalized = re.sub(r"\s+", " ", without_controls.strip())
     return normalized
-
-
-def _resolve_user_id(value: str | None) -> UUID:
-    if value:
-        try:
-            return UUID(value)
-        except ValueError:
-            return uuid5(NAMESPACE_URL, value)
-    return UUID("00000000-0000-0000-0000-000000000001")
 
 
 def _parse_responses(raw_text: str) -> list[SuggestedResponse]:
