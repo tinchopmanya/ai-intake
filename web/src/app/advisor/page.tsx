@@ -3,7 +3,8 @@
 import Image from "next/image";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 
-import { advisorProfiles } from "./advisorProfiles";
+import AdvisorSelector from "@/components/advisor/AdvisorSelector";
+import { systemAdvisorById } from "@/components/advisor/systemAdvisors";
 
 type AdvisorResult = {
   advisor_id: string;
@@ -43,7 +44,7 @@ const ADVISOR_CONVERSATIONS_URL = `${API_BASE_URL}/v1/advisor/conversations`;
 const STORAGE_KEY = "advisor_conversation_id";
 
 function getAdvisorVisual(advisor: AdvisorResult) {
-  const profile = advisorProfiles[advisor.advisor_id];
+  const profile = systemAdvisorById[advisor.advisor_id];
   if (profile) {
     return profile;
   }
@@ -52,7 +53,7 @@ function getAdvisorVisual(advisor: AdvisorResult) {
     name: advisor.advisor_name,
     role: "Consejero",
     description: "Perfil sin metadata visual cargada.",
-    avatar: "/advisors/generic.svg",
+    image: "/advisors/generic.svg",
   };
 }
 
@@ -74,6 +75,7 @@ export default function AdvisorPage() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AdvisorResponse | null>(null);
   const [copiedSuggestionKey, setCopiedSuggestionKey] = useState<string | null>(null);
+  const [selectedAdvisors, setSelectedAdvisors] = useState<string[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<AdvisorConversationSummary[]>([]);
   const [loadingConversations, setLoadingConversations] = useState(true);
@@ -215,6 +217,7 @@ export default function AdvisorPage() {
           conversation_id: conversationId,
           conversation_text: text,
           context: context.trim(),
+          selected_advisors: selectedAdvisors,
         }),
       });
 
@@ -245,10 +248,14 @@ export default function AdvisorPage() {
     }
   }
 
+  const handleAdvisorSelectionChange = useCallback((selected: string[]) => {
+    setSelectedAdvisors(selected);
+  }, []);
+
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-5 p-6">
       <header className="rounded-2xl border border-slate-700 bg-slate-900 px-6 py-5">
-        <h1 className="text-2xl font-bold text-slate-100">Consejero Emocional</h1>
+        <h1 className="text-2xl font-bold text-slate-100">Consejero de conversaciones</h1>
         <p className="mt-1 text-sm text-slate-300">
           Pega una conversacion y recibe sugerencias claras desde distintos perfiles.
         </p>
@@ -308,6 +315,8 @@ export default function AdvisorPage() {
             onSubmit={handleSubmit}
             className="space-y-4 rounded-2xl border border-gray-200 bg-gray-50/70 p-5"
           >
+            <AdvisorSelector onSelectionChange={handleAdvisorSelectionChange} />
+
             <div>
               <label className="mb-2 block text-sm font-semibold text-gray-800">
                 Conversacion
@@ -341,7 +350,7 @@ export default function AdvisorPage() {
               disabled={loading || conversationText.trim().length === 0}
               className="rounded-xl bg-gray-900 px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {loading ? "Analizando..." : "Generar sugerencias"}
+              {loading ? "Analizando..." : "Analizar conversacion"}
             </button>
           </form>
 
@@ -367,7 +376,7 @@ export default function AdvisorPage() {
                     >
                       <div className="mb-3 flex items-center gap-3">
                         <Image
-                          src={profile.avatar}
+                          src={profile.image}
                           alt={profile.name}
                           width={52}
                           height={52}

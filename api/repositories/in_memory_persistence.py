@@ -49,12 +49,14 @@ class InMemoryPersistenceStore(PersistenceStore):
             owner_user_id=user.id,
             name="Ex Pareja",
             group_id=family_group.id,
+            profile_summary="Relacion previa sensible con alta carga emocional.",
         )
         self.contacts["contact-colleague"] = Contact(
             id="contact-colleague",
             owner_user_id=user.id,
             name="Colega",
             group_id=work_group.id,
+            profile_summary="Interacciones profesionales directas y orientadas a resultados.",
         )
 
         self._seed_advisors()

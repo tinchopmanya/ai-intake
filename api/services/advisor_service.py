@@ -19,6 +19,7 @@ from schemas import Message
 from services.advisor_committee_parser import parse_committee_response
 from services.advisor_committee_prompt_builder import build_committee_prompt
 from services.advisor_resolution_service import AdvisorResolutionService
+from services.contact_history_context_service import ContactHistoryContextService
 from services.contact_resolution_service import ContactResolutionService
 
 logger = logging.getLogger(__name__)
@@ -30,6 +31,7 @@ class AdvisorService:
         self._store = store
         self._resolver = AdvisorResolutionService(store)
         self._contact_resolver = ContactResolutionService(store)
+        self._history_context_service = ContactHistoryContextService(store)
 
     def advise(self, payload: AdvisorRequest) -> AdvisorResponse:
         resolved_contact_id, resolution_metadata = self._resolve_contact_for_request(payload)
@@ -56,7 +58,17 @@ class AdvisorService:
             if fallback is not None:
                 advisors = [fallback]
 
-        prompt = self._build_prompt(advisors, payload.context, payload.conversation_text)
+        history_context = self._build_contact_history_context(
+            user_id=payload.user_id,
+            resolved_contact_id=resolved_contact_id,
+            current_conversation_id=conversation.id,
+        )
+        prompt = self._build_prompt(
+            advisors,
+            payload.context,
+            payload.conversation_text,
+            history_context,
+        )
 
         try:
             # Mandatory architecture rule: exactly one Gemini call per advisor session.
@@ -191,7 +203,11 @@ class AdvisorService:
         )
 
     def _build_prompt(
-        self, advisors: list[Advisor], context: str, conversation_text: str
+        self,
+        advisors: list[Advisor],
+        context: str,
+        conversation_text: str,
+        contact_history_context: str | None,
     ) -> str:
         skills_by_advisor = {
             advisor.id: self._store.list_advisor_skills(advisor.id)
@@ -202,7 +218,25 @@ class AdvisorService:
             skills_by_advisor=skills_by_advisor,
             context=context,
             conversation_text=conversation_text,
+            contact_history_context=contact_history_context,
         )
+
+    def _build_contact_history_context(
+        self,
+        user_id: str,
+        resolved_contact_id: str | None,
+        current_conversation_id: str,
+    ) -> str | None:
+        if resolved_contact_id is None:
+            return None
+        context = self._history_context_service.build_for_prompt(
+            user_id=user_id,
+            contact_id=resolved_contact_id,
+            current_conversation_id=current_conversation_id,
+        )
+        if context is None:
+            return None
+        return context.history_block
 
     def _complete_partial_response(
         self, parsed: AdvisorResponse, resolved_advisors: list[Advisor]

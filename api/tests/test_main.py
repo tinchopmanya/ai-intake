@@ -307,6 +307,44 @@ class TestAPI(unittest.TestCase):
         result_ids = [item["advisor_id"] for item in body["results"]]
         self.assertEqual(result_ids[0], "robert")
 
+    def test_advisor_prompt_includes_contact_history_when_contact_resolved(self):
+        seed_response = self.client.post(
+            "/v1/advisor",
+            json={
+                "conversation_id": "hist-1",
+                "conversation_text": "Yo: hola\nEx Pareja: necesito hablar",
+                "user_id": "user-main",
+                "contact_id": "contact-ex",
+            },
+        )
+        self.assertEqual(seed_response.status_code, 200)
+
+        response = self.client.post(
+            "/v1/advisor",
+            json={
+                "conversation_id": "hist-2",
+                "conversation_text": "Yo: sigo pensando esto\nEx Pareja: que hacemos?",
+                "user_id": "user-main",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("[INICIO_HISTORIAL_CONTACTO]", self.fake_committee_provider.last_prompt)
+        self.assertIn("Perfil conocido del contacto:", self.fake_committee_provider.last_prompt)
+
+    def test_advisor_prompt_skips_contact_history_when_no_contact(self):
+        response = self.client.post(
+            "/v1/advisor",
+            json={
+                "conversation_text": "A: hola\nB: te leo",
+                "user_id": "user-main",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn(
+            "[INICIO_HISTORIAL_CONTACTO]",
+            self.fake_committee_provider.last_prompt,
+        )
+
     def test_advisor_persists_one_output_per_advisor(self):
         response = self.client.post(
             "/v1/advisor",

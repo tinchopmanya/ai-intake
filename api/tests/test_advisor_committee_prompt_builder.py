@@ -110,6 +110,28 @@ class TestAdvisorCommitteePromptBuilder(unittest.TestCase):
         self.assertIn("[INICIO_CONTEXTO]", prompt)
         self.assertIn("[FIN_CONTEXTO]", prompt)
 
+    def test_build_prompt_includes_contact_history_block_when_provided(self):
+        prompt = build_committee_prompt(
+            advisors=[_advisor("laura")],
+            skills_by_advisor={},
+            context="ctx",
+            conversation_text="conv",
+            contact_history_context="historial breve",
+        )
+        self.assertIn("[INICIO_HISTORIAL_CONTACTO]", prompt)
+        self.assertIn("historial breve", prompt)
+        self.assertIn("[FIN_HISTORIAL_CONTACTO]", prompt)
+
+    def test_build_prompt_skips_contact_history_block_when_missing(self):
+        prompt = build_committee_prompt(
+            advisors=[_advisor("laura")],
+            skills_by_advisor={},
+            context="ctx",
+            conversation_text="conv",
+            contact_history_context=None,
+        )
+        self.assertNotIn("[INICIO_HISTORIAL_CONTACTO]", prompt)
+
 
 if __name__ == "__main__":
     unittest.main()

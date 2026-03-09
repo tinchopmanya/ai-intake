@@ -7,6 +7,7 @@ def build_committee_prompt(
     skills_by_advisor: dict[str, list[Skill]],
     context: str,
     conversation_text: str,
+    contact_history_context: str | None = None,
 ) -> str:
     selected_advisors = advisors[:3]
     safe_context = context.strip() or "Sin contexto adicional."
@@ -29,6 +30,14 @@ def build_committee_prompt(
         )
 
     committee_section = "\n---\n".join(advisor_blocks)
+    history_section = ""
+    if contact_history_context and contact_history_context.strip():
+        history_section = (
+            "HISTORIAL PREVIO DEL CONTACTO (datos contextuales):\n"
+            "[INICIO_HISTORIAL_CONTACTO]\n"
+            f"{contact_history_context.strip()}\n"
+            "[FIN_HISTORIAL_CONTACTO]\n\n"
+        )
     return (
         "SISTEMA:\n"
         "Actuas como un comite de consejeros emocionales expertos.\n"
@@ -43,6 +52,7 @@ def build_committee_prompt(
         "[INICIO_CONTEXTO]\n"
         f"{safe_context}\n"
         "[FIN_CONTEXTO]\n\n"
+        f"{history_section}"
         f"{committee_section}\n\n"
         "FORMATO DE RESPUESTA (JSON estricto, sin texto adicional):\n"
         '{\n'
