@@ -1,0 +1,24 @@
+from uuid import UUID
+
+from pydantic import BaseModel
+from pydantic import EmailStr
+from pydantic import Field
+
+
+class GoogleAuthRequest(BaseModel):
+    id_token: str = Field(min_length=1, max_length=4096)
+
+
+class UserSummary(BaseModel):
+    id: UUID
+    email: EmailStr
+    name: str | None = None
+    memory_opt_in: bool = False
+
+
+class GoogleAuthResponse(BaseModel):
+    access_token: str = Field(min_length=1)
+    token_type: str = "bearer"
+    expires_in: int = Field(default=3600, gt=0)
+    user: UserSummary
+
