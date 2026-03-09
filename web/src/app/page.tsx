@@ -1,8 +1,8 @@
 import Link from "next/link";
+import { API_URL } from "@/lib/config";
 
 export default async function Home() {
-  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL!;
-  const res = await fetch(`${baseUrl}/health`, { cache: "no-store" });
+  const res = await fetch(`${API_URL}/health`, { cache: "no-store" });
   const data = await res.json();
 
   return (
@@ -14,6 +14,9 @@ export default async function Home() {
         </Link>
         <Link href="/advisor" className="rounded border border-gray-300 px-3 py-2 text-sm">
           Ir a Advisor
+        </Link>
+        <Link href="/mvp" className="rounded border border-gray-300 px-3 py-2 text-sm">
+          Base MVP
         </Link>
       </div>
       <p className="mt-2 text-sm text-gray-600">Backend health:</p>

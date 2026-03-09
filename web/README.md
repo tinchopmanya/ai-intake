@@ -1,36 +1,44 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Frontend MVP (Next.js)
 
-## Getting Started
+Base frontend para integrar el wizard del advisor sobre:
+- `POST /v1/analysis`
+- `POST /v1/advisor`
 
-First, run the development server:
+## Requisitos
+
+- Node.js 20+
+- Backend corriendo (por defecto `http://localhost:8000`)
+
+## Configuracion
+
+1. Crear variables locales:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Ajustar si hace falta:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Ejecutar
 
-## Learn More
+```bash
+npm install
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+Abrir:
+- `http://localhost:3000/` (home)
+- `http://localhost:3000/mvp` (base wizard MVP)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Estructura base agregada
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- `src/lib/config.ts`: resuelve `API_URL`.
+- `src/lib/api/types.ts`: tipos request/response para analysis/advisor.
+- `src/lib/api/client.ts`: cliente HTTP mínimo.
+- `src/components/mvp/*`: shell + scaffold de wizard.
+- `src/app/mvp/page.tsx`: página base de MVP.
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
