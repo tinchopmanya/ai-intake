@@ -14,6 +14,8 @@ const steps = [
   { id: "respuesta", label: "Respuesta" },
 ] as const;
 
+const advisorNames = ["Laura", "Robert", "Lidia"] as const;
+
 export function WizardScaffold() {
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
   const [messageText, setMessageText] = useState("");
@@ -26,6 +28,10 @@ export function WizardScaffold() {
   const [analysisId, setAnalysisId] = useState<string | null>(null);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [advisorResult, setAdvisorResult] = useState<AdvisorResponse | null>(null);
+  const [loadingAdvisor, setLoadingAdvisor] = useState(false);
+  const [advisorError, setAdvisorError] = useState<string | null>(null);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
   async function handleQuickResponse() {
     const text = messageText.trim();
@@ -80,6 +86,41 @@ export function WizardScaffold() {
       setAnalysisError("No se pudo ejecutar el analisis.");
     } finally {
       setLoadingAnalysis(false);
+    }
+  }
+
+  async function handleContinueToStep3() {
+    const text = messageText.trim();
+    if (!text || !analysisId || loadingAdvisor) return;
+
+    setLoadingAdvisor(true);
+    setAdvisorError(null);
+    setAdvisorResult(null);
+    setCopiedIndex(null);
+
+    try {
+      const result = await postAdvisor({
+        message_text: text,
+        mode,
+        analysis_id: analysisId,
+        relationship_type: "otro",
+      });
+      setAdvisorResult(result);
+      setCurrentStep(3);
+    } catch {
+      setAdvisorError("No se pudo generar respuestas de advisor.");
+    } finally {
+      setLoadingAdvisor(false);
+    }
+  }
+
+  async function handleCopy(text: string, index: number) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedIndex(index);
+      window.setTimeout(() => setCopiedIndex(null), 1200);
+    } catch {
+      setAdvisorError("No se pudo copiar la respuesta.");
     }
   }
 
@@ -197,15 +238,16 @@ export function WizardScaffold() {
             </button>
             <button
               type="button"
-              onClick={() => setCurrentStep(3)}
-              disabled={!analysisId}
+              onClick={handleContinueToStep3}
+              disabled={!analysisId || loadingAdvisor}
               className="rounded border border-black px-4 py-2 text-sm disabled:opacity-50"
             >
-              Continuar al paso 3
+              {loadingAdvisor ? "Generando..." : "Continuar al paso 3"}
             </button>
           </div>
 
           {analysisError && <p className="text-sm text-red-700">{analysisError}</p>}
+          {advisorError && <p className="text-sm text-red-700">{advisorError}</p>}
 
           {analysisResult && (
             <div className="space-y-3 rounded border border-gray-200 bg-gray-50 p-3">
@@ -261,10 +303,36 @@ export function WizardScaffold() {
       ) : (
         <div className="space-y-3">
           <h2 className="text-base font-medium">Paso 3: Respuesta</h2>
-          <p className="text-sm text-gray-700">Base lista para integrar /v1/advisor con analysis_id.</p>
+          <p className="text-sm text-gray-700">
+            Respuestas generadas desde <code>POST /v1/advisor</code>.
+          </p>
           <p className="text-xs text-gray-600">
             analysis_id en estado global: {analysisId ?? "sin analisis"}
           </p>
+          {advisorError && <p className="text-sm text-red-700">{advisorError}</p>}
+
+          <div className="space-y-3">
+            {advisorNames.map((advisorName, index) => {
+              const responseText = advisorResult?.responses[index]?.text ?? "";
+              return (
+                <article key={advisorName} className="space-y-2 rounded border border-gray-200 p-3">
+                  <h3 className="text-sm font-semibold">{advisorName}</h3>
+                  <p className="text-sm text-gray-800">
+                    {responseText || "Sin respuesta disponible."}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleCopy(responseText, index)}
+                    disabled={!responseText}
+                    className="rounded border border-gray-300 px-3 py-1 text-xs disabled:opacity-50"
+                  >
+                    {copiedIndex === index ? "Copiado" : "Copiar"}
+                  </button>
+                </article>
+              );
+            })}
+          </div>
+
           <button
             type="button"
             onClick={() => setCurrentStep(2)}
