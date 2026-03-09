@@ -1,7 +1,6 @@
 "use client";
 
-import Image from "next/image";
-
+import { AdvisorAvatarItem } from "@/components/ui/AdvisorAvatarItem";
 import { SystemAdvisor } from "./systemAdvisors";
 
 type AdvisorCardProps = {
@@ -25,20 +24,13 @@ export default function AdvisorCard({
           : "border-gray-200 hover:border-gray-300 hover:shadow"
       }`}
     >
-      <div className="mb-3 flex items-center gap-3">
-        <Image
-          src={advisor.image}
-          alt={advisor.name}
-          width={56}
-          height={56}
-          className="rounded-xl border border-gray-200 bg-gray-100"
+      <div className="mb-3">
+        <AdvisorAvatarItem
+          name={advisor.name}
+          role={advisor.role}
+          avatarSrc={advisor.image}
+          size={56}
         />
-        <div>
-          <p className="text-base font-semibold text-gray-900">{advisor.name}</p>
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-600">
-            {advisor.role}
-          </p>
-        </div>
       </div>
       <p className="text-sm leading-6 text-gray-700">{advisor.description}</p>
     </button>

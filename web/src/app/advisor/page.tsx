@@ -8,6 +8,7 @@ import {
   ADVISOR_PROFILES,
   advisorProfileById,
 } from "@/data/advisors";
+import { InputField, TextareaField } from "@/components/ui/primitives";
 
 type AdvisorResult = {
   advisor_id: string;
@@ -208,12 +209,12 @@ export default function AdvisorPage() {
                 <label className="mb-1.5 block text-sm font-medium text-gray-700">
                   Conversacion
                 </label>
-                <textarea
+                <TextareaField
                   value={conversationText}
                   onChange={(event) => setConversationText(event.target.value)}
                   placeholder={"Persona A: ...\nPersona B: ..."}
                   rows={5}
-                  className="w-full rounded-xl border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-500 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400/25 lg:max-w-3xl"
+                  className="lg:max-w-3xl"
                   disabled={loading}
                 />
               </div>
@@ -254,12 +255,11 @@ export default function AdvisorPage() {
               <label className="mb-1.5 block text-sm font-medium text-gray-700">
                 Contexto opcional
               </label>
-              <input
+              <InputField
                 type="text"
                 value={context}
                 onChange={(event) => setContext(event.target.value)}
                 placeholder="Ej: conflicto familiar, quiero responder con firmeza sin escalar"
-                className="w-full rounded-xl border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-500 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400/25"
                 disabled={loading}
               />
             </div>
