@@ -20,6 +20,7 @@ from app.schemas.advisor import AnalysisSnapshot
 from app.schemas.advisor import PersistenceMetadata
 from app.schemas.advisor import SuggestedResponse
 from app.services.analysis_registry import analysis_registry
+from app.services.emotional_linter import run_emotional_linter
 from providers.base import AIProvider
 from providers.base import AIProviderError
 
@@ -58,83 +59,110 @@ class AdvisorOrchestrator:
             success=True,
         )
 
-        if uow is not None:
-            try:
-                uow.sessions.update_step(
-                    session_id=session_id,
-                    user_id=context.user_id,
-                    current_step="respuesta" if payload.quick_mode else "analisis",
-                )
-            except Exception:
-                pass
+        try:
+            if uow is not None:
+                try:
+                    uow.sessions.update_step(
+                        session_id=session_id,
+                        user_id=context.user_id,
+                        current_step="respuesta" if payload.quick_mode else "analisis",
+                    )
+                except Exception:
+                    pass
 
-        variables = build_advisor_prompt_variables(
-            message_text=sanitized_text,
-            relationship_type=context.relationship_type,
-            risk_flags=context.risk_flags,
-            mode=payload.mode,
-            emotional_context=context.emotional_context,
-            user_style=context.user_style,
-            contact_context=context.contact_context,
-        )
-        user_payload = build_advisor_user_payload(variables)
-
-        raw_model_output = self._call_model(user_payload)
-        responses = _parse_responses(raw_model_output)
-        if not responses:
-            responses = _fallback_responses()
-
-        if payload.quick_mode:
-            analysis = None
-        else:
-            analysis = context.analysis or AnalysisSnapshot(
-                summary="Analisis no disponible. Se genero respuesta con contexto minimo.",
+            variables = build_advisor_prompt_variables(
+                message_text=sanitized_text,
+                relationship_type=context.relationship_type,
                 risk_flags=context.risk_flags,
+                mode=payload.mode,
+                emotional_context=context.emotional_context,
+                user_style=context.user_style,
+                contact_context=context.contact_context,
+            )
+            user_payload = build_advisor_user_payload(variables)
+
+            raw_model_output = self._call_model(user_payload)
+            responses = _coerce_responses(raw_model_output)
+
+            if payload.quick_mode:
+                analysis = None
+            else:
+                analysis = context.analysis or AnalysisSnapshot(
+                    summary="Analisis no disponible. Se genero respuesta con contexto minimo.",
+                    risk_flags=context.risk_flags,
+                )
+
+            self._persist_outputs_and_memory(
+                payload=payload,
+                session_id=session_id,
+                user_id=context.user_id,
+                responses=responses,
+                analysis=analysis,
+                context=context,
+                uow=uow,
+                persistence=persistence,
             )
 
-        self._persist_outputs_and_memory(
-            payload=payload,
-            session_id=session_id,
-            user_id=context.user_id,
-            responses=responses,
-            analysis=analysis,
-            context=context,
-            uow=uow,
-            persistence=persistence,
-        )
+            if uow is not None:
+                try:
+                    uow.sessions.mark_completed(session_id=session_id, user_id=context.user_id)
+                except Exception:
+                    try:
+                        uow.sessions.mark_error(session_id=session_id, user_id=context.user_id)
+                    except Exception:
+                        pass
 
-        if uow is not None:
-            try:
-                uow.sessions.mark_completed(session_id=session_id, user_id=context.user_id)
-            except Exception:
+            duration_ms = int((datetime.now(UTC) - started_at).total_seconds() * 1000)
+            self._track_event(
+                uow,
+                event_name="advisor_session_completed",
+                session_id=session_id,
+                user_id=context.user_id,
+                step="respuesta",
+                mode=payload.mode,
+                quick_mode=payload.quick_mode,
+                save_session=payload.save_session,
+                success=True,
+                duration_ms=duration_ms,
+            )
+
+            return AdvisorResponse(
+                session_id=session_id,
+                mode=payload.mode,
+                quick_mode=payload.quick_mode,
+                analysis=analysis,
+                responses=responses,
+                persistence=persistence,
+                created_at=datetime.now(UTC),
+            )
+        except Exception:
+            if uow is not None:
                 try:
                     uow.sessions.mark_error(session_id=session_id, user_id=context.user_id)
                 except Exception:
                     pass
-
-        duration_ms = int((datetime.now(UTC) - started_at).total_seconds() * 1000)
-        self._track_event(
-            uow,
-            event_name="advisor_session_completed",
-            session_id=session_id,
-            user_id=context.user_id,
-            step="respuesta",
-            mode=payload.mode,
-            quick_mode=payload.quick_mode,
-            save_session=payload.save_session,
-            success=True,
-            duration_ms=duration_ms,
-        )
-
-        return AdvisorResponse(
-            session_id=session_id,
-            mode=payload.mode,
-            quick_mode=payload.quick_mode,
-            analysis=analysis,
-            responses=responses,
-            persistence=persistence,
-            created_at=datetime.now(UTC),
-        )
+            duration_ms = int((datetime.now(UTC) - started_at).total_seconds() * 1000)
+            self._track_event(
+                uow,
+                event_name="advisor_session_failed",
+                session_id=session_id,
+                user_id=context.user_id,
+                step="respuesta",
+                mode=payload.mode,
+                quick_mode=payload.quick_mode,
+                save_session=payload.save_session,
+                success=False,
+                duration_ms=duration_ms,
+            )
+            return AdvisorResponse(
+                session_id=session_id,
+                mode=payload.mode,
+                quick_mode=payload.quick_mode,
+                analysis=None if payload.quick_mode else context.analysis,
+                responses=_fallback_responses(),
+                persistence=persistence,
+                created_at=datetime.now(UTC),
+            )
 
     def _build_context(self, payload: AdvisorRequest, *, uow: UnitOfWork | None) -> OrchestrationContext:
         context = payload.context or {}
@@ -142,7 +170,11 @@ class AdvisorOrchestrator:
         memory_opt_in = bool(context.get("memory_opt_in", False))
         user_style = str(context.get("user_style") or "neutral_claro")
 
-        contact_context: str | None = None
+        contact_context: str | None = (
+            str(context.get("contact_context")).strip()
+            if context.get("contact_context") is not None
+            else None
+        )
         relationship_type = payload.relationship_type
         if payload.contact_id and uow is not None:
             try:
@@ -153,21 +185,35 @@ class AdvisorOrchestrator:
             except Exception:
                 pass
 
-        risk_flags = []
-        emotional_context = None
+        risk_flags: list[str] = []
+        emotional_context: str | None = None
         analysis = None
         if payload.analysis_id is not None:
             stored = analysis_registry.get(payload.analysis_id)
             if stored is not None:
-                risk_flags = list(stored.risk_flags)
-                emotional_context = stored.emotional_context
-                analysis = AnalysisSnapshot(summary=stored.summary, risk_flags=stored.risk_flags)
+                risk_flags = [str(item.get("code", "")) for item in stored.risk_flags if item.get("code")]
+                tone = stored.emotional_context.get("tone") if stored.emotional_context else None
+                intent = (
+                    stored.emotional_context.get("intent_guess")
+                    if stored.emotional_context
+                    else None
+                )
+                emotional_context = _compose_emotional_context(tone=tone, intent_guess=intent)
+                analysis = AnalysisSnapshot(summary=stored.summary, risk_flags=risk_flags)
+
+        if not risk_flags:
+            inline_linter = run_emotional_linter(payload.message_text, quick_mode=payload.quick_mode)
+            risk_flags = [item.code for item in inline_linter.risk_flags]
+            emotional_context = _compose_emotional_context(
+                tone=inline_linter.emotional_context.tone,
+                intent_guess=inline_linter.emotional_context.intent_guess,
+            )
 
         return OrchestrationContext(
             user_id=user_id,
             memory_opt_in=memory_opt_in,
             relationship_type=relationship_type,
-            user_style=user_style,
+            user_style=_adjust_user_style(user_style, risk_flags, mode=payload.mode),
             contact_context=contact_context,
             analysis=analysis,
             risk_flags=risk_flags,
@@ -303,7 +349,8 @@ class AdvisorOrchestrator:
 
 
 def _sanitize_message(value: str) -> str:
-    normalized = re.sub(r"\s+", " ", value.strip())
+    without_controls = re.sub(r"[\x00-\x1F\x7F]", " ", value)
+    normalized = re.sub(r"\s+", " ", without_controls.strip())
     return normalized
 
 
@@ -343,6 +390,18 @@ def _parse_responses(raw_text: str) -> list[SuggestedResponse]:
     return ordered
 
 
+def _coerce_responses(raw_text: str) -> list[SuggestedResponse]:
+    parsed = _parse_responses(raw_text)
+    fallback_by_advisor = {item.emotion_label: item.text for item in _fallback_responses()}
+    parsed_map = {item.emotion_label: item.text for item in parsed}
+
+    ordered: list[SuggestedResponse] = []
+    for emotion in ["empathetic", "assertive", "neutral"]:
+        text = parsed_map.get(emotion) or fallback_by_advisor[emotion]
+        ordered.append(SuggestedResponse(text=text, emotion_label=emotion))
+    return ordered
+
+
 def _try_parse_json(raw_text: str) -> dict[str, object] | None:
     text = raw_text.strip()
     try:
@@ -376,4 +435,29 @@ def _fallback_responses() -> list[SuggestedResponse]:
             emotion_label="neutral",
         ),
     ]
+
+
+def _compose_emotional_context(*, tone: str | None, intent_guess: str | None) -> str | None:
+    if not tone and not intent_guess:
+        return None
+    if tone and intent_guess:
+        return f"tone={tone}; intent={intent_guess}"
+    return tone or intent_guess
+
+
+def _adjust_user_style(base_style: str, risk_flags: list[str], *, mode: str) -> str:
+    flags = set(risk_flags)
+    adjusted = base_style
+    if mode == "preventive":
+        adjusted = f"{adjusted}|review_before_send"
+
+    if "high_emotion" in flags:
+        adjusted = f"{adjusted}|neutral_brief"
+    if "custody_related" in flags:
+        adjusted = f"{adjusted}|logistics_first"
+    if "legal_sensitive" in flags:
+        adjusted = f"{adjusted}|avoid_legal_claims"
+    if "passive_aggressive" in flags:
+        adjusted = f"{adjusted}|deescalate"
+    return adjusted
 

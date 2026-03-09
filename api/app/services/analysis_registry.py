@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from threading import Lock
+from typing import Any
 from uuid import UUID
 
 
@@ -10,8 +11,9 @@ from uuid import UUID
 class StoredAnalysis:
     analysis_id: UUID
     summary: str
-    risk_flags: list[str]
-    emotional_context: str | None
+    risk_flags: list[dict[str, Any]]
+    emotional_context: dict[str, str]
+    ui_alerts: list[dict[str, str]]
     created_at: datetime
 
 

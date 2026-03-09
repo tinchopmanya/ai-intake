@@ -10,6 +10,8 @@ from pydantic import field_validator
 UsageMode = Literal["reactive", "preventive"]
 RelationshipType = Literal["pareja", "familia", "amistad", "trabajo", "cliente", "otro"]
 EmotionLabel = Literal["neutral", "calm", "empathetic", "assertive", "friendly", "apologetic"]
+RiskSeverity = Literal["low", "medium", "high"]
+AlertLevel = Literal["info", "warning", "critical"]
 
 
 class AnalysisRequest(BaseModel):
@@ -30,9 +32,25 @@ class AnalysisRequest(BaseModel):
 
 
 class AnalysisResponse(BaseModel):
+    class RiskFlag(BaseModel):
+        code: str
+        severity: RiskSeverity
+        confidence: float = Field(ge=0, le=1)
+        evidence: list[str] = Field(default_factory=list)
+
+    class EmotionalContext(BaseModel):
+        tone: str
+        intent_guess: str
+
+    class UiAlert(BaseModel):
+        level: AlertLevel
+        message: str
+
     analysis_id: UUID
     summary: str
-    risk_flags: list[str] = Field(default_factory=list)
+    risk_flags: list[RiskFlag] = Field(default_factory=list)
+    emotional_context: EmotionalContext
+    ui_alerts: list[UiAlert] = Field(default_factory=list)
     tone_detected: str | None = None
     suggested_emotion_label: EmotionLabel | None = None
     analysis_skipped: bool = False
