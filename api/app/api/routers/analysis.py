@@ -7,6 +7,8 @@ from fastapi import status
 
 from app.schemas.analysis import AnalysisRequest
 from app.schemas.analysis import AnalysisResponse
+from app.services.analysis_registry import StoredAnalysis
+from app.services.analysis_registry import analysis_registry
 
 router = APIRouter(prefix="/v1/analysis", tags=["analysis"])
 
@@ -30,7 +32,7 @@ async def create_analysis(payload: AnalysisRequest) -> AnalysisResponse:
         tone_detected = "neutral"
         suggested_emotion = "empathetic"
 
-    return AnalysisResponse(
+    response = AnalysisResponse(
         analysis_id=uuid4(),
         summary=summary,
         risk_flags=risk_flags,
@@ -39,4 +41,14 @@ async def create_analysis(payload: AnalysisRequest) -> AnalysisResponse:
         analysis_skipped=analysis_skipped,
         created_at=datetime.now(UTC),
     )
+    analysis_registry.put(
+        StoredAnalysis(
+            analysis_id=response.analysis_id,
+            summary=response.summary,
+            risk_flags=response.risk_flags,
+            emotional_context=response.tone_detected,
+            created_at=response.created_at,
+        )
+    )
+    return response
 
