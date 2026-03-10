@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 
-import { AdvisorSidebar } from "@/components/mvp/AdvisorSidebar";
 import { Panel } from "@/components/mvp/ui";
 
 type AppShellProps = {
@@ -10,8 +9,8 @@ type AppShellProps = {
 
 export function AppShell({ children }: AppShellProps) {
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-3 bg-gray-100/60 p-3 md:p-4">
-      <Panel className="flex items-center justify-between px-4 py-2.5">
+    <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col gap-2 bg-gray-100/60 px-2 py-2 md:px-3 md:py-3">
+      <Panel className="mx-auto flex w-full max-w-4xl items-center justify-between px-4 py-2.5">
         <div>
           <h1 className="text-xl font-bold text-gray-800">Consejero de Conversaciones</h1>
           <p className="mt-0.5 text-sm text-gray-600">
@@ -22,12 +21,7 @@ export function AppShell({ children }: AppShellProps) {
           Inicio
         </Link>
       </Panel>
-      <section className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_150px] lg:items-start">
-        <div className="min-w-0 order-2 lg:order-1">{children}</div>
-        <div className="order-1 lg:order-2">
-          <AdvisorSidebar />
-        </div>
-      </section>
+      <section className="mx-auto w-full max-w-4xl min-w-0">{children}</section>
     </main>
   );
 }
