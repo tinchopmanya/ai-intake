@@ -3,10 +3,12 @@
 import Image from "next/image";
 import { useState } from "react";
 
+import { AdvisorProfileModal } from "@/components/mvp/AdvisorProfileModal";
 import { Button, Panel, Select, Textarea } from "@/components/mvp/ui";
 import { AdvisorAvatarItem } from "@/components/ui/AdvisorAvatarItem";
 import { ADVISOR_PROFILES } from "@/data/advisors";
 import { postAdvisor, postAnalysis } from "@/lib/api/client";
+import type { AdvisorProfile } from "@/data/advisors";
 import type { AdvisorResponse, AnalysisResponse, AnalysisRiskFlag, UsageMode } from "@/lib/api/types";
 
 const ADVISOR_FALLBACK_VISUAL = {
@@ -189,9 +191,15 @@ export function WizardScaffold() {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [contextOptional, setContextOptional] = useState("");
   const [selectedRecentPersonId, setSelectedRecentPersonId] = useState<string | null>(null);
+  const [selectedProfile, setSelectedProfile] = useState<AdvisorProfile | null>(null);
 
   const selectedRecentPerson =
     RECENT_PEOPLE.find((person) => person.id === selectedRecentPersonId) ?? null;
+
+  function openAdvisorProfileById(advisorId: string) {
+    const profile = ADVISOR_PROFILES.find((advisor) => advisor.id === advisorId) ?? null;
+    setSelectedProfile(profile);
+  }
 
   function buildContextPayload() {
     const context: Record<string, unknown> = {};
@@ -316,7 +324,13 @@ export function WizardScaffold() {
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[#334155]">
               <span className="font-medium text-[#1f2937]">Responderas con ayuda de</span>
               {ADVISOR_PROFILES.map((advisor) => (
-                <div key={advisor.id} className="flex items-center gap-2">
+                <button
+                  key={advisor.id}
+                  type="button"
+                  onClick={() => openAdvisorProfileById(advisor.id)}
+                  className="flex items-center gap-2 rounded-full px-1 py-0.5 text-left transition hover:bg-[#f8fafc] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/20"
+                  aria-label={`Abrir perfil de ${advisor.name}`}
+                >
                   <Image
                     src={advisor.avatar64}
                     alt={advisor.name}
@@ -325,7 +339,7 @@ export function WizardScaffold() {
                     className="h-7 w-7 rounded-full border border-[#dbe3ec] object-cover"
                   />
                   <span>{advisor.name}</span>
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -575,6 +589,7 @@ export function WizardScaffold() {
                           avatarSrc={advisorVisual.avatar64}
                           size={56}
                           tone="light"
+                          onClick={() => openAdvisorProfileById(advisorVisual.id)}
                         />
                       </div>
                       <span className="shrink-0 rounded-full bg-white/15 px-2 py-1 text-[11px] font-medium text-white">
@@ -627,6 +642,8 @@ export function WizardScaffold() {
           </div>
         </div>
       ) : null}
+
+      <AdvisorProfileModal profile={selectedProfile} onClose={() => setSelectedProfile(null)} />
     </Panel>
   );
 }
