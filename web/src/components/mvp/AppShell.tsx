@@ -9,19 +9,19 @@ type AppShellProps = {
 
 export function AppShell({ children }: AppShellProps) {
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col gap-2 bg-gray-100/60 px-2 py-2 md:px-3 md:py-3">
-      <Panel className="mx-auto flex w-full max-w-4xl items-center justify-between px-4 py-2.5">
+    <main className="mx-auto flex min-h-screen w-full max-w-[1080px] min-w-0 flex-col gap-4 overflow-x-hidden bg-[#f3f4f6] px-5 py-6">
+      <Panel className="mx-auto flex w-full items-center justify-between border-[#e5e7eb] bg-white px-4 py-3">
         <div>
-          <h1 className="text-xl font-bold text-gray-800">Consejero de Conversaciones</h1>
-          <p className="mt-0.5 text-sm text-gray-600">
+          <h1 className="text-xl font-bold text-[#1f2937]">Consejero de Conversaciones</h1>
+          <p className="mt-1 text-sm text-[#334155]">
             Pega una conversacion dificil y revisa tres perspectivas antes de responder.
           </p>
         </div>
-        <Link href="/" className="text-sm text-gray-700 underline underline-offset-2">
+        <Link href="/" className="text-sm text-[#334155] underline underline-offset-2">
           Inicio
         </Link>
       </Panel>
-      <section className="mx-auto w-full max-w-4xl min-w-0">{children}</section>
+      <section className="mx-auto w-full min-w-0">{children}</section>
     </main>
   );
 }
