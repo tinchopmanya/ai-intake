@@ -39,6 +39,7 @@ class OrchestrationContext:
     analysis: AnalysisSnapshot | None
     risk_flags: list[str]
     emotional_context: str | None
+    advisor_lineup: list[dict[str, str]]
 
 
 class AdvisorOrchestrator:
@@ -82,11 +83,13 @@ class AdvisorOrchestrator:
                 emotional_context=context.emotional_context,
                 user_style=context.user_style,
                 contact_context=context.contact_context,
+                advisor_lineup=context.advisor_lineup,
             )
             user_payload = build_advisor_user_payload(variables)
 
             raw_model_output = self._call_model(user_payload)
-            responses = _coerce_responses(raw_model_output)
+            advisor_ids = _advisor_ids_from_lineup(context.advisor_lineup)
+            responses = _coerce_responses(raw_model_output, advisor_ids=advisor_ids)
 
             if payload.quick_mode:
                 analysis = None
@@ -180,6 +183,8 @@ class AdvisorOrchestrator:
             else None
         )
         relationship_type = payload.relationship_type
+        advisor_lineup_raw = context.get("advisor_lineup")
+        advisor_lineup = _normalize_advisor_lineup(advisor_lineup_raw)
         if payload.contact_id and uow is not None:
             try:
                 contact = uow.contacts.get_by_id(user_id=user_id, contact_id=payload.contact_id)
@@ -227,6 +232,7 @@ class AdvisorOrchestrator:
             analysis=analysis,
             risk_flags=risk_flags,
             emotional_context=emotional_context,
+            advisor_lineup=advisor_lineup,
         )
 
     def _start_session(
@@ -363,7 +369,7 @@ def _sanitize_message(value: str) -> str:
     return normalized
 
 
-def _parse_responses(raw_text: str) -> list[SuggestedResponse]:
+def _parse_responses(raw_text: str, *, advisor_ids: list[str]) -> list[SuggestedResponse]:
     if not raw_text:
         return []
     parsed = _try_parse_json(raw_text)
@@ -383,15 +389,16 @@ def _parse_responses(raw_text: str) -> list[SuggestedResponse]:
             by_advisor[advisor] = text
 
     ordered = []
-    for advisor, emotion in [("laura", "empathetic"), ("robert", "assertive"), ("lidia", "neutral")]:
+    for index, advisor in enumerate(advisor_ids):
+        emotion = _emotion_for_advisor(advisor, index=index)
         text = by_advisor.get(advisor)
         if text:
             ordered.append(SuggestedResponse(text=text, emotion_label=emotion))
     return ordered
 
 
-def _coerce_responses(raw_text: str) -> list[SuggestedResponse]:
-    parsed = _parse_responses(raw_text)
+def _coerce_responses(raw_text: str, *, advisor_ids: list[str]) -> list[SuggestedResponse]:
+    parsed = _parse_responses(raw_text, advisor_ids=advisor_ids)
     fallback_by_advisor = {item.emotion_label: item.text for item in _fallback_responses()}
     parsed_map = {item.emotion_label: item.text for item in parsed}
 
@@ -460,4 +467,52 @@ def _adjust_user_style(base_style: str, risk_flags: list[str], *, mode: str) -> 
     if "passive_aggressive" in flags:
         adjusted = f"{adjusted}|deescalate"
     return adjusted
+
+
+def _normalize_advisor_lineup(value: object) -> list[dict[str, str]]:
+    default = [
+        {"id": "laura", "name": "Laura", "role": "Empatica", "tone": "calmado"},
+        {"id": "robert", "name": "Robert", "role": "Estrategico", "tone": "directo"},
+        {"id": "lidia", "name": "Lidia", "role": "Neutral", "tone": "objetivo"},
+    ]
+    if not isinstance(value, list):
+        return default
+    resolved: list[dict[str, str]] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        advisor_id = str(item.get("id", "")).strip().lower()
+        if not advisor_id:
+            continue
+        resolved.append(
+            {
+                "id": advisor_id,
+                "name": str(item.get("name") or advisor_id).strip() or advisor_id,
+                "role": str(item.get("role") or "").strip(),
+                "tone": str(item.get("tone") or "").strip(),
+            }
+        )
+    if len(resolved) < 3:
+        return default
+    return resolved[:3]
+
+
+def _advisor_ids_from_lineup(lineup: list[dict[str, str]]) -> list[str]:
+    ids = [str(item.get("id", "")).strip().lower() for item in lineup if item.get("id")]
+    if len(ids) < 3:
+        return ["laura", "robert", "lidia"]
+    return ids[:3]
+
+
+def _emotion_for_advisor(advisor_id: str, *, index: int) -> str:
+    by_id = {
+        "laura": "empathetic",
+        "robert": "assertive",
+        "lidia": "neutral",
+    }
+    mapped = by_id.get(advisor_id)
+    if mapped:
+        return mapped
+    by_index = ["empathetic", "assertive", "neutral"]
+    return by_index[min(index, 2)]
 

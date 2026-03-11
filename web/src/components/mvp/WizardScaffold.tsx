@@ -11,6 +11,7 @@ import { authFetch } from "@/lib/auth/client";
 import { postAdvisor, postAnalysis } from "@/lib/api/client";
 import type { AdvisorProfile } from "@/data/advisors";
 import { API_URL } from "@/lib/config";
+import { resolveRuntimeLocale, tRuntime } from "@/lib/i18n/runtime";
 import type {
   AdvisorResponse,
   AnalysisResponse,
@@ -129,11 +130,17 @@ function humanizeFlag(flag: AnalysisRiskFlag) {
 /**
  * Visual step indicator for intake, analysis and response stages.
  */
-function Stepper({ currentStep }: { currentStep: 1 | 2 | 3 }) {
+function Stepper({
+  currentStep,
+  labels,
+}: {
+  currentStep: 1 | 2 | 3;
+  labels: [string, string, string];
+}) {
   const steps = [
-    { id: 1, label: "Ingreso" },
-    { id: 2, label: "Analisis" },
-    { id: 3, label: "Respuestas" },
+    { id: 1, label: labels[0] },
+    { id: 2, label: labels[1] },
+    { id: 3, label: labels[2] },
   ] as const;
 
   return (
@@ -201,6 +208,8 @@ function StepSection({
  * Client-side wizard that orchestrates analysis and advisor response calls.
  */
 export function WizardScaffold() {
+  const locale = resolveRuntimeLocale();
+  const t = (key: string) => tRuntime(key, locale);
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
   const [messageText, setMessageText] = useState("");
   const [mode, setMode] = useState<UsageMode>("reactive");
@@ -387,15 +396,22 @@ export function WizardScaffold() {
 
   return (
     <Panel className="mx-auto w-full min-w-0 space-y-5 overflow-x-hidden border-[#e5e7eb] bg-white p-4 shadow-sm sm:p-5">
-      <Stepper currentStep={currentStep} />
+      <Stepper
+        currentStep={currentStep}
+        labels={[
+          t("wizard.step.intake"),
+          t("wizard.step.analysis"),
+          t("wizard.step.responses"),
+        ]}
+      />
 
       {currentStep === 1 ? (
         <div className="space-y-4">
           <div className="space-y-3">
             <div>
-              <h3 className="text-lg font-semibold text-[#1f2937]">Paso 1: Ingreso</h3>
+              <h3 className="text-lg font-semibold text-[#1f2937]">{t("wizard.step1.title")}</h3>
               <p className="mt-1 text-sm text-[#334155]">
-                Pega el mensaje y define el enfoque antes de analizarlo.
+                {t("wizard.step1.subtitle")}
               </p>
             </div>
 
@@ -425,7 +441,9 @@ export function WizardScaffold() {
           <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_260px] md:items-start">
             <div className="min-w-0 space-y-3">
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-[#1f2937]">Mensaje</label>
+                <label className="block text-sm font-medium text-[#1f2937]">
+                  {t("wizard.input.message")}
+                </label>
                 <div className="rounded-xl border border-dashed border-[#cbd5e1] bg-[#f8fafc] p-3">
                   <div className="flex flex-wrap items-center gap-2">
                     <input
@@ -474,9 +492,9 @@ export function WizardScaffold() {
 
               <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_240px] md:items-end">
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-[#1f2937]">
-                    Contexto opcional
-                  </label>
+                    <label className="block text-sm font-medium text-[#1f2937]">
+                      {t("wizard.input.context_optional")}
+                    </label>
                   <Textarea
                     value={contextOptional}
                     onChange={(event) => setContextOptional(event.target.value)}
@@ -488,7 +506,9 @@ export function WizardScaffold() {
 
                 <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] md:grid-cols-1">
                   <div className="space-y-2">
-                    <label className="block text-sm font-medium text-[#1f2937]">Modo</label>
+                    <label className="block text-sm font-medium text-[#1f2937]">
+                      {t("wizard.input.mode")}
+                    </label>
                     <Select
                       value={mode}
                       onChange={(event) => setMode(event.target.value as UsageMode)}
@@ -509,7 +529,7 @@ export function WizardScaffold() {
                   variant="primary"
                   className="min-w-[170px] bg-[#1f2937] hover:bg-[#111827]"
                 >
-                  {loadingAnalysis ? "Analizando conversacion..." : "Continuar"}
+                  {loadingAnalysis ? t("wizard.button.analyzing") : t("wizard.button.continue")}
                 </Button>
                 <Button
                   type="button"
@@ -521,7 +541,7 @@ export function WizardScaffold() {
                   variant="secondary"
                   className="min-w-[170px] border-[#cbd5e1] bg-white text-[#334155] hover:bg-[#f8fafc]"
                 >
-                  {loadingAdvisor ? "Generando respuestas..." : "Respuesta rapida"}
+                  {loadingAdvisor ? t("wizard.button.generating") : t("wizard.button.quick_reply")}
                 </Button>
               </div>
 
@@ -661,7 +681,7 @@ export function WizardScaffold() {
                   variant="primary"
                   className="min-w-[150px] bg-[#1f2937] hover:bg-[#111827]"
                 >
-                  {loadingAdvisor ? "Generando respuestas..." : "Continuar"}
+                  {loadingAdvisor ? t("wizard.button.generating") : t("wizard.button.continue")}
                 </Button>
               </div>
             </>

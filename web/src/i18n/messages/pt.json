@@ -3,5 +3,14 @@
   "app.subtitle": "Responda com clareza e inteligencia emocional.",
   "wizard.step.intake": "Entrada",
   "wizard.step.analysis": "Analise",
-  "wizard.step.responses": "Respostas"
+  "wizard.step.responses": "Respostas",
+  "wizard.step1.title": "Passo 1: Entrada",
+  "wizard.step1.subtitle": "Cole a mensagem e defina a abordagem antes da analise.",
+  "wizard.input.message": "Mensagem",
+  "wizard.input.context_optional": "Contexto opcional",
+  "wizard.input.mode": "Modo",
+  "wizard.button.continue": "Continuar",
+  "wizard.button.quick_reply": "Resposta rapida",
+  "wizard.button.analyzing": "Analisando conversa...",
+  "wizard.button.generating": "Gerando respostas..."
 }

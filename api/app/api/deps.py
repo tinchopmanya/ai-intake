@@ -11,6 +11,7 @@ from app.repositories import UnitOfWork
 from app.services.auth_service import AuthenticatedUser
 from app.services.auth_service import AuthError
 from app.services.auth_service import AuthService
+from app.services.advisor_catalog_service import AdvisorCatalogService
 from app.services.ocr_service import OcrService
 from config import settings
 from providers.base import AIProvider
@@ -59,4 +60,8 @@ def get_current_user(
 
 def get_ocr_service() -> OcrService:
     return OcrService(provider=settings.ocr_provider)
+
+
+def get_advisor_catalog_service() -> AdvisorCatalogService:
+    return AdvisorCatalogService()
 

@@ -3,5 +3,14 @@
   "app.subtitle": "Reply with clarity and emotional intelligence.",
   "wizard.step.intake": "Intake",
   "wizard.step.analysis": "Analysis",
-  "wizard.step.responses": "Replies"
+  "wizard.step.responses": "Replies",
+  "wizard.step1.title": "Step 1: Intake",
+  "wizard.step1.subtitle": "Paste the message and set the approach before analysis.",
+  "wizard.input.message": "Message",
+  "wizard.input.context_optional": "Optional context",
+  "wizard.input.mode": "Mode",
+  "wizard.button.continue": "Continue",
+  "wizard.button.quick_reply": "Quick reply",
+  "wizard.button.analyzing": "Analyzing conversation...",
+  "wizard.button.generating": "Generating replies..."
 }
