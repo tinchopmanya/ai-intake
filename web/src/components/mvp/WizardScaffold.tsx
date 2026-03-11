@@ -332,6 +332,7 @@ export function WizardScaffold() {
         mode,
         relationship_type: "otro",
         quick_mode: params.quickMode,
+        save_session: true,
         analysis_id: params.analysisId ?? undefined,
         context: buildContextPayload(),
       });
