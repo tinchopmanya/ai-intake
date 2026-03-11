@@ -1,11 +1,12 @@
 import { API_URL } from "@/lib/config";
+import { authFetch } from "@/lib/auth/client";
 import type { AdvisorRequest } from "@/lib/api/types";
 import type { AdvisorResponse } from "@/lib/api/types";
 import type { AnalysisRequest } from "@/lib/api/types";
 import type { AnalysisResponse } from "@/lib/api/types";
 
 async function postJson<T>(path: string, payload: unknown): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await authFetch(`${API_URL}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),

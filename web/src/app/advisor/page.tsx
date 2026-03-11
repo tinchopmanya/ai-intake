@@ -8,6 +8,8 @@ import {
   ADVISOR_PROFILES,
   advisorProfileById,
 } from "@/data/advisors";
+import { AuthGate } from "@/components/auth/AuthGate";
+import { authFetch } from "@/lib/auth/client";
 import type { AdvisorResponse as MvpAdvisorResponse } from "@/lib/api/types";
 import { InputField, TextareaField } from "@/components/ui/primitives";
 
@@ -93,7 +95,7 @@ export default function AdvisorPage() {
     setCopiedAdvisorId(null);
 
     try {
-      const response = await fetch(ADVISOR_URL, {
+      const response = await authFetch(ADVISOR_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -134,7 +136,8 @@ export default function AdvisorPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-4 bg-gray-100/60 p-5 md:p-6">
+    <AuthGate>
+      <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-4 bg-gray-100/60 p-5 md:p-6">
       <div className="grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)] lg:items-stretch">
         <aside className="h-full rounded-2xl border border-gray-200 bg-gray-100/80 p-4 shadow-sm lg:min-h-[560px]">
           <h2 className="mb-4 truncate text-xs font-normal text-gray-700">
@@ -413,6 +416,7 @@ export default function AdvisorPage() {
           </div>
         </div>
       )}
-    </main>
+      </main>
+    </AuthGate>
   );
 }

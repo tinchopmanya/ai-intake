@@ -2,6 +2,9 @@
 
 import { FormEvent, useEffect, useState } from "react";
 
+import { AuthGate } from "@/components/auth/AuthGate";
+import { authFetch } from "@/lib/auth/client";
+
 type Message = {
   id: string;
   role: "user" | "assistant";
@@ -55,7 +58,7 @@ export default function ChatPage() {
   }
 
   async function loadConversationHistory(id: string): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/v1/conversations/${id}`, {
+    const response = await authFetch(`${API_BASE_URL}/v1/conversations/${id}`, {
       cache: "no-store",
     });
 
@@ -92,7 +95,7 @@ export default function ChatPage() {
     async function syncHistory() {
       try {
         setError(null);
-        const response = await fetch(
+        const response = await authFetch(
           `${API_BASE_URL}/v1/conversations/${conversationId}`,
           { cache: "no-store" },
         );
@@ -136,7 +139,7 @@ export default function ChatPage() {
     setLoading(true);
 
     try {
-      const response = await fetch(CHAT_URL, {
+      const response = await authFetch(CHAT_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -161,55 +164,57 @@ export default function ChatPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-4 p-6">
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">Chat</h1>
-        <button
-          type="button"
-          onClick={handleNewConversation}
-          className="rounded border border-gray-300 px-3 py-2 text-sm"
-        >
-          Nueva conversacion
-        </button>
-      </div>
+    <AuthGate>
+      <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-4 p-6">
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-2xl font-bold">Chat</h1>
+          <button
+            type="button"
+            onClick={handleNewConversation}
+            className="rounded border border-gray-300 px-3 py-2 text-sm"
+          >
+            Nueva conversacion
+          </button>
+        </div>
 
-      <section className="flex-1 rounded border border-gray-200 p-4">
-        {messages.length === 0 ? (
-          <p className="text-sm text-gray-500">Todavia no hay mensajes.</p>
-        ) : (
-          <ul className="space-y-3">
-            {messages.map((message) => (
-              <li key={message.id} className="text-sm">
-                <span className="font-semibold">
-                  {message.role === "user" ? "Vos" : "Bot"}:
-                </span>{" "}
-                <span>{message.text}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+        <section className="flex-1 rounded border border-gray-200 p-4">
+          {messages.length === 0 ? (
+            <p className="text-sm text-gray-500">Todavia no hay mensajes.</p>
+          ) : (
+            <ul className="space-y-3">
+              {messages.map((message) => (
+                <li key={message.id} className="text-sm">
+                  <span className="font-semibold">
+                    {message.role === "user" ? "Vos" : "Bot"}:
+                  </span>{" "}
+                  <span>{message.text}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
 
-      {loading && <p className="text-sm text-gray-500">Enviando...</p>}
-      {error && <p className="text-sm text-red-600">{error}</p>}
+        {loading && <p className="text-sm text-gray-500">Enviando...</p>}
+        {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <form onSubmit={handleSubmit} className="flex gap-2">
-        <input
-          type="text"
-          value={input}
-          onChange={(event) => setInput(event.target.value)}
-          placeholder="Escribi un mensaje..."
-          className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm"
-          disabled={loading}
-        />
-        <button
-          type="submit"
-          disabled={loading || input.trim().length === 0}
-          className="rounded bg-black px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          Enviar
-        </button>
-      </form>
-    </main>
+        <form onSubmit={handleSubmit} className="flex gap-2">
+          <input
+            type="text"
+            value={input}
+            onChange={(event) => setInput(event.target.value)}
+            placeholder="Escribi un mensaje..."
+            className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm"
+            disabled={loading}
+          />
+          <button
+            type="submit"
+            disabled={loading || input.trim().length === 0}
+            className="rounded bg-black px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Enviar
+          </button>
+        </form>
+      </main>
+    </AuthGate>
   );
 }

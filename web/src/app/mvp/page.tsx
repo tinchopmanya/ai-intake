@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/mvp/AppShell";
+import { AuthGate } from "@/components/auth/AuthGate";
 import { WizardScaffold } from "@/components/mvp/WizardScaffold";
 
 /**
@@ -7,7 +8,9 @@ import { WizardScaffold } from "@/components/mvp/WizardScaffold";
 export default function MvpPage() {
   return (
     <AppShell>
-      <WizardScaffold />
+      <AuthGate>
+        <WizardScaffold />
+      </AuthGate>
     </AppShell>
   );
 }
