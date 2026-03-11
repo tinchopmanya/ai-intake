@@ -1,5 +1,19 @@
 {
   "error.invalid_google_token": "Token de Google invalido.",
+  "error.google_email_not_verified": "El correo de Google no esta verificado.",
+  "error.google_auth_library_missing": "Falta dependencia google-auth en el backend.",
+  "error.missing_bearer_token": "Falta token de autorizacion.",
+  "error.invalid_or_expired_session": "Sesion invalida o expirada.",
+  "error.invalid_refresh_token": "Refresh token invalido o expirado.",
+  "error.user_not_found": "Usuario no encontrado.",
+  "error.invalid_language_code": "Idioma invalido.",
   "error.analysis_not_found": "Analisis no encontrado o expirado.",
-  "error.analysis_forbidden": "No tienes acceso a este analisis."
+  "error.analysis_forbidden": "No tienes acceso a este analisis.",
+  "error.analysis_id_forbidden": "No tienes acceso a este analisis.",
+  "error.analysis_id_not_found_or_expired": "Analisis no encontrado o expirado.",
+  "error.file_must_be_image": "El archivo debe ser una imagen.",
+  "error.empty_file": "El archivo esta vacio.",
+  "error.file_too_large": "El archivo es demasiado grande.",
+  "error.python_multipart_not_installed": "Falta python-multipart en el backend.",
+  "error.ocr_unavailable": "OCR no disponible en este momento."
 }

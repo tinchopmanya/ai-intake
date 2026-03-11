@@ -12,5 +12,18 @@
   "wizard.button.continue": "Continue",
   "wizard.button.quick_reply": "Quick reply",
   "wizard.button.analyzing": "Analyzing conversation...",
-  "wizard.button.generating": "Generating replies..."
+  "wizard.button.generating": "Generating replies...",
+  "onboarding.title": "Complete your onboarding",
+  "onboarding.subtitle": "Set up your initial emotional profile to personalize suggestions.",
+  "onboarding.objective": "Objective",
+  "onboarding.objective_placeholder": "Ex: reply calmly while setting clear boundaries",
+  "onboarding.breakup_side": "Who ended the relationship",
+  "onboarding.breakup_i_left": "I ended the relationship",
+  "onboarding.breakup_ex_left": "My ex ended the relationship",
+  "onboarding.breakup_mutual": "It was mutual",
+  "onboarding.has_children": "We have children",
+  "onboarding.country": "Country (ISO-2)",
+  "onboarding.language": "Language",
+  "onboarding.submit": "Save and continue",
+  "onboarding.saving": "Saving..."
 }

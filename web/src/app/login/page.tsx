@@ -52,8 +52,10 @@ export default function LoginPage() {
       setLoading(true);
       setError(null);
       try {
-        await loginWithGoogleIdToken(idToken);
-        const nextPath = searchParams.get("next") || "/mvp";
+        const user = await loginWithGoogleIdToken(idToken);
+        const nextPath = user.onboarding_completed
+          ? searchParams.get("next") || "/mvp"
+          : "/onboarding";
         router.replace(nextPath);
       } catch {
         setError("No se pudo iniciar sesion con Google.");

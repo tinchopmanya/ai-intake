@@ -34,6 +34,9 @@ class AuthenticatedUser:
     country_code: str
     language_code: str
     onboarding_completed: bool
+    objective: str | None = None
+    has_children: bool | None = None
+    breakup_side: str | None = None
 
 
 @dataclass(frozen=True)
@@ -191,6 +194,9 @@ class AuthService:
                         country_code=country_code or existing.country_code,
                         language_code=language_code or existing.language_code,
                         onboarding_completed=existing.onboarding_completed,
+                        objective=existing.objective,
+                        has_children=existing.has_children,
+                        breakup_side=existing.breakup_side,
                     )
                 else:
                     user = AuthenticatedUser(
@@ -203,6 +209,9 @@ class AuthService:
                         country_code=country_code,
                         language_code=language_code,
                         onboarding_completed=False,
+                        objective=None,
+                        has_children=None,
+                        breakup_side=None,
                     )
                 self._memory_users_by_sub[google_sub] = user
                 self._memory_users_by_id[user.id] = user
@@ -346,6 +355,93 @@ class AuthService:
         finally:
             db.close()
 
+    def get_onboarding_profile(self, *, user_id: UUID) -> dict[str, object]:
+        if self._connection_factory is None:
+            with self._memory_lock:
+                user = self._memory_users_by_id.get(user_id)
+                if user is None:
+                    raise AuthError(status_code=404, detail="user_not_found")
+                return {
+                    "objective": user.objective,
+                    "has_children": user.has_children,
+                    "breakup_side": user.breakup_side,
+                    "country_code": user.country_code,
+                    "language_code": user.language_code,
+                    "onboarding_completed": user.onboarding_completed,
+                }
+
+        connection = self._connection_factory()
+        try:
+            users = UserRepository(connection)
+            profile = users.get_onboarding_profile(user_id=user_id)
+            if profile is None:
+                raise AuthError(status_code=404, detail="user_not_found")
+            return profile
+        finally:
+            connection.close()
+
+    def update_onboarding_profile(
+        self,
+        *,
+        user_id: UUID,
+        objective: str,
+        has_children: bool,
+        breakup_side: str,
+        country_code: str,
+        language_code: str,
+    ) -> dict[str, object]:
+        normalized_country = country_code.upper()
+        normalized_language = language_code.lower()
+        if normalized_language not in {"es", "en", "pt"}:
+            raise AuthError(status_code=400, detail="invalid_language_code")
+
+        if self._connection_factory is None:
+            with self._memory_lock:
+                user = self._memory_users_by_id.get(user_id)
+                if user is None:
+                    raise AuthError(status_code=404, detail="user_not_found")
+                updated = AuthenticatedUser(
+                    id=user.id,
+                    email=user.email,
+                    name=user.name,
+                    memory_opt_in=user.memory_opt_in,
+                    locale=f"{normalized_language}-{normalized_country}",
+                    picture_url=user.picture_url,
+                    country_code=normalized_country,
+                    language_code=normalized_language,
+                    onboarding_completed=True,
+                    objective=objective,
+                    has_children=has_children,
+                    breakup_side=breakup_side,
+                )
+                self._memory_users_by_id[user_id] = updated
+                return {
+                    "objective": updated.objective,
+                    "has_children": updated.has_children,
+                    "breakup_side": updated.breakup_side,
+                    "country_code": updated.country_code,
+                    "language_code": updated.language_code,
+                    "onboarding_completed": updated.onboarding_completed,
+                }
+
+        connection = self._connection_factory()
+        try:
+            users = UserRepository(connection)
+            updated = users.update_onboarding_profile(
+                user_id=user_id,
+                objective=objective,
+                has_children=has_children,
+                breakup_side=breakup_side,
+                country_code=normalized_country,
+                language_code=normalized_language,
+            )
+            if updated is None:
+                raise AuthError(status_code=404, detail="user_not_found")
+            connection.commit()
+            return updated
+        finally:
+            connection.close()
+
 
 def _new_session_token() -> str:
     return secrets.token_urlsafe(48)
@@ -378,6 +474,9 @@ def _map_user_row(row: dict[str, Any]) -> AuthenticatedUser:
         country_code=str(row.get("country_code") or "UY"),
         language_code=str(row.get("language_code") or "es"),
         onboarding_completed=bool(row.get("onboarding_completed", False)),
+        objective=row.get("objective"),
+        has_children=row.get("has_children"),
+        breakup_side=row.get("breakup_side"),
     )
 
 

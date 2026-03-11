@@ -25,6 +25,10 @@ export function AuthGate({ children }: AuthGateProps) {
         router.replace(`/login?next=${next}`);
         return;
       }
+      if (!user.onboarding_completed) {
+        router.replace("/onboarding");
+        return;
+      }
       setReady(true);
     }
 

@@ -85,10 +85,31 @@ function isRefreshExpired(session: StoredSession): boolean {
   return session.refreshExpiresAt <= nowMs();
 }
 
+function resolvePreferredLanguage(): string {
+  const session = readSession();
+  const fromSession = String(session?.user.language_code || "")
+    .trim()
+    .toLowerCase();
+  if (fromSession === "es" || fromSession === "en" || fromSession === "pt") {
+    return fromSession;
+  }
+  if (isBrowser()) {
+    const nav = String(window.navigator.language || "")
+      .trim()
+      .toLowerCase();
+    if (nav.startsWith("en")) return "en";
+    if (nav.startsWith("pt")) return "pt";
+  }
+  return "es";
+}
+
 async function postJson<T>(path: string, payload: unknown): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "Accept-Language": resolvePreferredLanguage(),
+    },
     body: JSON.stringify(payload),
   });
   if (!response.ok) {
@@ -145,6 +166,9 @@ export async function authFetch(
   const retryOn401 = options?.retryOn401 ?? true;
   const session = await getValidSession();
   const headers = new Headers(init?.headers ?? {});
+  if (!headers.has("Accept-Language")) {
+    headers.set("Accept-Language", resolvePreferredLanguage());
+  }
   if (session) {
     headers.set("Authorization", `Bearer ${session.accessToken}`);
   }

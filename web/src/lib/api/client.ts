@@ -13,7 +13,12 @@ async function postJson<T>(path: string, payload: unknown): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
+    const errorPayload = (await response.json().catch(() => null)) as
+      | { message?: string; detail?: string }
+      | null;
+    throw new Error(
+      errorPayload?.message || errorPayload?.detail || `HTTP ${response.status}`,
+    );
   }
 
   return (await response.json()) as T;

@@ -1,5 +1,19 @@
 {
   "error.invalid_google_token": "Invalid Google token.",
+  "error.google_email_not_verified": "Google email is not verified.",
+  "error.google_auth_library_missing": "Missing google-auth dependency in backend.",
+  "error.missing_bearer_token": "Missing authorization token.",
+  "error.invalid_or_expired_session": "Invalid or expired session.",
+  "error.invalid_refresh_token": "Invalid or expired refresh token.",
+  "error.user_not_found": "User not found.",
+  "error.invalid_language_code": "Invalid language code.",
   "error.analysis_not_found": "Analysis not found or expired.",
-  "error.analysis_forbidden": "You do not have access to this analysis."
+  "error.analysis_forbidden": "You do not have access to this analysis.",
+  "error.analysis_id_forbidden": "You do not have access to this analysis.",
+  "error.analysis_id_not_found_or_expired": "Analysis not found or expired.",
+  "error.file_must_be_image": "Uploaded file must be an image.",
+  "error.empty_file": "Uploaded file is empty.",
+  "error.file_too_large": "Uploaded file is too large.",
+  "error.python_multipart_not_installed": "Missing python-multipart dependency in backend.",
+  "error.ocr_unavailable": "OCR is not available right now."
 }
