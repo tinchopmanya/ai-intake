@@ -8,19 +8,8 @@ import {
   ADVISOR_PROFILES,
   advisorProfileById,
 } from "@/data/advisors";
+import type { AdvisorResponse as MvpAdvisorResponse } from "@/lib/api/types";
 import { InputField, TextareaField } from "@/components/ui/primitives";
-
-type AdvisorResult = {
-  advisor_id: string;
-  advisor_name: string;
-  suggestions: string[];
-};
-
-type AdvisorResponse = {
-  conversation_id: string;
-  analysis: string;
-  results: AdvisorResult[];
-};
 
 type PerspectiveContent = {
   reflection: string | null;
@@ -44,24 +33,13 @@ const RECENT_PEOPLE: RecentPerson[] = [
 ];
 
 /**
- * Parses advisor suggestion list into reflection plus concrete suggested reply.
+ * Maps a single advisor response text into display sections.
  */
-function getPerspectiveContent(result: AdvisorResult | undefined): PerspectiveContent {
-  if (!result || result.suggestions.length === 0) {
+function getPerspectiveContent(text: string | null): PerspectiveContent {
+  if (!text) {
     return { reflection: null, suggestedReply: null };
   }
-
-  const reflectionItem = result.suggestions.find((item) =>
-    item.toLowerCase().startsWith("reflexion:"),
-  );
-  const reflection = reflectionItem
-    ? reflectionItem.replace(/^reflexion:\s*/i, "").trim()
-    : null;
-
-  const remaining = result.suggestions.filter((item) => item !== reflectionItem);
-  const suggestedReply = (remaining[0] ?? result.suggestions[0])?.trim() ?? null;
-
-  return { reflection, suggestedReply };
+  return { reflection: null, suggestedReply: text.trim() };
 }
 
 /**
@@ -72,17 +50,19 @@ export default function AdvisorPage() {
   const [context, setContext] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<AdvisorResponse | null>(null);
-  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [result, setResult] = useState<MvpAdvisorResponse | null>(null);
   const [expandedAdvisorId, setExpandedAdvisorId] = useState<string | null>("laura");
   const [copiedAdvisorId, setCopiedAdvisorId] = useState<string | null>(null);
   const [profileModalAdvisorId, setProfileModalAdvisorId] = useState<string | null>(null);
   const [selectedRecentPersonId, setSelectedRecentPersonId] = useState<string | null>(null);
 
-  const resultsByAdvisorId = useMemo(() => {
-    const map = new Map<string, AdvisorResult>();
-    for (const item of result?.results ?? []) {
-      map.set(item.advisor_id, item);
+  const responsesByAdvisorId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const [index, advisor] of ADVISOR_PROFILES.entries()) {
+      const text = result?.responses?.[index]?.text;
+      if (text) {
+        map.set(advisor.id, text);
+      }
     }
     return map;
   }, [result]);
@@ -117,9 +97,10 @@ export default function AdvisorPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          conversation_id: conversationId,
-          conversation_text: text,
-          context: context.trim(),
+          message_text: text,
+          mode: "reactive",
+          relationship_type: "pareja",
+          context: context.trim() ? { contact_context: context.trim() } : undefined,
         }),
       });
 
@@ -127,9 +108,8 @@ export default function AdvisorPage() {
         throw new Error(`HTTP ${response.status}`);
       }
 
-      const data = (await response.json()) as AdvisorResponse;
+      const data = (await response.json()) as MvpAdvisorResponse;
       setResult(data);
-      setConversationId(data.conversation_id);
       setExpandedAdvisorId("laura");
     } catch {
       setError("No se pudo analizar la conversacion en este momento.");
@@ -287,13 +267,16 @@ export default function AdvisorPage() {
                 <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
                   Analisis general
                 </p>
-                <p className="mt-1 text-sm leading-6 text-gray-800">{result.analysis}</p>
+                <p className="mt-1 text-sm leading-6 text-gray-800">
+                  {result.analysis?.summary ??
+                    "Analisis no disponible. Se muestran respuestas sugeridas."}
+                </p>
               </article>
 
               <div className="space-y-2">
                 {ADVISOR_PROFILES.map((advisor) => {
-                  const advisorResult = resultsByAdvisorId.get(advisor.id);
-                  const perspective = getPerspectiveContent(advisorResult);
+                  const responseText = responsesByAdvisorId.get(advisor.id) ?? null;
+                  const perspective = getPerspectiveContent(responseText);
                   const isExpanded = expandedAdvisorId === advisor.id;
 
                   return (
