@@ -19,6 +19,8 @@ class Settings:
     google_client_id: str | None
     auth_access_ttl_seconds: int
     auth_refresh_ttl_seconds: int
+    ocr_provider: str
+    ocr_max_file_bytes: int
 
 
 def get_settings() -> Settings:
@@ -31,6 +33,8 @@ def get_settings() -> Settings:
     auth_refresh_ttl_seconds = int(
         os.getenv("AUTH_REFRESH_TTL_SECONDS", str(60 * 60 * 24 * 30))
     )
+    ocr_provider = os.getenv("OCR_PROVIDER", "auto").strip().lower()
+    ocr_max_file_bytes = int(os.getenv("OCR_MAX_FILE_BYTES", str(8 * 1024 * 1024)))
     return Settings(
         cors_origins=_parse_cors_origins(cors_origins),
         gemini_api_key=gemini_api_key if gemini_api_key else None,
@@ -39,6 +43,8 @@ def get_settings() -> Settings:
         google_client_id=google_client_id if google_client_id else None,
         auth_access_ttl_seconds=auth_access_ttl_seconds,
         auth_refresh_ttl_seconds=auth_refresh_ttl_seconds,
+        ocr_provider=ocr_provider if ocr_provider else "auto",
+        ocr_max_file_bytes=ocr_max_file_bytes,
     )
 
 

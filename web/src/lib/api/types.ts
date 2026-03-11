@@ -82,3 +82,10 @@ export type AdvisorResponse = {
   created_at: string;
 };
 
+export type OcrExtractResponse = {
+  extracted_text: string;
+  provider: string;
+  confidence: number | null;
+  warnings: string[];
+};
+

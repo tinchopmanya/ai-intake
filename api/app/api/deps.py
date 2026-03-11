@@ -11,6 +11,7 @@ from app.repositories import UnitOfWork
 from app.services.auth_service import AuthenticatedUser
 from app.services.auth_service import AuthError
 from app.services.auth_service import AuthService
+from app.services.ocr_service import OcrService
 from config import settings
 from providers.base import AIProvider
 from providers.factory import build_provider
@@ -54,4 +55,8 @@ def get_current_user(
         return auth_service.get_user_from_access_token(authorization)
     except AuthError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+
+def get_ocr_service() -> OcrService:
+    return OcrService(provider=settings.ocr_provider)
 

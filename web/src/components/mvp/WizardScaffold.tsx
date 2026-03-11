@@ -1,15 +1,23 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { type ChangeEvent, useEffect, useState } from "react";
 
 import { AdvisorProfileModal } from "@/components/mvp/AdvisorProfileModal";
 import { Button, Panel, Select, Textarea } from "@/components/mvp/ui";
 import { AdvisorAvatarItem } from "@/components/ui/AdvisorAvatarItem";
 import { ADVISOR_PROFILES } from "@/data/advisors";
+import { authFetch } from "@/lib/auth/client";
 import { postAdvisor, postAnalysis } from "@/lib/api/client";
 import type { AdvisorProfile } from "@/data/advisors";
-import type { AdvisorResponse, AnalysisResponse, AnalysisRiskFlag, UsageMode } from "@/lib/api/types";
+import { API_URL } from "@/lib/config";
+import type {
+  AdvisorResponse,
+  AnalysisResponse,
+  AnalysisRiskFlag,
+  OcrExtractResponse,
+  UsageMode,
+} from "@/lib/api/types";
 
 const ADVISOR_FALLBACK_VISUAL = {
   id: "generic",
@@ -48,6 +56,7 @@ const ADVISOR_ACCENT_CLASS = [
   "border-t-[3px] border-t-blue-500",
   "border-t-[3px] border-t-amber-500",
 ] as const;
+const OCR_EXTRACT_URL = `${API_URL}/v1/ocr/extract`;
 
 function getAdvisorVisualByIndex(index: number) {
   return ADVISOR_PROFILES[index] ?? ADVISOR_FALLBACK_VISUAL;
@@ -207,9 +216,26 @@ export function WizardScaffold() {
   const [contextOptional, setContextOptional] = useState("");
   const [selectedRecentPersonId, setSelectedRecentPersonId] = useState<string | null>(null);
   const [selectedProfile, setSelectedProfile] = useState<AdvisorProfile | null>(null);
+  const [ocrImageFile, setOcrImageFile] = useState<File | null>(null);
+  const [ocrImagePreviewUrl, setOcrImagePreviewUrl] = useState<string | null>(null);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrError, setOcrError] = useState<string | null>(null);
+  const [ocrInfo, setOcrInfo] = useState<OcrExtractResponse | null>(null);
 
   const selectedRecentPerson =
     RECENT_PEOPLE.find((person) => person.id === selectedRecentPersonId) ?? null;
+
+  useEffect(() => {
+    if (!ocrImageFile) {
+      setOcrImagePreviewUrl(null);
+      return;
+    }
+    const nextUrl = URL.createObjectURL(ocrImageFile);
+    setOcrImagePreviewUrl(nextUrl);
+    return () => {
+      URL.revokeObjectURL(nextUrl);
+    };
+  }, [ocrImageFile]);
 
   function openAdvisorProfileById(advisorId: string) {
     const profile = ADVISOR_PROFILES.find((advisor) => advisor.id === advisorId) ?? null;
@@ -221,6 +247,39 @@ export function WizardScaffold() {
     if (contextOptional.trim()) context.contact_context = contextOptional.trim();
     if (selectedRecentPerson) context.recent_person = selectedRecentPerson.name;
     return Object.keys(context).length > 0 ? context : undefined;
+  }
+
+  function handleImageSelection(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    setOcrImageFile(file);
+    setOcrError(null);
+    setOcrInfo(null);
+  }
+
+  async function handleExtractTextFromImage() {
+    if (!ocrImageFile || ocrLoading) return;
+
+    setOcrLoading(true);
+    setOcrError(null);
+    setOcrInfo(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", ocrImageFile);
+      const response = await authFetch(OCR_EXTRACT_URL, {
+        method: "POST",
+        body: formData,
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const payload = (await response.json()) as OcrExtractResponse;
+      setMessageText(payload.extracted_text);
+      setOcrInfo(payload);
+    } catch {
+      setOcrError("No se pudo extraer texto de la imagen.");
+    } finally {
+      setOcrLoading(false);
+    }
   }
 
   async function runAnalysis() {
@@ -308,6 +367,10 @@ export function WizardScaffold() {
     setAdvisorError(null);
     setSelectedRecentPersonId(null);
     setCopiedIndex(null);
+    setOcrImageFile(null);
+    setOcrInfo(null);
+    setOcrError(null);
+    setOcrLoading(false);
   }
 
   async function handleCopy(text: string, index: number) {
@@ -363,11 +426,48 @@ export function WizardScaffold() {
             <div className="min-w-0 space-y-3">
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-[#1f2937]">Mensaje</label>
+                <div className="rounded-xl border border-dashed border-[#cbd5e1] bg-[#f8fafc] p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageSelection}
+                      className="text-xs text-[#334155]"
+                    />
+                    <Button
+                      type="button"
+                      onClick={() => void handleExtractTextFromImage()}
+                      disabled={!ocrImageFile || ocrLoading}
+                      variant="secondary"
+                      className="border-[#cbd5e1] bg-white px-3 py-1.5 text-xs text-[#334155]"
+                    >
+                      {ocrLoading ? "Extrayendo OCR..." : "Extraer texto (OCR)"}
+                    </Button>
+                  </div>
+                  {ocrImagePreviewUrl ? (
+                    <Image
+                      src={ocrImagePreviewUrl}
+                      alt="Preview OCR"
+                      width={560}
+                      height={260}
+                      className="mt-3 max-h-56 w-full rounded-lg border border-[#dbe3ec] object-contain"
+                    />
+                  ) : null}
+                  {ocrInfo ? (
+                    <p className="mt-2 text-xs text-[#334155]">
+                      OCR: proveedor {ocrInfo.provider}
+                      {ocrInfo.confidence !== null
+                        ? `, confianza ${(ocrInfo.confidence * 100).toFixed(1)}%`
+                        : ""}
+                    </p>
+                  ) : null}
+                  {ocrError ? <p className="mt-2 text-xs text-red-700">{ocrError}</p> : null}
+                </div>
                 <Textarea
                   value={messageText}
                   onChange={(event) => setMessageText(event.target.value)}
                   rows={6}
-                  placeholder="Pega aqui el mensaje a responder o revisar..."
+                  placeholder="Pega aqui el mensaje o valida/corrige el texto extraido por OCR..."
                   className="min-h-[164px] rounded-xl border-[#e5e7eb] bg-white text-[#1f2937] focus:border-[#3b82f6] focus:ring-[#3b82f6]/20"
                 />
               </div>

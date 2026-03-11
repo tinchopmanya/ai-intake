@@ -8,6 +8,7 @@ from .auth import GoogleAuthResponse
 from .auth import LogoutRequest
 from .auth import LogoutResponse
 from .auth import RefreshSessionRequest
+from .ocr import OcrExtractResponse
 
 __all__ = [
     "AdvisorRequest",
@@ -19,6 +20,7 @@ __all__ = [
     "GoogleAuthResponse",
     "LogoutRequest",
     "LogoutResponse",
+    "OcrExtractResponse",
     "RefreshSessionRequest",
 ]
 
