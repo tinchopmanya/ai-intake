@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { API_URL } from "@/lib/config";
 
+/**
+ * Landing page that verifies backend availability and links to key flows.
+ */
 export default async function Home() {
   const res = await fetch(`${API_URL}/health`, { cache: "no-store" });
   const data = await res.json();

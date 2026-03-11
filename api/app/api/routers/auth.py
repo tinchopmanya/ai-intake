@@ -17,6 +17,7 @@ router = APIRouter(prefix="/v1/auth", tags=["auth"])
     status_code=status.HTTP_200_OK,
 )
 async def google_sign_in(payload: GoogleAuthRequest) -> GoogleAuthResponse:
+    """Validate Google ID token shape and return a development auth payload."""
     # Base validation guard until Google token verification is wired.
     if len(payload.id_token) < 20:
         raise HTTPException(

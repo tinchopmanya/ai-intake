@@ -37,6 +37,9 @@ function mapHistoryToMessages(history: HistoryMessage[]): Message[] {
   }));
 }
 
+/**
+ * Basic chat UI for `/v1/chat` and `/v1/conversations/{conversation_id}`.
+ */
 export default function ChatPage() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);

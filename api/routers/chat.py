@@ -14,6 +14,7 @@ chat_service = ChatService(conversation_repository, build_provider())
 
 @router.post("/v1/chat", response_model=ChatResponse)
 def chat(payload: ChatRequest) -> ChatResponse:
+    """Create or continue a chat conversation and return assistant answer."""
     return chat_service.chat(payload)
 
 
@@ -22,6 +23,7 @@ def chat(payload: ChatRequest) -> ChatResponse:
     response_model=ConversationHistoryResponse,
 )
 def get_conversation_history(conversation_id: str) -> ConversationHistoryResponse:
+    """Return full message history for a chat conversation."""
     response = chat_service.get_conversation_history(conversation_id)
     if response is None:
         raise HTTPException(status_code=404, detail="Conversation not found")

@@ -1,0 +1,5 @@
+{
+  "error.invalid_google_token": "Invalid Google token.",
+  "error.analysis_not_found": "Analysis not found or expired.",
+  "error.analysis_forbidden": "You do not have access to this analysis."
+}

@@ -1,0 +1,27 @@
+{
+  "country": "UY",
+  "locale": "es",
+  "advisors": [
+    {
+      "id": "laura",
+      "name": "Laura",
+      "role": "Empatica",
+      "tone": "calmado",
+      "enabled": true
+    },
+    {
+      "id": "robert",
+      "name": "Robert",
+      "role": "Estrategico",
+      "tone": "directo",
+      "enabled": true
+    },
+    {
+      "id": "lidia",
+      "name": "Lidia",
+      "role": "Neutral",
+      "tone": "objetivo",
+      "enabled": true
+    }
+  ]
+}

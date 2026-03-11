@@ -7,6 +7,9 @@ type AppShellProps = {
   children: ReactNode;
 };
 
+/**
+ * Shared layout shell for MVP screens with header and constrained container.
+ */
 export function AppShell({ children }: AppShellProps) {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-[1080px] min-w-0 flex-col gap-4 overflow-x-hidden bg-[#f3f4f6] px-5 py-6">

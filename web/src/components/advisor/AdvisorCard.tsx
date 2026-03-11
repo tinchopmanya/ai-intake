@@ -9,6 +9,9 @@ type AdvisorCardProps = {
   onSelect: (advisorId: string) => void;
 };
 
+/**
+ * Selectable advisor tile used in advisor selection flows.
+ */
 export default function AdvisorCard({
   advisor,
   selected,

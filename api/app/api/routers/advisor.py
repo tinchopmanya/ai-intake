@@ -28,6 +28,7 @@ async def create_advisor_response(
     uow: Annotated[UnitOfWork | None, Depends(get_uow)],
     provider: Annotated[AIProvider, Depends(get_ai_provider)],
 ) -> AdvisorResponse:
+    """Generate three advisor-style reply suggestions using analysis context."""
     orchestrator = AdvisorOrchestrator(provider=provider)
     try:
         return orchestrator.run(payload, uow=uow)

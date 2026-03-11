@@ -18,10 +18,16 @@ async function postJson<T>(path: string, payload: unknown): Promise<T> {
   return (await response.json()) as T;
 }
 
+/**
+ * Executes message risk/emotion analysis.
+ */
 export function postAnalysis(payload: AnalysisRequest): Promise<AnalysisResponse> {
   return postJson<AnalysisResponse>("/v1/analysis", payload);
 }
 
+/**
+ * Requests advisor suggestions using optional analysis context.
+ */
 export function postAdvisor(payload: AdvisorRequest): Promise<AdvisorResponse> {
   return postJson<AdvisorResponse>("/v1/advisor", payload);
 }

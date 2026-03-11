@@ -43,6 +43,9 @@ const RECENT_PEOPLE: RecentPerson[] = [
   { id: "julio", name: "Julio", context: "Jefe" },
 ];
 
+/**
+ * Parses advisor suggestion list into reflection plus concrete suggested reply.
+ */
 function getPerspectiveContent(result: AdvisorResult | undefined): PerspectiveContent {
   if (!result || result.suggestions.length === 0) {
     return { reflection: null, suggestedReply: null };
@@ -61,6 +64,9 @@ function getPerspectiveContent(result: AdvisorResult | undefined): PerspectiveCo
   return { reflection, suggestedReply };
 }
 
+/**
+ * Legacy advisor experience that posts one conversation and renders per-advisor guidance.
+ */
 export default function AdvisorPage() {
   const [conversationText, setConversationText] = useState("");
   const [context, setContext] = useState("");

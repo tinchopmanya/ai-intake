@@ -53,10 +53,16 @@ function getAdvisorVisualByIndex(index: number) {
   return ADVISOR_PROFILES[index] ?? ADVISOR_FALLBACK_VISUAL;
 }
 
+/**
+ * Returns true when at least one medium/high severity signal is present.
+ */
 function hasRelevantRisk(flags: AnalysisRiskFlag[]) {
   return flags.some((flag) => flag.severity === "medium" || flag.severity === "high");
 }
 
+/**
+ * Detects mild conflict signals even when hard risk flags are absent.
+ */
 function hasModerateSignal(analysisResult: AnalysisResponse) {
   const tone = analysisResult.emotional_context.tone.toLowerCase();
   return (
@@ -111,6 +117,9 @@ function humanizeFlag(flag: AnalysisRiskFlag) {
   return `${label} (${SEVERITY_LABELS[flag.severity]})`;
 }
 
+/**
+ * Visual step indicator for intake, analysis and response stages.
+ */
 function Stepper({ currentStep }: { currentStep: 1 | 2 | 3 }) {
   const steps = [
     { id: 1, label: "Ingreso" },
@@ -161,6 +170,9 @@ function Stepper({ currentStep }: { currentStep: 1 | 2 | 3 }) {
   );
 }
 
+/**
+ * Reusable wrapper for each wizard step content block.
+ */
 function StepSection({
   title,
   children,
@@ -176,6 +188,9 @@ function StepSection({
   );
 }
 
+/**
+ * Client-side wizard that orchestrates analysis and advisor response calls.
+ */
 export function WizardScaffold() {
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
   const [messageText, setMessageText] = useState("");

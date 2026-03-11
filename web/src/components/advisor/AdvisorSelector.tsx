@@ -9,6 +9,9 @@ type AdvisorSelectorProps = {
   onSelectionChange: (selectedAdvisors: string[]) => void;
 };
 
+/**
+ * Interactive advisor picker with a maximum of three active selections.
+ */
 export default function AdvisorSelector({ onSelectionChange }: AdvisorSelectorProps) {
   const [selectedAdvisors, setSelectedAdvisors] = useState<string[]>([]);
 

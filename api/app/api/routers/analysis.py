@@ -22,6 +22,7 @@ router = APIRouter(prefix="/v1/analysis", tags=["analysis"])
     status_code=status.HTTP_200_OK,
 )
 async def create_analysis(payload: AnalysisRequest) -> AnalysisResponse:
+    """Analyze a candidate outbound message and return emotional/risk signals."""
     analysis_skipped = payload.quick_mode
     context = payload.context or {}
     user_id = resolve_user_id(context.get("user_id"))
