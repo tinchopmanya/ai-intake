@@ -4,12 +4,15 @@ from uuid import UUID
 from fastapi.testclient import TestClient
 
 from app.api.deps import get_ai_provider
+from app.api.deps import get_current_user
+from app.services.auth_service import AuthenticatedUser
 from main import app
 from main import conversations
 from providers.base import AIProviderError
 from providers.fallback import UNCONFIGURED_PROVIDER_MESSAGE
 from providers.fallback import UnconfiguredAIProvider
 from routers.chat import chat_service
+from uuid import UUID
 
 
 class FakeProvider:
@@ -37,6 +40,17 @@ class TestAPI(unittest.TestCase):
         chat_service._provider = self.fake_provider
         app.dependency_overrides.clear()
         app.dependency_overrides[get_ai_provider] = lambda: self.fake_provider
+        app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(
+            id=UUID("00000000-0000-0000-0000-000000000101"),
+            email="test@example.com",
+            name="Test User",
+            memory_opt_in=False,
+            locale="es-LA",
+            picture_url=None,
+            country_code="UY",
+            language_code="es",
+            onboarding_completed=False,
+        )
         self.client = TestClient(app)
 
     def tearDown(self):

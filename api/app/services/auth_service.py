@@ -31,6 +31,9 @@ class AuthenticatedUser:
     memory_opt_in: bool
     locale: str | None
     picture_url: str | None
+    country_code: str
+    language_code: str
+    onboarding_completed: bool
 
 
 @dataclass(frozen=True)
@@ -172,6 +175,7 @@ class AuthService:
         display_name = str(claims.get("name") or "").strip() or None
         picture_url = str(claims.get("picture") or "").strip() or None
         locale = str(claims.get("locale") or "").strip() or None
+        language_code, country_code = _parse_locale(locale)
 
         if self._connection_factory is None:
             with self._memory_lock:
@@ -184,6 +188,9 @@ class AuthService:
                         memory_opt_in=existing.memory_opt_in,
                         locale=locale or existing.locale,
                         picture_url=picture_url or existing.picture_url,
+                        country_code=country_code or existing.country_code,
+                        language_code=language_code or existing.language_code,
+                        onboarding_completed=existing.onboarding_completed,
                     )
                 else:
                     user = AuthenticatedUser(
@@ -193,6 +200,9 @@ class AuthService:
                         memory_opt_in=False,
                         locale=locale or "es-LA",
                         picture_url=picture_url,
+                        country_code=country_code,
+                        language_code=language_code,
+                        onboarding_completed=False,
                     )
                 self._memory_users_by_sub[google_sub] = user
                 self._memory_users_by_id[user.id] = user
@@ -207,6 +217,8 @@ class AuthService:
                 display_name=display_name,
                 picture_url=picture_url,
                 locale=locale,
+                country_code=country_code,
+                language_code=language_code,
             )
             connection.commit()
             return _map_user_row(row)
@@ -363,4 +375,21 @@ def _map_user_row(row: dict[str, Any]) -> AuthenticatedUser:
         memory_opt_in=bool(row.get("memory_opt_in", False)),
         locale=row.get("locale"),
         picture_url=row.get("picture_url"),
+        country_code=str(row.get("country_code") or "UY"),
+        language_code=str(row.get("language_code") or "es"),
+        onboarding_completed=bool(row.get("onboarding_completed", False)),
     )
+
+
+def _parse_locale(value: str | None) -> tuple[str, str]:
+    if not value:
+        return "es", "UY"
+    normalized = value.replace("_", "-").strip().lower()
+    parts = [part for part in normalized.split("-") if part]
+    language = parts[0] if parts else "es"
+    if language not in {"es", "en", "pt"}:
+        language = "es"
+    country = "UY"
+    if len(parts) >= 2 and len(parts[1]) in {2, 3} and parts[1].isalpha():
+        country = parts[1].upper()[:2]
+    return language, country

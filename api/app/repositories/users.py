@@ -17,34 +17,53 @@ class UserRepository:
         display_name: str | None,
         picture_url: str | None,
         locale: str | None,
+        country_code: str | None,
+        language_code: str | None,
     ) -> Mapping[str, Any]:
         query = """
             INSERT INTO users (
-                google_sub, email, display_name, picture_url, locale, last_login_at
+                google_sub, email, display_name, picture_url, locale,
+                country_code, language_code, last_login_at
             )
-            VALUES (%s, %s, %s, %s, COALESCE(%s, 'es-LA'), now())
+            VALUES (
+                %s, %s, %s, %s, COALESCE(%s, 'es-LA'),
+                COALESCE(%s, 'UY'), COALESCE(%s, 'es'), now()
+            )
             ON CONFLICT (google_sub)
             DO UPDATE SET
                 email = EXCLUDED.email,
                 display_name = COALESCE(EXCLUDED.display_name, users.display_name),
                 picture_url = COALESCE(EXCLUDED.picture_url, users.picture_url),
                 locale = COALESCE(EXCLUDED.locale, users.locale),
+                country_code = COALESCE(EXCLUDED.country_code, users.country_code),
+                language_code = COALESCE(EXCLUDED.language_code, users.language_code),
                 last_login_at = now(),
                 updated_at = now()
             RETURNING
-                id, email, display_name, memory_opt_in, locale, picture_url
+                id, email, display_name, memory_opt_in, locale, picture_url,
+                country_code, language_code, onboarding_completed
         """
         with self._connection.cursor() as cursor:
             cursor.execute(
                 query,
-                (google_sub, email, display_name, picture_url, locale),
+                (
+                    google_sub,
+                    email,
+                    display_name,
+                    picture_url,
+                    locale,
+                    country_code,
+                    language_code,
+                ),
             )
             row = cursor.fetchone()
         return dict(row)
 
     def get_by_id(self, *, user_id: UUID) -> Mapping[str, Any] | None:
         query = """
-            SELECT id, email, display_name, memory_opt_in, locale, picture_url
+            SELECT
+                id, email, display_name, memory_opt_in, locale, picture_url,
+                country_code, language_code, onboarding_completed
             FROM users
             WHERE id = %s
         """

@@ -51,6 +51,9 @@ async def google_sign_in(
             memory_opt_in=user.memory_opt_in,
             locale=user.locale,
             picture_url=user.picture_url,
+            country_code=user.country_code,
+            language_code=user.language_code,
+            onboarding_completed=user.onboarding_completed,
         ),
     )
 
@@ -86,6 +89,9 @@ async def refresh_session(
             memory_opt_in=user.memory_opt_in,
             locale=user.locale,
             picture_url=user.picture_url,
+            country_code=user.country_code,
+            language_code=user.language_code,
+            onboarding_completed=user.onboarding_completed,
         ),
     )
 
@@ -127,6 +133,9 @@ async def current_session(
             memory_opt_in=user.memory_opt_in,
             locale=user.locale,
             picture_url=user.picture_url,
+            country_code=user.country_code,
+            language_code=user.language_code,
+            onboarding_completed=user.onboarding_completed,
         )
     )
 

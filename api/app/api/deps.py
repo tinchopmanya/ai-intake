@@ -1,8 +1,15 @@
 from collections.abc import Iterator
+from typing import Annotated
+
+from fastapi import Depends
+from fastapi import Header
+from fastapi import HTTPException
 
 from app.db import build_postgres_connection_factory
 from app.repositories import TrackingEventRepository
 from app.repositories import UnitOfWork
+from app.services.auth_service import AuthenticatedUser
+from app.services.auth_service import AuthError
 from app.services.auth_service import AuthService
 from config import settings
 from providers.base import AIProvider
@@ -37,4 +44,14 @@ def get_auth_service() -> AuthService:
         access_ttl_seconds=settings.auth_access_ttl_seconds,
         refresh_ttl_seconds=settings.auth_refresh_ttl_seconds,
     )
+
+
+def get_current_user(
+    auth_service: Annotated[AuthService, Depends(get_auth_service)],
+    authorization: Annotated[str | None, Header(alias="Authorization")] = None,
+) -> AuthenticatedUser:
+    try:
+        return auth_service.get_user_from_access_token(authorization)
+    except AuthError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 

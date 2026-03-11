@@ -5,11 +5,15 @@ from datetime import datetime
 from datetime import timedelta
 from uuid import UUID
 from uuid import uuid4
+from uuid import uuid5
+from uuid import NAMESPACE_URL
 
 from fastapi.testclient import TestClient
 
 from app.api.deps import get_ai_provider
+from app.api.deps import get_current_user
 from app.api.deps import get_uow
+from app.services.auth_service import AuthenticatedUser
 from app.services.analysis_registry import analysis_registry
 from main import app
 
@@ -92,6 +96,18 @@ class FakeUow:
 class TestAppMvpAdvisorFlow(unittest.TestCase):
     def setUp(self) -> None:
         app.dependency_overrides.clear()
+        self._active_user_label = "user-a"
+        app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(
+            id=uuid5(NAMESPACE_URL, self._active_user_label),
+            email="flow@example.com",
+            name="Flow User",
+            memory_opt_in=False,
+            locale="es-LA",
+            picture_url=None,
+            country_code="UY",
+            language_code="es",
+            onboarding_completed=False,
+        )
         self.client = TestClient(app)
         with analysis_registry._lock:  # noqa: SLF001 - test-only cleanup
             analysis_registry._items.clear()  # noqa: SLF001 - test-only cleanup
@@ -102,6 +118,7 @@ class TestAppMvpAdvisorFlow(unittest.TestCase):
             analysis_registry._items.clear()  # noqa: SLF001 - test-only cleanup
 
     def _post_analysis(self, *, user_id: str = "user-a", quick_mode: bool = False):
+        self._active_user_label = user_id
         return self.client.post(
             "/v1/analysis",
             json={
@@ -122,6 +139,7 @@ class TestAppMvpAdvisorFlow(unittest.TestCase):
         save_session: bool = False,
         memory_opt_in: bool = False,
     ):
+        self._active_user_label = user_id
         payload = {
             "message_text": "Necesito responder este mensaje con calma",
             "mode": "reactive",

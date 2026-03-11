@@ -15,6 +15,9 @@ class UserSummary(BaseModel):
     memory_opt_in: bool = False
     locale: str | None = None
     picture_url: str | None = None
+    country_code: str = "UY"
+    language_code: str = "es"
+    onboarding_completed: bool = False
 
 
 class GoogleAuthResponse(BaseModel):

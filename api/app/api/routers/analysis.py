@@ -1,17 +1,21 @@
+from typing import Annotated
+
 from datetime import UTC
 from datetime import datetime
 from uuid import uuid4
 
 from fastapi import APIRouter
+from fastapi import Depends
 from fastapi import status
 
+from app.api.deps import get_current_user
 from app.schemas.analysis import AnalysisRequest
 from app.schemas.analysis import AnalysisResponse
+from app.services.auth_service import AuthenticatedUser
 from app.services.analysis_registry import StoredAnalysis
 from app.services.analysis_registry import analysis_registry
 from app.services.emotional_linter import extract_risk_codes
 from app.services.emotional_linter import run_emotional_linter
-from app.services.user_identity import resolve_user_id
 
 router = APIRouter(prefix="/v1/analysis", tags=["analysis"])
 
@@ -21,11 +25,13 @@ router = APIRouter(prefix="/v1/analysis", tags=["analysis"])
     response_model=AnalysisResponse,
     status_code=status.HTTP_200_OK,
 )
-async def create_analysis(payload: AnalysisRequest) -> AnalysisResponse:
+async def create_analysis(
+    payload: AnalysisRequest,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+) -> AnalysisResponse:
     """Analyze a candidate outbound message and return emotional/risk signals."""
     analysis_skipped = payload.quick_mode
-    context = payload.context or {}
-    user_id = resolve_user_id(context.get("user_id"))
+    user_id = current_user.id
     linter_result = run_emotional_linter(
         payload.message_text,
         quick_mode=analysis_skipped,
