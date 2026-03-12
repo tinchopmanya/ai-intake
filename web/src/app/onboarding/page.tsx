@@ -1,8 +1,12 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { OnboardingBottomAction } from "@/components/onboarding/OnboardingBottomAction";
+import { OnboardingOptionCard } from "@/components/onboarding/OnboardingOptionCard";
+import { OnboardingStepTitle } from "@/components/onboarding/OnboardingStepTitle";
+import { OnboardingWizardShell } from "@/components/onboarding/OnboardingWizardShell";
 import { authFetch, getCurrentUser } from "@/lib/auth/client";
 import { API_URL } from "@/lib/config";
 import { resolveRuntimeLocale, tRuntime } from "@/lib/i18n/runtime";
@@ -17,6 +21,20 @@ type OnboardingProfileResponse = {
 };
 
 const PROFILE_URL = `${API_URL}/v1/onboarding/profile`;
+const COUNTRY_OPTIONS = [
+  { code: "UY", label: "Uruguay" },
+  { code: "AR", label: "Argentina" },
+  { code: "CL", label: "Chile" },
+  { code: "MX", label: "Mexico" },
+  { code: "ES", label: "Espana" },
+  { code: "US", label: "Estados Unidos" },
+  { code: "BR", label: "Brasil" },
+] as const;
+const LANGUAGE_OPTIONS = [
+  { code: "es", label: "Espanol" },
+  { code: "en", label: "English" },
+  { code: "pt", label: "Portugues" },
+] as const;
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -30,6 +48,8 @@ export default function OnboardingPage() {
   const [breakupSide, setBreakupSide] = useState<"yo" | "mi_ex" | "mutuo">("mutuo");
   const [countryCode, setCountryCode] = useState("UY");
   const [languageCode, setLanguageCode] = useState<"es" | "en" | "pt">("es");
+  const [currentStep, setCurrentStep] = useState<0 | 1 | 2 | 3 | 4>(0);
+  const [useCustomCountry, setUseCustomCountry] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -53,8 +73,10 @@ export default function OnboardingPage() {
         setObjective(profile.objective ?? "");
         setHasChildren(Boolean(profile.has_children));
         setBreakupSide((profile.breakup_side ?? "mutuo") as "yo" | "mi_ex" | "mutuo");
-        setCountryCode((profile.country_code || user.country_code || "UY").toUpperCase());
+        const resolvedCountryCode = (profile.country_code || user.country_code || "UY").toUpperCase();
+        setCountryCode(resolvedCountryCode);
         setLanguageCode((profile.language_code || user.language_code || "es") as "es" | "en" | "pt");
+        setUseCustomCountry(!COUNTRY_OPTIONS.some((item) => item.code === resolvedCountryCode));
       } catch {
         setCountryCode((user.country_code || "UY").toUpperCase());
         setLanguageCode((user.language_code || "es") as "es" | "en" | "pt");
@@ -62,14 +84,15 @@ export default function OnboardingPage() {
         setLoading(false);
       }
     }
-    bootstrap();
+    void bootstrap();
     return () => {
       mounted = false;
     };
   }, [router]);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  const progress = useMemo(() => ((currentStep + 1) / 5) * 100, [currentStep]);
+
+  async function handleSubmit() {
     if (!objective.trim() || saving) return;
     setSaving(true);
     setError(null);
@@ -99,84 +122,179 @@ export default function OnboardingPage() {
     }
   }
 
-  if (loading) {
-    return <main className="p-6 text-sm text-gray-600">Cargando onboarding...</main>;
+  function chooseBreakupSide(value: "yo" | "mi_ex" | "mutuo") {
+    if (saving) return;
+    setBreakupSide(value);
+    window.setTimeout(() => setCurrentStep(2), 120);
   }
 
+  function chooseHasChildren(value: boolean) {
+    if (saving) return;
+    setHasChildren(value);
+    window.setTimeout(() => setCurrentStep(3), 120);
+  }
+
+  function chooseCountry(code: string) {
+    if (saving) return;
+    setUseCustomCountry(false);
+    setCountryCode(code);
+    window.setTimeout(() => setCurrentStep(4), 120);
+  }
+
+  async function chooseLanguage(value: "es" | "en" | "pt") {
+    if (saving) return;
+    setLanguageCode(value);
+    await handleSubmit();
+  }
+
+  if (loading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#f3f4f6] p-6 text-sm text-[#667085]">
+        Cargando onboarding...
+      </main>
+    );
+  }
+
+  const breakupOptions: Array<{ value: "yo" | "mi_ex" | "mutuo"; label: string }> = [
+    { value: "yo", label: t("onboarding.breakup_i_left") },
+    { value: "mi_ex", label: t("onboarding.breakup_ex_left") },
+    { value: "mutuo", label: t("onboarding.breakup_mutual") },
+  ];
+
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-xl flex-col gap-4 p-6">
-      <h1 className="text-2xl font-bold text-gray-900">{t("onboarding.title")}</h1>
-      <p className="text-sm text-gray-600">{t("onboarding.subtitle")}</p>
-
-      <form onSubmit={handleSubmit} className="space-y-4 rounded border border-gray-200 p-4">
-        <div className="space-y-1">
-          <label className="text-sm font-medium text-gray-800">{t("onboarding.objective")}</label>
-          <textarea
-            value={objective}
-            onChange={(event) => setObjective(event.target.value)}
-            className="min-h-[90px] w-full rounded border border-gray-300 p-2 text-sm"
-            placeholder={t("onboarding.objective_placeholder")}
-            required
+    <OnboardingWizardShell
+      progress={progress}
+      error={error}
+      bottomAction={
+        currentStep === 0 ? (
+          <OnboardingBottomAction
+            label="Next"
+            disabled={objective.trim().length === 0 || saving}
+            onClick={() => setCurrentStep(1)}
           />
-        </div>
-
-        <div className="space-y-1">
-          <label className="text-sm font-medium text-gray-800">{t("onboarding.breakup_side")}</label>
-          <select
-            value={breakupSide}
-            onChange={(event) => setBreakupSide(event.target.value as "yo" | "mi_ex" | "mutuo")}
-            className="w-full rounded border border-gray-300 p-2 text-sm"
-          >
-            <option value="yo">{t("onboarding.breakup_i_left")}</option>
-            <option value="mi_ex">{t("onboarding.breakup_ex_left")}</option>
-            <option value="mutuo">{t("onboarding.breakup_mutual")}</option>
-          </select>
-        </div>
-
-        <label className="flex items-center gap-2 text-sm text-gray-800">
-          <input
-            type="checkbox"
-            checked={hasChildren}
-            onChange={(event) => setHasChildren(event.target.checked)}
+        ) : currentStep === 3 && useCustomCountry ? (
+          <OnboardingBottomAction
+            label="Next"
+            disabled={countryCode.trim().length < 2 || saving}
+            onClick={() => setCurrentStep(4)}
           />
-          {t("onboarding.has_children")}
-        </label>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-800">{t("onboarding.country")}</label>
-            <input
-              value={countryCode}
-              onChange={(event) => setCountryCode(event.target.value)}
-              className="w-full rounded border border-gray-300 p-2 text-sm uppercase"
-              maxLength={2}
+        ) : null
+      }
+    >
+      {currentStep === 0 ? (
+        <>
+          <OnboardingStepTitle
+            title={t("onboarding.objective")}
+            subtitle={t("onboarding.subtitle")}
+          />
+          <div className="rounded-2xl border border-[#e3e7ee] bg-[#eceff3] p-1.5">
+            <textarea
+              value={objective}
+              onChange={(event) => setObjective(event.target.value)}
+              className="min-h-[180px] w-full resize-none rounded-xl border border-transparent bg-transparent px-4 py-3 text-[16px] leading-6 text-[#1f2a44] placeholder:text-[#667085] focus:border-[#d1d8e4] focus:bg-white/40 focus:outline-none"
+              placeholder={t("onboarding.objective_placeholder")}
               required
             />
           </div>
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-800">{t("onboarding.language")}</label>
-            <select
-              value={languageCode}
-              onChange={(event) => setLanguageCode(event.target.value as "es" | "en" | "pt")}
-              className="w-full rounded border border-gray-300 p-2 text-sm"
-            >
-              <option value="es">Español</option>
-              <option value="en">English</option>
-              <option value="pt">Português</option>
-            </select>
+        </>
+      ) : null}
+
+      {currentStep === 1 ? (
+        <>
+          <OnboardingStepTitle
+            title={t("onboarding.breakup_side")}
+            subtitle="Selecciona una opcion y avanzamos automaticamente."
+          />
+          <div className="space-y-3">
+            {breakupOptions.map((item) => (
+              <OnboardingOptionCard
+                key={item.value}
+                label={item.label}
+                selected={breakupSide === item.value}
+                onClick={() => chooseBreakupSide(item.value)}
+              />
+            ))}
           </div>
-        </div>
+        </>
+      ) : null}
 
-        {error ? <p className="text-sm text-red-700">{error}</p> : null}
+      {currentStep === 2 ? (
+        <>
+          <OnboardingStepTitle
+            title={t("onboarding.has_children")}
+            subtitle="Esto nos ayuda a ajustar mejor el tono de las sugerencias."
+          />
+          <div className="space-y-3">
+            <OnboardingOptionCard
+              label="Si, tenemos hijos"
+              selected={hasChildren === true}
+              onClick={() => chooseHasChildren(true)}
+            />
+            <OnboardingOptionCard
+              label="No tenemos hijos"
+              selected={hasChildren === false}
+              onClick={() => chooseHasChildren(false)}
+            />
+          </div>
+        </>
+      ) : null}
 
-        <button
-          type="submit"
-          disabled={saving || objective.trim().length === 0}
-          className="rounded bg-black px-4 py-2 text-sm text-white disabled:opacity-50"
-        >
-          {saving ? t("onboarding.saving") : t("onboarding.submit")}
-        </button>
-      </form>
-    </main>
+      {currentStep === 3 ? (
+        <>
+          <OnboardingStepTitle
+            title={t("onboarding.country")}
+            subtitle="Selecciona tu pais principal."
+          />
+          <div className="space-y-3">
+            {COUNTRY_OPTIONS.map((item) => (
+              <OnboardingOptionCard
+                key={item.code}
+                label={item.label}
+                description={item.code}
+                selected={!useCustomCountry && countryCode === item.code}
+                onClick={() => chooseCountry(item.code)}
+              />
+            ))}
+            <OnboardingOptionCard
+              label="Otro pais (ISO-2)"
+              selected={useCustomCountry}
+              onClick={() => setUseCustomCountry(true)}
+            />
+            {useCustomCountry ? (
+              <div className="rounded-2xl border border-[#e3e7ee] bg-[#eceff3] p-1.5">
+                <input
+                  value={countryCode}
+                  onChange={(event) =>
+                    setCountryCode(event.target.value.trim().toUpperCase().slice(0, 2))
+                  }
+                  className="h-14 w-full rounded-xl border border-transparent bg-transparent px-4 text-base font-semibold uppercase text-[#1f2a44] placeholder:text-[#667085] focus:border-[#d1d8e4] focus:bg-white/40 focus:outline-none"
+                  placeholder="Ej: UY"
+                  maxLength={2}
+                />
+              </div>
+            ) : null}
+          </div>
+        </>
+      ) : null}
+
+      {currentStep === 4 ? (
+        <>
+          <OnboardingStepTitle
+            title={t("onboarding.language")}
+            subtitle={saving ? t("onboarding.saving") : "Selecciona idioma y finalizamos."}
+          />
+          <div className="space-y-3">
+            {LANGUAGE_OPTIONS.map((item) => (
+              <OnboardingOptionCard
+                key={item.code}
+                label={item.label}
+                selected={languageCode === item.code}
+                onClick={() => void chooseLanguage(item.code)}
+              />
+            ))}
+          </div>
+        </>
+      ) : null}
+    </OnboardingWizardShell>
   );
 }

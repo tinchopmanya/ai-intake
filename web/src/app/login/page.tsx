@@ -3,9 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import { loginWithGoogleIdToken } from "@/lib/auth/client";
+import { DevTokenSection } from "@/components/auth/DevTokenSection";
+import { GoogleButton } from "@/components/auth/GoogleButton";
+import { LoginCard } from "@/components/auth/LoginCard";
+import { AuthApiError, getCurrentUser, loginWithGoogleIdToken } from "@/lib/auth/client";
 
 const GOOGLE_GSI_SRC = "https://accounts.google.com/gsi/client";
+const IS_DEV = process.env.NODE_ENV !== "production";
 
 type GoogleCredentialResponse = {
   credential?: string;
@@ -35,41 +39,85 @@ type GoogleApi = {
   };
 };
 
+const LOGIN_ERROR_MESSAGES: Record<string, string> = {
+  google_client_id_not_configured:
+    "La configuracion de Google OAuth no esta lista en el backend.",
+  google_auth_library_missing: "Falta una dependencia de autenticacion en el backend.",
+  invalid_google_token: "Google devolvio un token invalido. Intenta nuevamente.",
+  database_unavailable: "La base de datos no esta disponible temporalmente.",
+  user_persistence_failed: "No se pudo crear o actualizar tu usuario.",
+  session_persistence_failed: "No se pudo iniciar tu sesion. Reintenta.",
+  auth_internal_error: "Ocurrio un error interno al autenticar.",
+};
+
 function readGoogleClientId(): string {
   return process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
+}
+
+function resolveSafeNextPath(raw: string | null): string | null {
+  if (!raw) return null;
+  if (!raw.startsWith("/")) return null;
+  if (raw.startsWith("//")) return null;
+  return raw;
+}
+
+function mapLoginError(error: unknown): string {
+  if (error instanceof AuthApiError) {
+    return (
+      LOGIN_ERROR_MESSAGES[error.code] ||
+      error.backendMessage ||
+      "No se pudo iniciar sesion en este momento."
+    );
+  }
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+  return "No se pudo iniciar sesion en este momento.";
 }
 
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const buttonHostRef = useRef<HTMLDivElement | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [googleReady, setGoogleReady] = useState(false);
   const [manualToken, setManualToken] = useState("");
+
+  const nextFromQuery = resolveSafeNextPath(searchParams.get("next"));
 
   const handleLogin = useCallback(
     async (idToken: string) => {
       setLoading(true);
-      setError(null);
+      setErrorMessage(null);
       try {
         const user = await loginWithGoogleIdToken(idToken);
-        const nextPath = user.onboarding_completed
-          ? searchParams.get("next") || "/mvp"
-          : "/onboarding";
+        const nextPath = user.onboarding_completed ? nextFromQuery || "/mvp" : "/onboarding";
         router.replace(nextPath);
-      } catch {
-        setError("No se pudo iniciar sesion con Google.");
+      } catch (exc) {
+        setErrorMessage(mapLoginError(exc));
       } finally {
         setLoading(false);
       }
     },
-    [router, searchParams],
+    [nextFromQuery, router],
   );
 
   useEffect(() => {
+    let mounted = true;
+
+    async function redirectWhenAlreadyAuthenticated() {
+      const user = await getCurrentUser();
+      if (!mounted || !user) return;
+      const nextPath = user.onboarding_completed ? nextFromQuery || "/mvp" : "/onboarding";
+      router.replace(nextPath);
+    }
+
+    void redirectWhenAlreadyAuthenticated();
+
     const clientId = readGoogleClientId();
     if (!clientId) {
-      setError("Falta NEXT_PUBLIC_GOOGLE_CLIENT_ID para renderizar Google Sign-In.");
+      setErrorMessage("Falta NEXT_PUBLIC_GOOGLE_CLIENT_ID para renderizar Google Sign-In.");
       return;
     }
 
@@ -77,16 +125,25 @@ export default function LoginPage() {
     script.src = GOOGLE_GSI_SRC;
     script.async = true;
     script.defer = true;
+    script.onerror = () => {
+      if (mounted) {
+        setErrorMessage("No se pudo cargar Google Sign-In. Reintenta en unos segundos.");
+      }
+    };
     script.onload = () => {
+      if (!mounted) return;
       const googleApi = (window as { google?: GoogleApi }).google;
-      if (!googleApi?.accounts?.id || !buttonHostRef.current) return;
+      if (!googleApi?.accounts?.id || !buttonHostRef.current) {
+        setErrorMessage("Google Sign-In no disponible en este navegador.");
+        return;
+      }
 
       googleApi.accounts.id.initialize({
         client_id: clientId,
         callback: async (response: GoogleCredentialResponse) => {
           const credential = response.credential;
           if (!credential) {
-            setError("Google no devolvio credenciales.");
+            setErrorMessage("Google no devolvio credenciales.");
             return;
           }
           await handleLogin(credential);
@@ -98,46 +155,59 @@ export default function LoginPage() {
         size: "large",
         shape: "pill",
         text: "signin_with",
-        theme: "outline",
+        theme: "filled_black",
         width: 320,
       });
+      setGoogleReady(true);
     };
     document.head.appendChild(script);
 
     return () => {
+      mounted = false;
       script.remove();
     };
-  }, [handleLogin]);
+  }, [handleLogin, nextFromQuery, router]);
+
+  function handleGoogleButtonClick() {
+    const trigger = buttonHostRef.current?.querySelector<HTMLElement>('[role="button"]');
+    if (trigger) {
+      trigger.click();
+      return;
+    }
+    setErrorMessage("Google Sign-In todavia no esta listo. Intenta de nuevo en unos segundos.");
+  }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-xl flex-col justify-center gap-4 p-6">
-      <h1 className="text-2xl font-bold text-gray-900">Iniciar sesion</h1>
-      <p className="text-sm text-gray-600">
-        Accede con Google para continuar al flujo de ZeroContact Emocional.
-      </p>
-
-      <div ref={buttonHostRef} className="min-h-[44px]" />
-
-      <div className="rounded border border-gray-200 p-3">
-        <p className="mb-2 text-sm font-medium text-gray-800">Fallback (ID token manual)</p>
-        <textarea
-          value={manualToken}
-          onChange={(event) => setManualToken(event.target.value)}
-          className="min-h-[120px] w-full rounded border border-gray-300 p-2 text-xs"
-          placeholder="Pega aqui un Google ID token para pruebas locales"
-          disabled={loading}
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[var(--login-bg)] p-4 sm:p-6">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_25%_20%,rgba(99,102,241,0.25),transparent_45%),radial-gradient(circle_at_80%_80%,rgba(99,102,241,0.12),transparent_45%)]" />
+      <LoginCard errorMessage={errorMessage}>
+        <GoogleButton
+          disabled={!googleReady || loading}
+          loading={loading}
+          googleReady={googleReady}
+          buttonHostRef={buttonHostRef}
+          onClick={handleGoogleButtonClick}
         />
-        <button
-          type="button"
-          onClick={() => handleLogin(manualToken.trim())}
-          disabled={loading || manualToken.trim().length === 0}
-          className="mt-2 rounded bg-black px-4 py-2 text-sm text-white disabled:opacity-50"
-        >
-          {loading ? "Autenticando..." : "Entrar con token manual"}
-        </button>
-      </div>
 
-      {error ? <p className="text-sm text-red-700">{error}</p> : null}
+        <div className="my-5 flex items-center gap-3">
+          <span className="h-px flex-1 bg-[var(--login-border)]" />
+          <span className="text-xs uppercase tracking-[0.12em] text-[var(--login-text-muted)]">o</span>
+          <span className="h-px flex-1 bg-[var(--login-border)]" />
+        </div>
+
+        {IS_DEV ? (
+          <DevTokenSection
+            loading={loading}
+            manualToken={manualToken}
+            onManualTokenChange={setManualToken}
+            onSubmit={() => void handleLogin(manualToken.trim())}
+          />
+        ) : (
+          <p className="text-xs text-[var(--login-text-muted)]">
+            Si el acceso falla, vuelve a intentar en unos segundos.
+          </p>
+        )}
+      </LoginCard>
     </main>
   );
 }

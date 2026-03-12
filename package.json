@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "concurrently \"powershell -NoExit -Command cd api; .\\\\.venv\\\\Scripts\\\\Activate.ps1; uvicorn main:app --reload --port 8000\" \"cd web && npm run dev\"",
+    "dev": "concurrently -n api,web -c blue,green \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:api": "cmd /c \"cd api && ..\\\\api\\\\.venv\\\\Scripts\\\\python.exe -m uvicorn main:app --reload --host 127.0.0.1 --port 8000\"",
+    "dev:web": "npm --prefix web run dev",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {

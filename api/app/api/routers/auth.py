@@ -1,4 +1,5 @@
 from typing import Annotated
+import logging
 
 from fastapi import APIRouter
 from fastapi import Depends
@@ -17,6 +18,7 @@ from app.schemas.auth import UserSummary
 from app.services.auth_service import AuthError
 from app.services.auth_service import AuthService
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1/auth", tags=["auth"])
 
 
@@ -36,6 +38,12 @@ async def google_sign_in(
         raise HTTPException(
             status_code=exc.status_code,
             detail=exc.detail,
+        ) from exc
+    except Exception as exc:
+        logger.exception("Unexpected error in /v1/auth/google: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="auth_internal_error",
         ) from exc
 
     return GoogleAuthResponse(
@@ -75,6 +83,12 @@ async def refresh_session(
             status_code=exc.status_code,
             detail=exc.detail,
         ) from exc
+    except Exception as exc:
+        logger.exception("Unexpected error in /v1/auth/refresh: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="auth_internal_error",
+        ) from exc
 
     return GoogleAuthResponse(
         access_token=tokens.access_token,
@@ -106,7 +120,19 @@ async def logout_session(
     auth_service: Annotated[AuthService, Depends(get_auth_service)],
 ) -> LogoutResponse:
     """Revoke an active session by refresh token."""
-    revoked = auth_service.logout(payload.refresh_token)
+    try:
+        revoked = auth_service.logout(payload.refresh_token)
+    except AuthError as exc:
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail=exc.detail,
+        ) from exc
+    except Exception as exc:
+        logger.exception("Unexpected error in /v1/auth/logout: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="auth_internal_error",
+        ) from exc
     return LogoutResponse(revoked=revoked)
 
 
@@ -124,6 +150,12 @@ async def current_session(
         user = auth_service.get_user_from_access_token(authorization)
     except AuthError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    except Exception as exc:
+        logger.exception("Unexpected error in /v1/auth/me: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="auth_internal_error",
+        ) from exc
 
     return CurrentSessionResponse(
         user=UserSummary(

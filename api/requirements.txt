@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+pydantic
+google-auth
+requests
+psycopg
+python-multipart
+pillow
+pytesseract

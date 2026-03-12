@@ -30,6 +30,20 @@ type StoredSession = {
   user: AuthUser;
 };
 
+export class AuthApiError extends Error {
+  code: string;
+  status: number;
+  backendMessage: string | null;
+
+  constructor(params: { code: string; status: number; backendMessage?: string | null }) {
+    super(params.code);
+    this.name = "AuthApiError";
+    this.code = params.code;
+    this.status = params.status;
+    this.backendMessage = params.backendMessage ?? null;
+  }
+}
+
 const SESSION_STORAGE_KEY = "zc_auth_session_v1";
 const ACCESS_SKEW_MS = 30_000;
 
@@ -113,7 +127,16 @@ async function postJson<T>(path: string, payload: unknown): Promise<T> {
     body: JSON.stringify(payload),
   });
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
+    const errorPayload = (await response.json().catch(() => null)) as
+      | { message?: string; detail?: string }
+      | null;
+    const detail = String(errorPayload?.detail || "").trim();
+    const code = detail.length > 0 ? detail : `http_${response.status}`;
+    throw new AuthApiError({
+      code,
+      status: response.status,
+      backendMessage: errorPayload?.message ?? null,
+    });
   }
   return (await response.json()) as T;
 }

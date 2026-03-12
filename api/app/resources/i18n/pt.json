@@ -1,7 +1,12 @@
 {
   "error.invalid_google_token": "Token do Google invalido.",
+  "error.google_client_id_not_configured": "GOOGLE_CLIENT_ID nao esta configurado no backend.",
   "error.google_email_not_verified": "O e-mail do Google nao esta verificado.",
   "error.google_auth_library_missing": "Falta a dependencia google-auth no backend.",
+  "error.database_unavailable": "Banco de dados indisponivel.",
+  "error.user_persistence_failed": "Nao foi possivel persistir o usuario autenticado.",
+  "error.session_persistence_failed": "Nao foi possivel criar a sessao de autenticacao.",
+  "error.auth_internal_error": "Erro interno de autenticacao.",
   "error.missing_bearer_token": "Falta token de autorizacao.",
   "error.invalid_or_expired_session": "Sessao invalida ou expirada.",
   "error.invalid_refresh_token": "Refresh token invalido ou expirado.",

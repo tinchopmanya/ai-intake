@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import secrets
+import sys
 from dataclasses import dataclass
 from datetime import UTC
 from datetime import datetime
@@ -14,6 +16,8 @@ from uuid import uuid4
 from app.repositories.auth_sessions import AuthSessionRepository
 from app.repositories.protocols import ConnectionFactory
 from app.repositories.users import UserRepository
+
+logger = logging.getLogger(__name__)
 
 
 class AuthError(Exception):
@@ -80,10 +84,16 @@ class AuthService:
         self._refresh_ttl = max(refresh_ttl_seconds, 600)
 
     def sign_in_with_google(self, id_token_value: str) -> tuple[SessionTokens, AuthenticatedUser]:
-        google_claims = self._verify_google_id_token(id_token_value)
-        user = self._upsert_google_user(google_claims)
-        tokens = self._issue_session(user.id)
-        return tokens, user
+        try:
+            google_claims = self._verify_google_id_token(id_token_value)
+            user = self._upsert_google_user(google_claims)
+            tokens = self._issue_session(user.id)
+            return tokens, user
+        except AuthError:
+            raise
+        except Exception as exc:
+            logger.exception("Unexpected sign-in failure in Google auth flow: %s", exc)
+            raise AuthError(status_code=500, detail="auth_internal_error") from exc
 
     def refresh_session(self, refresh_token: str) -> tuple[SessionTokens, AuthenticatedUser]:
         refresh_hash = _hash_token(refresh_token)
@@ -144,18 +154,35 @@ class AuthService:
             connection.close()
 
     def _verify_google_id_token(self, id_token_value: str) -> dict[str, Any]:
+        if not self._google_client_id:
+            raise AuthError(status_code=400, detail="google_client_id_not_configured")
+
         try:
             from google.auth.transport import requests as google_requests
             from google.oauth2 import id_token as google_id_token
+        except ImportError as exc:
+            logger.exception(
+                "Google auth import failed. Missing dependency or wrong interpreter. "
+                "python=%s error=%r",
+                sys.executable,
+                exc,
+            )
+            raise AuthError(status_code=503, detail="google_auth_library_missing") from exc
         except Exception as exc:
-            raise AuthError(status_code=500, detail="google_auth_library_missing") from exc
+            logger.exception(
+                "Unexpected exception importing google auth modules. "
+                "python=%s error=%r",
+                sys.executable,
+                exc,
+            )
+            raise AuthError(status_code=503, detail="google_auth_library_missing") from exc
 
         try:
             request = google_requests.Request()
             claims: dict[str, Any] = google_id_token.verify_oauth2_token(
                 id_token_value,
                 request,
-                audience=self._google_client_id if self._google_client_id else None,
+                audience=self._google_client_id,
             )
         except Exception as exc:
             raise AuthError(status_code=401, detail="invalid_google_token") from exc
@@ -181,6 +208,9 @@ class AuthService:
         language_code, country_code = _parse_locale(locale)
 
         if self._connection_factory is None:
+            logger.warning(
+                "Auth running in memory mode: DATABASE_URL missing; user will not persist."
+            )
             with self._memory_lock:
                 existing = self._memory_users_by_sub.get(google_sub)
                 if existing is not None:
@@ -217,7 +247,12 @@ class AuthService:
                 self._memory_users_by_id[user.id] = user
                 return user
 
-        connection = self._connection_factory()
+        try:
+            connection = self._connection_factory()
+        except Exception as exc:
+            logger.exception("Failed to open DB connection for Google user upsert: %s", exc)
+            raise AuthError(status_code=503, detail="database_unavailable") from exc
+
         try:
             users = UserRepository(connection)
             row = users.upsert_google_user(
@@ -231,6 +266,15 @@ class AuthService:
             )
             connection.commit()
             return _map_user_row(row)
+        except Exception as exc:
+            try:
+                connection.rollback()
+            except Exception:
+                pass
+            logger.exception("Failed to persist Google user in DB: %s", exc)
+            if _is_db_connection_error(exc):
+                raise AuthError(status_code=503, detail="database_unavailable") from exc
+            raise AuthError(status_code=503, detail="user_persistence_failed") from exc
         finally:
             connection.close()
 
@@ -256,7 +300,11 @@ class AuthService:
                 self._memory_sessions_by_refresh[refresh_hash] = session
                 self._memory_sessions_by_access[access_hash] = session
         else:
-            connection = self._connection_factory()
+            try:
+                connection = self._connection_factory()
+            except Exception as exc:
+                logger.exception("Failed to open DB connection for auth session create: %s", exc)
+                raise AuthError(status_code=503, detail="database_unavailable") from exc
             try:
                 sessions = AuthSessionRepository(connection)
                 sessions.create(
@@ -267,6 +315,15 @@ class AuthService:
                     refresh_expires_at=refresh_expires_at,
                 )
                 connection.commit()
+            except Exception as exc:
+                try:
+                    connection.rollback()
+                except Exception:
+                    pass
+                logger.exception("Failed to persist auth session in DB: %s", exc)
+                if _is_db_connection_error(exc):
+                    raise AuthError(status_code=503, detail="database_unavailable") from exc
+                raise AuthError(status_code=503, detail="session_persistence_failed") from exc
             finally:
                 connection.close()
 
@@ -492,3 +549,16 @@ def _parse_locale(value: str | None) -> tuple[str, str]:
     if len(parts) >= 2 and len(parts[1]) in {2, 3} and parts[1].isalpha():
         country = parts[1].upper()[:2]
     return language, country
+
+
+def _is_db_connection_error(exc: Exception) -> bool:
+    type_name = type(exc).__name__.lower()
+    module_name = type(exc).__module__.lower()
+    message = str(exc).lower()
+    if "operationalerror" in type_name or "interfaceerror" in type_name:
+        return True
+    if "psycopg" in module_name and (
+        "connection" in message or "connect" in message or "could not" in message
+    ):
+        return True
+    return False

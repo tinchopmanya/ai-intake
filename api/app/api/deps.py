@@ -1,4 +1,6 @@
 from collections.abc import Iterator
+import logging
+import os
 from typing import Annotated
 
 from fastapi import Depends
@@ -16,6 +18,13 @@ from app.services.ocr_service import OcrService
 from config import settings
 from providers.base import AIProvider
 from providers.factory import build_provider
+
+logger = logging.getLogger(__name__)
+
+
+def _is_production_env() -> bool:
+    raw = os.getenv("ENV") or os.getenv("APP_ENV") or os.getenv("PYTHON_ENV") or "development"
+    return raw.strip().lower() in {"production", "prod"}
 
 
 def get_uow() -> Iterator[UnitOfWork | None]:
@@ -35,9 +44,14 @@ def get_ai_provider() -> AIProvider:
 
 
 def get_auth_service() -> AuthService:
+    production_env = _is_production_env()
     try:
         connection_factory = build_postgres_connection_factory()
-    except RuntimeError:
+    except RuntimeError as exc:
+        if production_env:
+            logger.error("Auth DB connection factory unavailable in production: %s", exc)
+            raise HTTPException(status_code=503, detail="database_unavailable") from exc
+        logger.warning("Auth DB connection factory unavailable: %s", exc)
         connection_factory = None
 
     return AuthService(

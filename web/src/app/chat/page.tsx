@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 
 import { AuthGate } from "@/components/auth/AuthGate";
 import { authFetch } from "@/lib/auth/client";
+import { API_URL } from "@/lib/config";
 
 type Message = {
   id: string;
@@ -27,10 +28,15 @@ type HistoryResponse = {
   messages: HistoryMessage[];
 };
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
-const CHAT_URL = `${API_BASE_URL}/v1/chat`;
+const CHAT_URL = `${API_URL}/v1/chat`;
 const STORAGE_KEY = "conversation_id";
+
+async function readErrorDetail(response: Response): Promise<string> {
+  const payload = (await response.json().catch(() => null)) as
+    | { message?: string; detail?: string }
+    | null;
+  return payload?.message || payload?.detail || `HTTP ${response.status}`;
+}
 
 function mapHistoryToMessages(history: HistoryMessage[]): Message[] {
   return history.map((item, index) => ({
@@ -58,7 +64,7 @@ export default function ChatPage() {
   }
 
   async function loadConversationHistory(id: string): Promise<void> {
-    const response = await authFetch(`${API_BASE_URL}/v1/conversations/${id}`, {
+    const response = await authFetch(`${API_URL}/v1/conversations/${id}`, {
       cache: "no-store",
     });
 
@@ -68,7 +74,7 @@ export default function ChatPage() {
     }
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+      throw new Error(await readErrorDetail(response));
     }
 
     const data: HistoryResponse = await response.json();
@@ -96,7 +102,7 @@ export default function ChatPage() {
       try {
         setError(null);
         const response = await authFetch(
-          `${API_BASE_URL}/v1/conversations/${conversationId}`,
+          `${API_URL}/v1/conversations/${conversationId}`,
           { cache: "no-store" },
         );
 
@@ -108,16 +114,16 @@ export default function ChatPage() {
         }
 
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
+          throw new Error(await readErrorDetail(response));
         }
 
         const data: HistoryResponse = await response.json();
         if (!cancelled) {
           setMessages(mapHistoryToMessages(data.messages));
         }
-      } catch {
+      } catch (exc) {
         if (!cancelled) {
-          setError("No se pudo cargar el historial.");
+          setError(exc instanceof Error ? exc.message : "No se pudo cargar el historial.");
         }
       }
     }
@@ -150,14 +156,14 @@ export default function ChatPage() {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        throw new Error(await readErrorDetail(response));
       }
 
       const data: ChatResponse = await response.json();
       setConversationId(data.conversation_id);
       await loadConversationHistory(data.conversation_id);
-    } catch {
-      setError("No se pudo enviar el mensaje. Intenta de nuevo.");
+    } catch (exc) {
+      setError(exc instanceof Error ? exc.message : "No se pudo enviar el mensaje. Intenta de nuevo.");
     } finally {
       setLoading(false);
     }

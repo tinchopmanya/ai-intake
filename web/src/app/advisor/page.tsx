@@ -9,7 +9,7 @@ import {
   advisorProfileById,
 } from "@/data/advisors";
 import { AuthGate } from "@/components/auth/AuthGate";
-import { authFetch } from "@/lib/auth/client";
+import { postAdvisor } from "@/lib/api/client";
 import type { AdvisorResponse as MvpAdvisorResponse } from "@/lib/api/types";
 import { InputField, TextareaField } from "@/components/ui/primitives";
 
@@ -23,10 +23,6 @@ type RecentPerson = {
   name: string;
   context: string;
 };
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
-const ADVISOR_URL = `${API_BASE_URL}/v1/advisor`;
 
 const RECENT_PEOPLE: RecentPerson[] = [
   { id: "marcela", name: "Marcela", context: "Ex pareja" },
@@ -95,26 +91,21 @@ export default function AdvisorPage() {
     setCopiedAdvisorId(null);
 
     try {
-      const response = await authFetch(ADVISOR_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message_text: text,
-          mode: "reactive",
-          relationship_type: "pareja",
-          context: context.trim() ? { contact_context: context.trim() } : undefined,
-        }),
+      const data = await postAdvisor({
+        message_text: text,
+        mode: "reactive",
+        relationship_type: "pareja",
+        save_session: true,
+        context: context.trim() ? { contact_context: context.trim() } : undefined,
       });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const data = (await response.json()) as MvpAdvisorResponse;
       setResult(data);
       setExpandedAdvisorId("laura");
-    } catch {
-      setError("No se pudo analizar la conversacion en este momento.");
+    } catch (exc) {
+      setError(
+        exc instanceof Error
+          ? exc.message
+          : "No se pudo analizar la conversacion en este momento.",
+      );
     } finally {
       setLoading(false);
     }
