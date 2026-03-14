@@ -1,4 +1,5 @@
 from app.repositories.auth_sessions import AuthSessionRepository
+from app.repositories.analysis_results import AnalysisResultRepository
 from app.repositories.advisor_outputs import AdvisorOutputRepository
 from app.repositories.advisor_sessions import AdvisorSessionRepository
 from app.repositories.contacts import ContactRepository
@@ -9,6 +10,7 @@ from app.repositories.users import UserRepository
 
 __all__ = [
     "AuthSessionRepository",
+    "AnalysisResultRepository",
     "AdvisorOutputRepository",
     "AdvisorSessionRepository",
     "ContactRepository",

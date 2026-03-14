@@ -109,6 +109,23 @@ class AdvisorOrchestrator:
                 uow=uow,
                 persistence=persistence,
             )
+            self._save_session_result(
+                payload=payload,
+                session_id=session_id,
+                user_id=context.user_id,
+                responses=responses,
+                analysis=analysis,
+                uow=uow,
+            )
+            self._track_reply_generated_events(
+                uow=uow,
+                session_id=session_id,
+                user_id=context.user_id,
+                mode=payload.mode,
+                quick_mode=payload.quick_mode,
+                save_session=payload.save_session,
+                responses=responses,
+            )
 
             if uow is not None:
                 try:
@@ -161,12 +178,22 @@ class AdvisorOrchestrator:
                 success=False,
                 duration_ms=duration_ms,
             )
+            fallback = _fallback_responses()
+            self._track_reply_generated_events(
+                uow=uow,
+                session_id=session_id,
+                user_id=context.user_id,
+                mode=payload.mode,
+                quick_mode=payload.quick_mode,
+                save_session=payload.save_session,
+                responses=fallback,
+            )
             return AdvisorResponse(
                 session_id=session_id,
                 mode=payload.mode,
                 quick_mode=payload.quick_mode,
                 analysis=None if payload.quick_mode else context.analysis,
-                responses=_fallback_responses(),
+                responses=fallback,
                 persistence=persistence,
                 created_at=datetime.now(UTC),
             )
@@ -202,18 +229,26 @@ class AdvisorOrchestrator:
                 stored = analysis_registry.get_for_user(payload.analysis_id, user_id)
             except AnalysisOwnershipError:
                 raise
-            if stored is None:
-                raise AnalysisNotFoundError("analysis_id not found or expired")
-
-            risk_flags = [str(item.get("code", "")) for item in stored.risk_flags if item.get("code")]
-            tone = stored.emotional_context.get("tone") if stored.emotional_context else None
-            intent = (
-                stored.emotional_context.get("intent_guess")
-                if stored.emotional_context
-                else None
-            )
-            emotional_context = _compose_emotional_context(tone=tone, intent_guess=intent)
-            analysis = AnalysisSnapshot(summary=stored.summary, risk_flags=risk_flags)
+            if stored is not None:
+                risk_flags = [str(item.get("code", "")) for item in stored.risk_flags if item.get("code")]
+                tone = stored.emotional_context.get("tone") if stored.emotional_context else None
+                intent = (
+                    stored.emotional_context.get("intent_guess")
+                    if stored.emotional_context
+                    else None
+                )
+                emotional_context = _compose_emotional_context(tone=tone, intent_guess=intent)
+                analysis = AnalysisSnapshot(summary=stored.summary, risk_flags=risk_flags)
+            else:
+                persisted = self._load_persisted_analysis(
+                    uow=uow,
+                    analysis_id=payload.analysis_id,
+                    user_id=user_id,
+                )
+                if persisted is None:
+                    raise AnalysisNotFoundError("analysis_id not found or expired")
+                risk_flags = persisted.risk_flags
+                analysis = persisted
 
         if not risk_flags:
             inline_linter = run_emotional_linter(payload.message_text, quick_mode=payload.quick_mode)
@@ -255,10 +290,14 @@ class AdvisorOrchestrator:
         try:
             created = uow.sessions.create_started(
                 user_id=context.user_id,
+                case_id=_resolve_optional_uuid(payload.case_id),
                 contact_id=payload.contact_id,
                 mode=payload.mode,
                 quick_mode=payload.quick_mode,
                 save_session=payload.save_session,
+                source_type=(payload.source_type or "text"),
+                original_input_text=payload.message_text,
+                analysis_id=payload.analysis_id,
                 current_step="ingreso",
                 status="started",
             )
@@ -347,6 +386,7 @@ class AdvisorOrchestrator:
         save_session: bool,
         success: bool,
         duration_ms: int | None = None,
+        properties: dict[str, object] | None = None,
     ) -> None:
         if uow is None or uow.tracking is None:
             return
@@ -360,7 +400,93 @@ class AdvisorOrchestrator:
             save_session=save_session,
             duration_ms=duration_ms,
             success=success,
+            properties=properties,
         )
+
+    def _save_session_result(
+        self,
+        *,
+        payload: AdvisorRequest,
+        session_id: UUID,
+        user_id: UUID,
+        responses: list[SuggestedResponse],
+        analysis: AnalysisSnapshot | None,
+        uow: UnitOfWork | None,
+    ) -> None:
+        if uow is None:
+            return
+        try:
+            uow.sessions.save_advisor_result(
+                session_id=session_id,
+                user_id=user_id,
+                analysis_id=payload.analysis_id,
+                advisor_response_json={
+                    "responses": [item.model_dump() for item in responses],
+                    "analysis": analysis.model_dump() if analysis else None,
+                },
+            )
+        except Exception:
+            pass
+
+    def _track_reply_generated_events(
+        self,
+        *,
+        uow: UnitOfWork | None,
+        session_id: UUID,
+        user_id: UUID,
+        mode: str,
+        quick_mode: bool,
+        save_session: bool,
+        responses: list[SuggestedResponse],
+    ) -> None:
+        for index, item in enumerate(responses):
+            self._track_event(
+                uow,
+                event_name="reply_generated",
+                session_id=session_id,
+                user_id=user_id,
+                step="respuesta",
+                mode=mode,
+                quick_mode=quick_mode,
+                save_session=save_session,
+                success=True,
+                properties={
+                    "response_index": index,
+                    "emotion_label": item.emotion_label,
+                },
+            )
+
+    def _load_persisted_analysis(
+        self,
+        *,
+        uow: UnitOfWork | None,
+        analysis_id: UUID,
+        user_id: UUID,
+    ) -> AnalysisSnapshot | None:
+        if uow is None:
+            return None
+        try:
+            row = uow.analyses.get_by_id_for_user(analysis_id=analysis_id, user_id=user_id)
+        except Exception:
+            return None
+        if row is None:
+            return None
+        raw = row.get("analysis_json")
+        if not isinstance(raw, dict):
+            return None
+        summary = str(raw.get("summary") or "").strip()
+        risk_raw = raw.get("risk_flags")
+        risk_flags: list[str] = []
+        if isinstance(risk_raw, list):
+            for item in risk_raw:
+                if not isinstance(item, dict):
+                    continue
+                code = str(item.get("code") or "").strip()
+                if code:
+                    risk_flags.append(code)
+        if not summary:
+            summary = "Analisis recuperado sin resumen."
+        return AnalysisSnapshot(summary=summary, risk_flags=risk_flags)
 
 
 def _sanitize_message(value: str) -> str:
@@ -515,4 +641,18 @@ def _emotion_for_advisor(advisor_id: str, *, index: int) -> str:
         return mapped
     by_index = ["empathetic", "assertive", "neutral"]
     return by_index[min(index, 2)]
+
+
+def _resolve_optional_uuid(value: object) -> UUID | None:
+    if value is None:
+        return None
+    if isinstance(value, UUID):
+        return value
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        return UUID(text)
+    except ValueError:
+        return None
 

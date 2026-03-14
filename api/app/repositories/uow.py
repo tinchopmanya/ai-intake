@@ -1,3 +1,4 @@
+from app.repositories.analysis_results import AnalysisResultRepository
 from app.repositories.advisor_outputs import AdvisorOutputRepository
 from app.repositories.advisor_sessions import AdvisorSessionRepository
 from app.repositories.contacts import ContactRepository
@@ -18,6 +19,7 @@ class UnitOfWork:
         self._tracking_repository = tracking_repository
 
         self.contacts: ContactRepository
+        self.analyses: AnalysisResultRepository
         self.sessions: AdvisorSessionRepository
         self.outputs: AdvisorOutputRepository
         self.memory: ConversationMemoryRepository
@@ -29,6 +31,7 @@ class UnitOfWork:
     def __enter__(self) -> "UnitOfWork":
         self._connection = self._connection_factory()
         self.contacts = ContactRepository(self._connection)
+        self.analyses = AnalysisResultRepository(self._connection)
         self.sessions = AdvisorSessionRepository(self._connection)
         self.outputs = AdvisorOutputRepository(self._connection)
         self.memory = ConversationMemoryRepository(self._connection)

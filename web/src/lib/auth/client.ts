@@ -60,6 +60,11 @@ function parseSession(raw: string | null): StoredSession | null {
   try {
     const parsed = JSON.parse(raw) as StoredSession;
     if (!parsed.accessToken || !parsed.refreshToken) return null;
+    if (!parsed.tokenType || parsed.tokenType.toLowerCase() !== "bearer") return null;
+    if (!Number.isFinite(parsed.accessExpiresAt) || !Number.isFinite(parsed.refreshExpiresAt)) {
+      return null;
+    }
+    if (!parsed.user || !parsed.user.id || !parsed.user.email) return null;
     return parsed;
   } catch {
     return null;
@@ -68,7 +73,12 @@ function parseSession(raw: string | null): StoredSession | null {
 
 function readSession(): StoredSession | null {
   if (!isBrowser()) return null;
-  return parseSession(window.localStorage.getItem(SESSION_STORAGE_KEY));
+  const raw = window.localStorage.getItem(SESSION_STORAGE_KEY);
+  const parsed = parseSession(raw);
+  if (!parsed && raw) {
+    window.localStorage.removeItem(SESSION_STORAGE_KEY);
+  }
+  return parsed;
 }
 
 function writeSessionFromAuthResponse(payload: AuthResponse): StoredSession {
@@ -181,13 +191,31 @@ async function getValidSession(): Promise<StoredSession | null> {
   return refreshSession();
 }
 
+async function getSessionForRequest(): Promise<StoredSession | null> {
+  const session = readSession();
+  if (!session) return null;
+  if (isRefreshExpired(session)) {
+    clearSession();
+    return null;
+  }
+  if (!isAccessExpired(session)) return session;
+  const refreshed = await refreshSession();
+  if (refreshed) return refreshed;
+  clearSession();
+  return null;
+}
+
+export function hasStoredSession(): boolean {
+  return readSession() !== null;
+}
+
 export async function authFetch(
   input: RequestInfo | URL,
   init?: RequestInit,
   options?: { retryOn401?: boolean },
 ): Promise<Response> {
   const retryOn401 = options?.retryOn401 ?? true;
-  const session = await getValidSession();
+  const session = await getSessionForRequest();
   const headers = new Headers(init?.headers ?? {});
   if (!headers.has("Accept-Language")) {
     headers.set("Accept-Language", resolvePreferredLanguage());
@@ -198,21 +226,32 @@ export async function authFetch(
 
   const response = await fetch(input, { ...init, headers });
   if (response.status !== 401 || !retryOn401 || !session) {
+    if (response.status === 401) {
+      clearSession();
+    }
     return response;
   }
 
   const refreshed = await refreshSession();
   if (!refreshed) {
+    clearSession();
     return response;
   }
 
   const retryHeaders = new Headers(init?.headers ?? {});
+  if (!retryHeaders.has("Accept-Language")) {
+    retryHeaders.set("Accept-Language", resolvePreferredLanguage());
+  }
   retryHeaders.set("Authorization", `Bearer ${refreshed.accessToken}`);
   return fetch(input, { ...init, headers: retryHeaders });
 }
 
 export async function loginWithGoogleIdToken(idToken: string): Promise<AuthUser> {
-  const payload = await postJson<AuthResponse>("/v1/auth/google", { id_token: idToken });
+  const normalized = idToken.trim();
+  if (!normalized) {
+    throw new AuthApiError({ code: "invalid_google_token", status: 400 });
+  }
+  const payload = await postJson<AuthResponse>("/v1/auth/google", { id_token: normalized });
   const session = writeSessionFromAuthResponse(payload);
   return session.user;
 }

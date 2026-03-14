@@ -2,13 +2,18 @@ from typing import Annotated
 
 from datetime import UTC
 from datetime import datetime
+from uuid import UUID
 from uuid import uuid4
 
 from fastapi import APIRouter
 from fastapi import Depends
+from fastapi import HTTPException
 from fastapi import status
+import logging
 
 from app.api.deps import get_current_user
+from app.api.deps import get_uow
+from app.repositories import UnitOfWork
 from app.schemas.analysis import AnalysisRequest
 from app.schemas.analysis import AnalysisResponse
 from app.services.auth_service import AuthenticatedUser
@@ -18,6 +23,7 @@ from app.services.emotional_linter import extract_risk_codes
 from app.services.emotional_linter import run_emotional_linter
 
 router = APIRouter(prefix="/v1/analysis", tags=["analysis"])
+logger = logging.getLogger(__name__)
 
 
 @router.post(
@@ -28,6 +34,7 @@ router = APIRouter(prefix="/v1/analysis", tags=["analysis"])
 async def create_analysis(
     payload: AnalysisRequest,
     current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    uow: Annotated[UnitOfWork | None, Depends(get_uow)],
 ) -> AnalysisResponse:
     """Analyze a candidate outbound message and return emotional/risk signals."""
     analysis_skipped = payload.quick_mode
@@ -84,5 +91,61 @@ async def create_analysis(
             expires_at=analysis_registry.build_expires_at(response.created_at),
         )
     )
+    if uow is not None:
+        try:
+            uow.analyses.create(
+                analysis_id=response.analysis_id,
+                user_id=user_id,
+                case_id=payload.case_id,
+                contact_id=payload.contact_id,
+                source_type=payload.source_type,
+                input_text=payload.message_text,
+                analysis_json=response.model_dump(mode="json"),
+            )
+        except Exception as exc:
+            logger.exception("Failed to persist analysis result: analysis_id=%s", response.analysis_id)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="analysis_persistence_failed",
+            ) from exc
     return response
 
+
+@router.get(
+    "/{analysis_id}",
+    response_model=AnalysisResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def get_analysis_by_id(
+    analysis_id: UUID,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    uow: Annotated[UnitOfWork | None, Depends(get_uow)],
+) -> AnalysisResponse:
+    """Return an analysis result for current user by id."""
+    stored = analysis_registry.get_for_user(analysis_id, current_user.id)
+    if stored is not None:
+        return AnalysisResponse(
+            analysis_id=stored.analysis_id,
+            summary=stored.summary,
+            risk_flags=[AnalysisResponse.RiskFlag.model_validate(item) for item in stored.risk_flags],
+            emotional_context=AnalysisResponse.EmotionalContext.model_validate(
+                stored.emotional_context
+            ),
+            ui_alerts=[AnalysisResponse.UiAlert.model_validate(item) for item in stored.ui_alerts],
+            tone_detected=stored.emotional_context.get("tone"),
+            suggested_emotion_label=None,
+            analysis_skipped=False,
+            created_at=stored.created_at,
+        )
+
+    if uow is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="analysis_not_found")
+
+    row = uow.analyses.get_by_id_for_user(analysis_id=analysis_id, user_id=current_user.id)
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="analysis_not_found")
+
+    payload = row.get("analysis_json")
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="analysis_invalid")
+    return AnalysisResponse.model_validate(payload)

@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi import HTTPException
 from fastapi import Request
@@ -7,14 +9,17 @@ from fastapi.responses import JSONResponse
 from app.api.routers import advisor_router as advisor_v1_router
 from app.api.routers import analysis_router
 from app.api.routers import auth_router
+from app.api.routers import events_router
 from app.api.routers import onboarding_router
 from app.api.routers import ocr_router
+from app.services.i18n_service import i18n_service
 from config import settings
+from config import validate_startup_or_raise
 from repositories.in_memory import conversation_repository
 from routers.chat import router as chat_router
 from routers.health import router as health_router
-from app.services.i18n_service import i18n_service
 
+logger = logging.getLogger(__name__)
 app = FastAPI()
 
 app.add_middleware(
@@ -25,12 +30,31 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.on_event("startup")
+async def startup_validation() -> None:
+    validate_startup_or_raise(settings)
+    logger.info(
+        "Startup validation completed. env=%s local=%s legacy_chat=%s",
+        settings.app_env,
+        settings.is_local_env,
+        settings.enable_legacy_chat_routes,
+    )
+
+
 app.include_router(health_router)
-app.include_router(chat_router)
+if settings.enable_legacy_chat_routes:
+    app.include_router(chat_router)
+    logger.warning(
+        "Legacy compatibility router enabled: /v1/chat and /v1/conversations/* are deprecated."
+    )
+else:
+    logger.info("Legacy chat router disabled (ENABLE_LEGACY_CHAT_ROUTES=false).")
 app.include_router(auth_router)
 app.include_router(onboarding_router)
 app.include_router(analysis_router)
 app.include_router(advisor_v1_router)
+app.include_router(events_router)
 app.include_router(ocr_router)
 
 
@@ -55,6 +79,7 @@ async def localized_http_exception_handler(
             "language_code": language_code,
         },
     )
+
 
 # Backward compatibility with existing tests/imports.
 conversations = conversation_repository.conversations

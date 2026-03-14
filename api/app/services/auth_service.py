@@ -111,12 +111,21 @@ class AuthService:
                 session.revoked_at = datetime.now(UTC)
                 return True
 
-        connection = self._connection_factory()
+        connection = self._open_connection(operation="logout")
         try:
             sessions = AuthSessionRepository(connection)
             revoked = sessions.revoke_by_refresh_hash(refresh_token_hash=refresh_hash)
             connection.commit()
             return revoked
+        except Exception as exc:
+            try:
+                connection.rollback()
+            except Exception:
+                pass
+            logger.exception("Failed to revoke auth session in DB: %s", exc)
+            if _is_db_connection_error(exc):
+                raise AuthError(status_code=503, detail="database_unavailable") from exc
+            raise AuthError(status_code=500, detail="auth_internal_error") from exc
         finally:
             connection.close()
 
@@ -139,7 +148,13 @@ class AuthService:
                     raise AuthError(status_code=401, detail="invalid_or_expired_session")
                 return user
 
-        connection = self._connection_factory()
+        try:
+            connection = self._connection_factory()
+        except Exception as exc:
+            logger.exception("Failed to open DB connection while validating access token: %s", exc)
+            if _is_db_connection_error(exc) or isinstance(exc, RuntimeError):
+                raise AuthError(status_code=503, detail="database_unavailable") from exc
+            raise
         try:
             sessions = AuthSessionRepository(connection)
             users = UserRepository(connection)
@@ -372,11 +387,15 @@ class AuthService:
     def _refresh_session_in_db(
         self, refresh_hash: str
     ) -> tuple[SessionTokens, AuthenticatedUser]:
-        connection = self._connection_factory
-        if connection is None:
+        connection_factory = self._connection_factory
+        if connection_factory is None:
             raise AuthError(status_code=500, detail="auth_service_misconfigured")
 
-        db = connection()
+        try:
+            db = connection_factory()
+        except Exception as exc:
+            logger.exception("Failed to open DB connection for refresh_session: %s", exc)
+            raise AuthError(status_code=503, detail="database_unavailable") from exc
         try:
             sessions = AuthSessionRepository(db)
             users = UserRepository(db)
@@ -409,6 +428,17 @@ class AuthService:
                 refresh_expires_in=self._refresh_ttl,
             )
             return tokens, _map_user_row(user_row)
+        except AuthError:
+            raise
+        except Exception as exc:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+            logger.exception("Failed to refresh auth session in DB: %s", exc)
+            if _is_db_connection_error(exc):
+                raise AuthError(status_code=503, detail="database_unavailable") from exc
+            raise AuthError(status_code=500, detail="auth_internal_error") from exc
         finally:
             db.close()
 
@@ -427,13 +457,20 @@ class AuthService:
                     "onboarding_completed": user.onboarding_completed,
                 }
 
-        connection = self._connection_factory()
+        connection = self._open_connection(operation="get_onboarding_profile")
         try:
             users = UserRepository(connection)
             profile = users.get_onboarding_profile(user_id=user_id)
             if profile is None:
                 raise AuthError(status_code=404, detail="user_not_found")
             return profile
+        except AuthError:
+            raise
+        except Exception as exc:
+            logger.exception("Failed to fetch onboarding profile from DB: %s", exc)
+            if _is_db_connection_error(exc):
+                raise AuthError(status_code=503, detail="database_unavailable") from exc
+            raise AuthError(status_code=500, detail="auth_internal_error") from exc
         finally:
             connection.close()
 
@@ -481,7 +518,7 @@ class AuthService:
                     "onboarding_completed": updated.onboarding_completed,
                 }
 
-        connection = self._connection_factory()
+        connection = self._open_connection(operation="update_onboarding_profile")
         try:
             users = UserRepository(connection)
             updated = users.update_onboarding_profile(
@@ -496,8 +533,29 @@ class AuthService:
                 raise AuthError(status_code=404, detail="user_not_found")
             connection.commit()
             return updated
+        except AuthError:
+            raise
+        except Exception as exc:
+            try:
+                connection.rollback()
+            except Exception:
+                pass
+            logger.exception("Failed to persist onboarding profile in DB: %s", exc)
+            if _is_db_connection_error(exc):
+                raise AuthError(status_code=503, detail="database_unavailable") from exc
+            raise AuthError(status_code=500, detail="auth_internal_error") from exc
         finally:
             connection.close()
+
+    def _open_connection(self, *, operation: str):
+        connection_factory = self._connection_factory
+        if connection_factory is None:
+            raise AuthError(status_code=500, detail="auth_service_misconfigured")
+        try:
+            return connection_factory()
+        except Exception as exc:
+            logger.exception("Failed to open DB connection for %s: %s", operation, exc)
+            raise AuthError(status_code=503, detail="database_unavailable") from exc
 
 
 def _new_session_token() -> str:

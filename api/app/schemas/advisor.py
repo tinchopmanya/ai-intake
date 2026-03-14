@@ -33,7 +33,9 @@ class AdvisorRequest(BaseModel):
     message_text: str = Field(min_length=1, max_length=8000)
     mode: UsageMode
     relationship_type: RelationshipType
+    case_id: UUID | None = None
     contact_id: UUID | None = None
+    source_type: Literal["text", "ocr"] = "text"
     quick_mode: bool = False
     save_session: bool = False
     analysis_id: UUID | None = None

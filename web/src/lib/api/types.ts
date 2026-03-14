@@ -19,7 +19,9 @@ export type AnalysisRequest = {
   message_text: string;
   mode: UsageMode;
   relationship_type: RelationshipType;
+  case_id?: string | null;
   contact_id?: string | null;
+  source_type?: "text" | "ocr";
   quick_mode?: boolean;
   context?: Record<string, unknown> | null;
 };
@@ -53,12 +55,27 @@ export type AdvisorRequest = {
   message_text: string;
   mode: UsageMode;
   relationship_type: RelationshipType;
+  case_id?: string | null;
   contact_id?: string | null;
+  source_type?: "text" | "ocr";
   quick_mode?: boolean;
   save_session?: boolean;
   analysis_id?: string | null;
   prompt_version?: string | null;
   context?: Record<string, unknown> | null;
+};
+
+export type WizardEventRequest = {
+  event_name: "reply_copied";
+  session_id: string;
+  analysis_id?: string | null;
+  advisor_id?: string | null;
+  response_index?: number | null;
+};
+
+export type WizardEventResponse = {
+  accepted: boolean;
+  persisted: boolean;
 };
 
 export type AdvisorResponse = {
@@ -87,5 +104,12 @@ export type OcrExtractResponse = {
   provider: string;
   confidence: number | null;
   warnings: string[];
+};
+
+export type OcrCapabilitiesResponse = {
+  available: boolean;
+  selected_provider: string;
+  providers_checked: string[];
+  reason_codes: string[];
 };
 

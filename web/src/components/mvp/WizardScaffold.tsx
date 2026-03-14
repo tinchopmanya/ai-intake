@@ -8,7 +8,8 @@ import { Button, Panel, Select, Textarea } from "@/components/mvp/ui";
 import { AdvisorAvatarItem } from "@/components/ui/AdvisorAvatarItem";
 import { ADVISOR_PROFILES } from "@/data/advisors";
 import { authFetch } from "@/lib/auth/client";
-import { postAdvisor, postAnalysis } from "@/lib/api/client";
+import { hasStoredSession } from "@/lib/auth/client";
+import { postAdvisor, postAnalysis, postWizardEvent } from "@/lib/api/client";
 import type { AdvisorProfile } from "@/data/advisors";
 import { API_URL } from "@/lib/config";
 import { resolveRuntimeLocale, tRuntime } from "@/lib/i18n/runtime";
@@ -16,6 +17,7 @@ import type {
   AdvisorResponse,
   AnalysisResponse,
   AnalysisRiskFlag,
+  OcrCapabilitiesResponse,
   OcrExtractResponse,
   UsageMode,
 } from "@/lib/api/types";
@@ -58,6 +60,41 @@ const ADVISOR_ACCENT_CLASS = [
   "border-t-[3px] border-t-amber-500",
 ] as const;
 const OCR_EXTRACT_URL = `${API_URL}/v1/ocr/extract`;
+const OCR_CAPABILITIES_URL = `${API_URL}/v1/ocr/capabilities`;
+
+const OCR_ERROR_MESSAGES: Record<string, string> = {
+  missing_image_file: "Selecciona una imagen para continuar.",
+  unsupported_image_mime_type: "Formato no compatible. Usa PNG, JPG o WebP.",
+  empty_file: "La imagen seleccionada esta vacia.",
+  file_too_large: "La imagen es demasiado grande.",
+  python_multipart_not_installed: "OCR no disponible en este entorno.",
+  ocr_no_text_detected: "No detectamos texto legible. Prueba otra captura mas nítida.",
+  invalid_image_file: "No pudimos leer la imagen. Prueba con otro archivo.",
+  pillow_not_installed: "OCR no disponible por configuracion del servidor.",
+  pytesseract_not_installed: "OCR no disponible por configuracion del servidor.",
+  tesseract_not_installed: "OCR no disponible: falta Tesseract en el servidor.",
+  tesseract_not_available: "OCR no disponible en este servidor.",
+  tesseract_binary_not_found: "OCR no disponible: Tesseract no fue encontrado.",
+  tesseract_language_not_available: "OCR no disponible para el idioma configurado.",
+  tesseract_execution_failed: "No se pudo procesar la imagen con OCR.",
+  google_vision_dependency_missing: "OCR no disponible por configuracion del servidor.",
+  google_vision_not_configured: "OCR no disponible: Google Vision no esta configurado.",
+  google_vision_request_failed: "No se pudo procesar la imagen en este momento.",
+  ocr_unavailable: "OCR no esta disponible ahora. Intenta de nuevo mas tarde.",
+  ocr_internal_error: "Error interno al leer la imagen.",
+  invalid_or_expired_session: "Tu sesion expiro. Inicia sesion nuevamente.",
+  missing_bearer_token: "Necesitas iniciar sesion para usar OCR.",
+};
+
+function resolveOcrErrorMessage(detail?: string, message?: string): string {
+  if (detail && OCR_ERROR_MESSAGES[detail]) {
+    return OCR_ERROR_MESSAGES[detail];
+  }
+  if (message && message.trim()) {
+    return message;
+  }
+  return "No se pudo leer el texto de la imagen.";
+}
 
 function getAdvisorVisualByIndex(index: number) {
   return ADVISOR_PROFILES[index] ?? ADVISOR_FALLBACK_VISUAL;
@@ -230,6 +267,8 @@ export function WizardScaffold() {
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrError, setOcrError] = useState<string | null>(null);
   const [ocrInfo, setOcrInfo] = useState<OcrExtractResponse | null>(null);
+  const [ocrCapabilities, setOcrCapabilities] = useState<OcrCapabilitiesResponse | null>(null);
+  const [ocrCapabilitiesLoading, setOcrCapabilitiesLoading] = useState(true);
 
   const selectedRecentPerson =
     RECENT_PEOPLE.find((person) => person.id === selectedRecentPersonId) ?? null;
@@ -246,6 +285,39 @@ export function WizardScaffold() {
     };
   }, [ocrImageFile]);
 
+  useEffect(() => {
+    let mounted = true;
+    async function loadOcrCapabilities() {
+      setOcrCapabilitiesLoading(true);
+      try {
+        const response = await authFetch(OCR_CAPABILITIES_URL, {
+          method: "GET",
+          cache: "no-store",
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const payload = (await response.json()) as OcrCapabilitiesResponse;
+        if (!mounted) return;
+        setOcrCapabilities(payload);
+      } catch {
+        if (!mounted) return;
+        setOcrCapabilities({
+          available: false,
+          selected_provider: "auto",
+          providers_checked: [],
+          reason_codes: ["ocr_unavailable"],
+        });
+      } finally {
+        if (mounted) setOcrCapabilitiesLoading(false);
+      }
+    }
+    void loadOcrCapabilities();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   function openAdvisorProfileById(advisorId: string) {
     const profile = ADVISOR_PROFILES.find((advisor) => advisor.id === advisorId) ?? null;
     setSelectedProfile(profile);
@@ -260,6 +332,12 @@ export function WizardScaffold() {
 
   function handleImageSelection(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] ?? null;
+    if (file && !file.type.startsWith("image/")) {
+      setOcrImageFile(null);
+      setOcrError("Selecciona una imagen valida (PNG, JPG o WebP).");
+      setOcrInfo(null);
+      return;
+    }
     setOcrImageFile(file);
     setOcrError(null);
     setOcrInfo(null);
@@ -267,6 +345,14 @@ export function WizardScaffold() {
 
   async function handleExtractTextFromImage() {
     if (!ocrImageFile || ocrLoading) return;
+    if (!hasStoredSession()) {
+      setOcrError("Tu sesion no esta activa. Inicia sesion para usar esta funcion.");
+      return;
+    }
+    if (ocrCapabilitiesLoading || ocrCapabilities?.available === false) {
+      setOcrError("Esta funcion no esta disponible en este entorno.");
+      return;
+    }
 
     setOcrLoading(true);
     setOcrError(null);
@@ -279,13 +365,22 @@ export function WizardScaffold() {
         body: formData,
       });
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        const errorPayload = (await response.json().catch(() => null)) as
+          | { detail?: string; message?: string }
+          | null;
+        throw new Error(
+          resolveOcrErrorMessage(errorPayload?.detail, errorPayload?.message),
+        );
       }
       const payload = (await response.json()) as OcrExtractResponse;
       setMessageText(payload.extracted_text);
       setOcrInfo(payload);
-    } catch {
-      setOcrError("No se pudo extraer texto de la imagen.");
+    } catch (exc) {
+      setOcrError(
+        exc instanceof Error
+          ? exc.message
+          : "No se pudo leer el texto de la imagen.",
+      );
     } finally {
       setOcrLoading(false);
     }
@@ -294,6 +389,7 @@ export function WizardScaffold() {
   async function runAnalysis() {
     const text = messageText.trim();
     if (!text || loadingAnalysis) return;
+    const sourceType = ocrInfo ? "ocr" : "text";
 
     setLoadingAnalysis(true);
     setAnalysisError(null);
@@ -305,6 +401,7 @@ export function WizardScaffold() {
         message_text: text,
         mode,
         relationship_type: "otro",
+        source_type: sourceType,
         quick_mode: quickMode,
         context: buildContextPayload(),
       });
@@ -320,6 +417,7 @@ export function WizardScaffold() {
   async function requestAdvisor(params: { quickMode: boolean; analysisId?: string | null }) {
     const text = messageText.trim();
     if (!text || loadingAdvisor) return;
+    const sourceType = ocrInfo ? "ocr" : "text";
 
     setLoadingAdvisor(true);
     setAdvisorError(null);
@@ -331,6 +429,7 @@ export function WizardScaffold() {
         message_text: text,
         mode,
         relationship_type: "otro",
+        source_type: sourceType,
         quick_mode: params.quickMode,
         save_session: true,
         analysis_id: params.analysisId ?? undefined,
@@ -386,6 +485,19 @@ export function WizardScaffold() {
   async function handleCopy(text: string, index: number) {
     try {
       await navigator.clipboard.writeText(text);
+      const sessionId = advisorResult?.session_id;
+      const advisorId = getAdvisorVisualByIndex(index).id;
+      if (sessionId) {
+        void postWizardEvent({
+          event_name: "reply_copied",
+          session_id: sessionId,
+          analysis_id: analysisId ?? undefined,
+          advisor_id: advisorId,
+          response_index: index,
+        }).catch(() => {
+          // Keep UX resilient if analytics persistence fails.
+        });
+      }
       setCopiedIndex(index);
       window.setTimeout(() => setCopiedIndex(null), 1500);
     } catch {
@@ -456,13 +568,28 @@ export function WizardScaffold() {
                     <Button
                       type="button"
                       onClick={() => void handleExtractTextFromImage()}
-                      disabled={!ocrImageFile || ocrLoading}
+                      disabled={
+                        !ocrImageFile ||
+                        ocrLoading ||
+                        ocrCapabilitiesLoading ||
+                        ocrCapabilities?.available === false
+                      }
                       variant="secondary"
                       className="border-[#cbd5e1] bg-white px-3 py-1.5 text-xs text-[#334155]"
                     >
-                      {ocrLoading ? "Extrayendo OCR..." : "Extraer texto (OCR)"}
+                      {ocrLoading
+                        ? "Leyendo texto..."
+                        : ocrCapabilitiesLoading
+                          ? "Preparando OCR..."
+                          : "Leer texto de la imagen"}
                     </Button>
                   </div>
+                  {ocrCapabilities?.available === false ? (
+                    <p className="mt-2 text-xs text-amber-700">
+                      OCR no disponible:{" "}
+                      {resolveOcrErrorMessage(ocrCapabilities.reason_codes[0])}
+                    </p>
+                  ) : null}
                   {ocrImagePreviewUrl ? (
                     <Image
                       src={ocrImagePreviewUrl}
@@ -474,7 +601,7 @@ export function WizardScaffold() {
                   ) : null}
                   {ocrInfo ? (
                     <p className="mt-2 text-xs text-[#334155]">
-                      OCR: proveedor {ocrInfo.provider}
+                      Texto cargado desde imagen ({ocrInfo.provider})
                       {ocrInfo.confidence !== null
                         ? `, confianza ${(ocrInfo.confidence * 100).toFixed(1)}%`
                         : ""}
@@ -486,7 +613,7 @@ export function WizardScaffold() {
                   value={messageText}
                   onChange={(event) => setMessageText(event.target.value)}
                   rows={6}
-                  placeholder="Pega aqui el mensaje o valida/corrige el texto extraido por OCR..."
+                  placeholder="Pega aqui el mensaje o revisa el texto leido desde la imagen..."
                   className="min-h-[164px] rounded-xl border-[#e5e7eb] bg-white text-[#1f2937] focus:border-[#3b82f6] focus:ring-[#3b82f6]/20"
                 />
               </div>

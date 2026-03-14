@@ -2,288 +2,75 @@
 
 Base URL local: `http://localhost:8000`
 
-## Endpoints
+## Runtime Surface
 
-| Metodo | Ruta | Parametros | Descripcion |
+| Metodo | Ruta | Estado | Notas |
 |---|---|---|---|
-| `GET` | `/health` | - | Healthcheck de servicio |
-| `POST` | `/v1/auth/google` | body `GoogleAuthRequest` | Login Google (MVP stub) |
-| `POST` | `/v1/analysis` | body `AnalysisRequest` | Analisis emocional/riesgo del mensaje |
-| `POST` | `/v1/advisor` | body `AdvisorRequest` | Genera respuestas de advisors |
-| `POST` | `/v1/chat` | body `ChatRequest` | Chat simple legacy |
-| `GET` | `/v1/conversations/{conversation_id}` | path `conversation_id` | Historial de chat legacy |
-| `GET` | `/v1/advisor/conversations` | query `user_id`, `contact_id` | Lista sesiones advisor legacy |
-| `GET` | `/v1/advisor/conversations/{conversation_id}` | path `conversation_id` | Historial advisor legacy |
+| `GET` | `/health` | Activo | Healthcheck |
+| `POST` | `/v1/auth/google` | Activo | Login Google + creacion de sesion opaca |
+| `POST` | `/v1/auth/refresh` | Activo | Rotacion de access/refresh token opacos |
+| `POST` | `/v1/auth/logout` | Activo | Revocacion por refresh token |
+| `GET` | `/v1/auth/me` | Activo | Usuario actual por bearer token |
+| `GET` | `/v1/onboarding/profile` | Activo | Perfil onboarding |
+| `PUT` | `/v1/onboarding/profile` | Activo | Persistencia onboarding |
+| `POST` | `/v1/analysis` | Activo | Analisis emocional/riesgo |
+| `GET` | `/v1/analysis/{analysis_id}` | Activo | Lectura de analisis persistido por usuario |
+| `POST` | `/v1/advisor` | Activo | Respuestas de advisors |
+| `POST` | `/v1/events` | Activo | Tracking MVP (`reply_copied`) |
+| `GET` | `/v1/ocr/capabilities` | Activo | Probe de disponibilidad OCR |
+| `POST` | `/v1/ocr/extract` | Activo | OCR de imagen autenticado |
+| `POST` | `/v1/chat` | Legacy | Compatibilidad, deprecado |
+| `GET` | `/v1/conversations/{conversation_id}` | Legacy | Compatibilidad, deprecado |
 
----
+## Estrategia de auth actual (MVP)
 
-## 1) GET /health
+- Esta version usa **opaque session tokens** (no JWT):
+  - `access_token` opaco de vida corta.
+  - `refresh_token` opaco de vida larga.
+  - ambos se guardan hasheados en `auth_sessions` (PostgreSQL) o memoria local dev.
+- El cliente web persiste sesion en `localStorage` (`zc_auth_session_v1`).
+- El backend autentica por `Authorization: Bearer <access_token>`.
 
-### Request
-```http
-GET /health
-```
+## Errores frecuentes de auth
 
-### Response 200
-```json
-{
-  "ok": true
-}
-```
+- `missing_bearer_token` -> `401`
+- `invalid_or_expired_session` -> `401`
+- `invalid_refresh_token` -> `401`
+- `google_client_id_not_configured` -> `400`
+- `invalid_google_token` -> `401`
+- `database_unavailable` -> `503`
 
-### Errores
-- No definidos a nivel de dominio.
+## OCR
 
----
+- `GET /v1/ocr/capabilities` devuelve disponibilidad real del entorno.
+- `POST /v1/ocr/extract` requiere sesion valida.
+- El proveedor se controla con `OCR_PROVIDER`:
+  - `auto`
+  - `google_vision`
+  - `tesseract`
 
-## 2) POST /v1/auth/google
+## Persistencia MVP de uso real
 
-### Body
-```json
-{
-  "id_token": "google-id-token"
-}
-```
+- `POST /v1/analysis` ahora persiste en `analysis_results` (cuando hay DB activa) y devuelve `analysis_id`.
+- `POST /v1/advisor` persiste sesion base en `advisor_sessions`:
+  - `source_type`, `original_input_text`, `analysis_id`, `advisor_response_json`.
+- El backend emite `reply_generated` en `analytics.wizard_events` por cada respuesta.
+- El frontend emite `reply_copied` con `POST /v1/events`.
+- `advisor_sessions.selected_advisor_id` se actualiza con el advisor copiado.
 
-### Response 200
-```json
-{
-  "access_token": "dev-<uuid>",
-  "token_type": "bearer",
-  "expires_in": 3600,
-  "user": {
-    "id": "0f0f4c89-7ff1-4a4f-84da-e3dfecf9586f",
-    "email": "user@example.com",
-    "name": "Usuario MVP",
-    "memory_opt_in": false
-  }
-}
-```
+Con esto se puede medir `reply adoption rate = reply_copied / reply_generated`.
 
-### Errores
-- `401 invalid_google_token`: token ausente o muy corto.
+## Hardening de startup
 
----
+- En `APP_ENV=production|prod`, el backend valida al boot:
+  - `DATABASE_URL` presente.
+  - `GOOGLE_CLIENT_ID` presente.
+  - Si `OCR_PROVIDER` es explicito (`google_vision` o `tesseract`), que ese provider sea utilizable.
+- Si falla alguna validacion critica, el proceso **no arranca**.
+- En local/dev, el fallback en memoria solo se permite con `ALLOW_INMEMORY_FALLBACK=true` y queda logueado.
 
-## 3) POST /v1/analysis
+## Nota sobre endpoints legacy
 
-### Body
-```json
-{
-  "message_text": "Necesito que confirmes horarios para esta semana.",
-  "mode": "reactive",
-  "relationship_type": "pareja",
-  "contact_id": null,
-  "quick_mode": false,
-  "context": {
-    "user_id": "1c47d0cb-4f47-4a80-b14c-a16e1f4f0624"
-  }
-}
-```
-
-### Response 200
-```json
-{
-  "analysis_id": "f0b314d8-6e42-4708-b3a4-9f8a0ec067f7",
-  "summary": "Se detecta un tono tenso con necesidad de claridad.",
-  "risk_flags": [
-    {
-      "code": "high_emotion",
-      "severity": "medium",
-      "confidence": 0.82,
-      "evidence": ["uso de frases absolutas"]
-    }
-  ],
-  "emotional_context": {
-    "tone": "tension",
-    "intent_guess": "marcar limites"
-  },
-  "ui_alerts": [
-    {
-      "level": "warning",
-      "message": "Revisa el tono antes de enviar."
-    }
-  ],
-  "tone_detected": "tension",
-  "suggested_emotion_label": "calm",
-  "analysis_skipped": false,
-  "created_at": "2026-03-11T15:12:41.631552+00:00"
-}
-```
-
-### Errores
-- `422`: validacion de schema (`message_text` vacio, enum invalido).
-
----
-
-## 4) POST /v1/advisor
-
-### Body
-```json
-{
-  "message_text": "No sigamos discutiendo por aca, confirmemos horario.",
-  "mode": "reactive",
-  "relationship_type": "pareja",
-  "contact_id": null,
-  "quick_mode": false,
-  "save_session": true,
-  "analysis_id": "f0b314d8-6e42-4708-b3a4-9f8a0ec067f7",
-  "prompt_version": "advisor_master_v1",
-  "context": {
-    "user_id": "1c47d0cb-4f47-4a80-b14c-a16e1f4f0624",
-    "memory_opt_in": true,
-    "user_style": "neutral_claro"
-  }
-}
-```
-
-### Response 200
-```json
-{
-  "session_id": "0607ea16-7ec2-46c7-84dd-1f7f3dc8f0f5",
-  "mode": "reactive",
-  "quick_mode": false,
-  "analysis": {
-    "summary": "Se detecta un tono tenso con necesidad de claridad.",
-    "risk_flags": ["high_emotion"]
-  },
-  "responses": [
-    {
-      "text": "Entiendo la tension. Propongo ordenar el tema por pasos y evitar reproches.",
-      "emotion_label": "empathetic"
-    },
-    {
-      "text": "Confirmame horario exacto para resolverlo sin ambiguedad.",
-      "emotion_label": "assertive"
-    },
-    {
-      "text": "Confirmemos horario y lugar para mantener foco logistico.",
-      "emotion_label": "neutral"
-    }
-  ],
-  "persistence": {
-    "save_session": true,
-    "zero_retention_applied": false,
-    "outputs_persisted": true,
-    "memory_persisted": true
-  },
-  "created_at": "2026-03-11T15:14:09.415847+00:00"
-}
-```
-
-### Errores
-- `403 analysis_id_forbidden`: el `analysis_id` pertenece a otro usuario.
-- `404 analysis_id_not_found_or_expired`: `analysis_id` inexistente o vencido.
-- `422`: validacion de request.
-
----
-
-## 5) POST /v1/chat (legacy)
-
-### Body
-```json
-{
-  "conversation_id": null,
-  "message": "Hola, que le responderias a este mensaje?",
-  "channel": "web"
-}
-```
-
-### Response 200
-```json
-{
-  "conversation_id": "2f6f2e61-ec48-4ebd-88d4-4efa8f351422",
-  "answer": "Respuesta generada por IA."
-}
-```
-
-### Errores
-- `422`: payload invalido.
-
----
-
-## 6) GET /v1/conversations/{conversation_id} (legacy)
-
-### Request
-```http
-GET /v1/conversations/2f6f2e61-ec48-4ebd-88d4-4efa8f351422
-```
-
-### Response 200
-```json
-{
-  "conversation_id": "2f6f2e61-ec48-4ebd-88d4-4efa8f351422",
-  "messages": [
-    {
-      "role": "user",
-      "message": "Hola",
-      "channel": "web"
-    },
-    {
-      "role": "assistant",
-      "message": "Respuesta",
-      "channel": "assistant"
-    }
-  ]
-}
-```
-
-### Errores
-- `404 Conversation not found`.
-
----
-
-## 7) GET /v1/advisor/conversations (legacy)
-
-### Query params
-- `user_id` (default: `user-main`)
-- `contact_id` (opcional)
-
-### Response 200
-```json
-{
-  "conversations": [
-    {
-      "conversation_id": "0a65f395-3da6-48da-89d7-29ab2fda8b05",
-      "contact_id": "contact-123",
-      "created_at": "2026-03-11T14:00:00+00:00",
-      "updated_at": "2026-03-11T14:10:00+00:00",
-      "analysis_preview": "Se detecta friccion moderada",
-      "advisors_count": 3
-    }
-  ]
-}
-```
-
-### Errores
-- `422`: query param invalido.
-
----
-
-## 8) GET /v1/advisor/conversations/{conversation_id} (legacy)
-
-### Response 200
-```json
-{
-  "conversation_id": "0a65f395-3da6-48da-89d7-29ab2fda8b05",
-  "messages": [
-    {
-      "role": "user",
-      "message": "texto",
-      "channel": "advisor"
-    }
-  ],
-  "analysis": "Resumen",
-  "results": [
-    {
-      "advisor_id": "laura",
-      "advisor_name": "Laura",
-      "suggestions": ["Reflexion: ...", "Respuesta sugerida: ..."]
-    }
-  ]
-}
-```
-
-### Errores
-- `404 Advisor conversation not found`.
-
+- Los endpoints `/v1/chat` y `/v1/conversations/*` se mantienen por compatibilidad.
+- Se puede deshabilitar su montaje con `ENABLE_LEGACY_CHAT_ROUTES=false`.
+- Si estan activos, responden header `X-API-Lifecycle: legacy`.

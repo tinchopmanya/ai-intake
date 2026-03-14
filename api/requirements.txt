@@ -7,3 +7,5 @@ psycopg
 python-multipart
 pillow
 pytesseract
+opencv-python-headless
+numpy

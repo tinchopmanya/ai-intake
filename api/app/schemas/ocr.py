@@ -2,8 +2,24 @@ from pydantic import BaseModel
 from pydantic import Field
 
 
+class OcrConversationTurn(BaseModel):
+    speaker: str = Field(pattern="^(me|them)$")
+    text: str = Field(min_length=1)
+    time: str | None = None
+
+
 class OcrExtractResponse(BaseModel):
     extracted_text: str = Field(min_length=1)
     provider: str
     confidence: float | None = Field(default=None, ge=0, le=1)
     warnings: list[str] = Field(default_factory=list)
+    conversation_turns: list[OcrConversationTurn] | None = None
+    raw_text: str | None = None
+    metadata: dict[str, object] | None = None
+
+
+class OcrCapabilitiesResponse(BaseModel):
+    available: bool
+    selected_provider: str
+    providers_checked: list[str] = Field(default_factory=list)
+    reason_codes: list[str] = Field(default_factory=list)
