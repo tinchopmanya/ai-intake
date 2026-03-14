@@ -8,6 +8,14 @@ from .auth import GoogleAuthResponse
 from .auth import LogoutRequest
 from .auth import LogoutResponse
 from .auth import RefreshSessionRequest
+from .cases import CaseCreateRequest
+from .cases import CaseListResponse
+from .cases import CaseSummary
+from .cases import CaseUpdateRequest
+from .incidents import IncidentCreateRequest
+from .incidents import IncidentListResponse
+from .incidents import IncidentSummary
+from .incidents import IncidentUpdateRequest
 from .onboarding import OnboardingProfileResponse
 from .onboarding import OnboardingProfileUpdateRequest
 from .ocr import OcrExtractResponse
@@ -22,6 +30,14 @@ __all__ = [
     "GoogleAuthResponse",
     "LogoutRequest",
     "LogoutResponse",
+    "CaseCreateRequest",
+    "CaseListResponse",
+    "CaseSummary",
+    "CaseUpdateRequest",
+    "IncidentCreateRequest",
+    "IncidentListResponse",
+    "IncidentSummary",
+    "IncidentUpdateRequest",
     "OnboardingProfileResponse",
     "OnboardingProfileUpdateRequest",
     "OcrExtractResponse",

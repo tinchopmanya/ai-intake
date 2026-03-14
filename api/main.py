@@ -9,7 +9,9 @@ from fastapi.responses import JSONResponse
 from app.api.routers import advisor_router as advisor_v1_router
 from app.api.routers import analysis_router
 from app.api.routers import auth_router
+from app.api.routers import cases_router
 from app.api.routers import events_router
+from app.api.routers import incidents_router
 from app.api.routers import onboarding_router
 from app.api.routers import ocr_router
 from app.services.i18n_service import i18n_service
@@ -52,6 +54,8 @@ else:
     logger.info("Legacy chat router disabled (ENABLE_LEGACY_CHAT_ROUTES=false).")
 app.include_router(auth_router)
 app.include_router(onboarding_router)
+app.include_router(cases_router)
+app.include_router(incidents_router)
 app.include_router(analysis_router)
 app.include_router(advisor_v1_router)
 app.include_router(events_router)

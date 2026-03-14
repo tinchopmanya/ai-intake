@@ -18,6 +18,14 @@ Aplicacion web fullstack para asistir respuestas en conversaciones sensibles.
 - `GET /v1/auth/me`
 - `GET /v1/onboarding/profile`
 - `PUT /v1/onboarding/profile`
+- `POST /v1/cases`
+- `GET /v1/cases`
+- `GET /v1/cases/{case_id}`
+- `PATCH /v1/cases/{case_id}`
+- `POST /v1/incidents`
+- `GET /v1/incidents`
+- `GET /v1/incidents/{incident_id}`
+- `PATCH /v1/incidents/{incident_id}`
 - `POST /v1/analysis`
 - `GET /v1/analysis/{analysis_id}`
 - `POST /v1/advisor`
@@ -89,6 +97,8 @@ NEXT_PUBLIC_GOOGLE_CLIENT_ID=
 ## Instrumentacion MVP (persistencia producto)
 - Analisis persistidos en `analysis_results`.
 - Sesiones de wizard persistidas en `advisor_sessions` con input/origen/analysis y respuesta agregada.
+- Case Memory minima en `cases` (title/contact/summary/last_activity_at).
+- Incident Log minimo en `incidents` (evento, fecha, confirmacion y enlaces opcionales a analysis/session).
 - Eventos de adopcion:
   - `reply_generated` (backend)
   - `reply_copied` (frontend -> `POST /v1/events`)

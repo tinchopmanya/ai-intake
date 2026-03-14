@@ -78,6 +78,89 @@ export type WizardEventResponse = {
   persisted: boolean;
 };
 
+export type CaseSummary = {
+  id: string;
+  title: string;
+  contact_name: string | null;
+  relationship_type: RelationshipType | null;
+  summary: string;
+  contact_id: string | null;
+  last_activity_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CaseCreateRequest = {
+  title: string;
+  contact_name?: string | null;
+  relationship_type?: RelationshipType | null;
+  summary?: string | null;
+  contact_id?: string | null;
+};
+
+export type CaseUpdateRequest = {
+  title?: string | null;
+  contact_name?: string | null;
+  relationship_type?: RelationshipType | null;
+  summary?: string | null;
+  contact_id?: string | null;
+};
+
+export type CaseListResponse = {
+  cases: CaseSummary[];
+};
+
+export type IncidentType =
+  | "schedule_change"
+  | "cancellation"
+  | "payment_issue"
+  | "hostile_message"
+  | "documentation"
+  | "other";
+
+export type IncidentSourceType = "manual" | "wizard" | "vent" | "ocr";
+
+export type IncidentSummary = {
+  id: string;
+  case_id: string;
+  contact_id: string | null;
+  incident_type: IncidentType;
+  title: string;
+  description: string;
+  source_type: IncidentSourceType;
+  related_analysis_id: string | null;
+  related_session_id: string | null;
+  incident_date: string;
+  confirmed: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type IncidentCreateRequest = {
+  case_id: string;
+  contact_id?: string | null;
+  incident_type: IncidentType;
+  title: string;
+  description?: string;
+  source_type?: IncidentSourceType;
+  related_analysis_id?: string | null;
+  related_session_id?: string | null;
+  incident_date: string;
+  confirmed?: boolean;
+};
+
+export type IncidentUpdateRequest = {
+  incident_type?: IncidentType;
+  title?: string;
+  description?: string;
+  incident_date?: string;
+  confirmed?: boolean;
+};
+
+export type IncidentListResponse = {
+  incidents: IncidentSummary[];
+};
+
 export type AdvisorResponse = {
   session_id: string;
   mode: UsageMode;

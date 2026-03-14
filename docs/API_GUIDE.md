@@ -13,6 +13,14 @@ Base URL local: `http://localhost:8000`
 | `GET` | `/v1/auth/me` | Activo | Usuario actual por bearer token |
 | `GET` | `/v1/onboarding/profile` | Activo | Perfil onboarding |
 | `PUT` | `/v1/onboarding/profile` | Activo | Persistencia onboarding |
+| `POST` | `/v1/cases` | Activo | Crear caso minimo |
+| `GET` | `/v1/cases` | Activo | Listar casos del usuario |
+| `GET` | `/v1/cases/{case_id}` | Activo | Obtener caso |
+| `PATCH` | `/v1/cases/{case_id}` | Activo | Editar metadata/resumen del caso |
+| `POST` | `/v1/incidents` | Activo | Registrar evento/incidente |
+| `GET` | `/v1/incidents` | Activo | Listar incidentes (filtrable por `case_id`) |
+| `GET` | `/v1/incidents/{incident_id}` | Activo | Obtener incidente |
+| `PATCH` | `/v1/incidents/{incident_id}` | Activo | Editar o confirmar incidente |
 | `POST` | `/v1/analysis` | Activo | Analisis emocional/riesgo |
 | `GET` | `/v1/analysis/{analysis_id}` | Activo | Lectura de analisis persistido por usuario |
 | `POST` | `/v1/advisor` | Activo | Respuestas de advisors |
@@ -54,6 +62,12 @@ Base URL local: `http://localhost:8000`
 - `POST /v1/analysis` ahora persiste en `analysis_results` (cuando hay DB activa) y devuelve `analysis_id`.
 - `POST /v1/advisor` persiste sesion base en `advisor_sessions`:
   - `source_type`, `original_input_text`, `analysis_id`, `advisor_response_json`.
+- `case_id` puede viajar en `analysis/advisor` y se valida ownership.
+- Al usar `case_id`, el backend actualiza `cases.last_activity_at` y agrega una linea al `summary` acumulado.
+- `POST /v1/incidents` permite registrar hechos relevantes:
+  - tipos cortos (`schedule_change`, `cancellation`, `payment_issue`, `hostile_message`, `documentation`, `other`).
+  - `source_type` (`manual`, `wizard`, `vent`, `ocr`).
+  - enlaces opcionales a `analysis_id` y `session_id`.
 - El backend emite `reply_generated` en `analytics.wizard_events` por cada respuesta.
 - El frontend emite `reply_copied` con `POST /v1/events`.
 - `advisor_sessions.selected_advisor_id` se actualiza con el advisor copiado.

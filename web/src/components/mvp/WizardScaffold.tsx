@@ -9,7 +9,7 @@ import { AdvisorAvatarItem } from "@/components/ui/AdvisorAvatarItem";
 import { ADVISOR_PROFILES } from "@/data/advisors";
 import { authFetch } from "@/lib/auth/client";
 import { hasStoredSession } from "@/lib/auth/client";
-import { postAdvisor, postAnalysis, postWizardEvent } from "@/lib/api/client";
+import { getCases, postAdvisor, postAnalysis, postCase, postIncident, postWizardEvent } from "@/lib/api/client";
 import type { AdvisorProfile } from "@/data/advisors";
 import { API_URL } from "@/lib/config";
 import { resolveRuntimeLocale, tRuntime } from "@/lib/i18n/runtime";
@@ -17,6 +17,9 @@ import type {
   AdvisorResponse,
   AnalysisResponse,
   AnalysisRiskFlag,
+  CaseSummary,
+  IncidentType,
+  RelationshipType,
   OcrCapabilitiesResponse,
   OcrExtractResponse,
   UsageMode,
@@ -59,6 +62,15 @@ const ADVISOR_ACCENT_CLASS = [
   "border-t-[3px] border-t-blue-500",
   "border-t-[3px] border-t-amber-500",
 ] as const;
+const INCIDENT_TYPE_OPTIONS: Array<{ value: IncidentType; label: string }> = [
+  { value: "schedule_change", label: "Cambio de horario" },
+  { value: "cancellation", label: "Cancelacion" },
+  { value: "payment_issue", label: "Tema de pago" },
+  { value: "hostile_message", label: "Mensaje hostil" },
+  { value: "documentation", label: "Documentacion" },
+  { value: "other", label: "Otro evento" },
+];
+
 const OCR_EXTRACT_URL = `${API_URL}/v1/ocr/extract`;
 const OCR_CAPABILITIES_URL = `${API_URL}/v1/ocr/capabilities`;
 
@@ -269,9 +281,23 @@ export function WizardScaffold() {
   const [ocrInfo, setOcrInfo] = useState<OcrExtractResponse | null>(null);
   const [ocrCapabilities, setOcrCapabilities] = useState<OcrCapabilitiesResponse | null>(null);
   const [ocrCapabilitiesLoading, setOcrCapabilitiesLoading] = useState(true);
+  const [cases, setCases] = useState<CaseSummary[]>([]);
+  const [casesLoading, setCasesLoading] = useState(true);
+  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
+  const [newCaseTitle, setNewCaseTitle] = useState("");
+  const [newCaseContactName, setNewCaseContactName] = useState("");
+  const [caseError, setCaseError] = useState<string | null>(null);
+  const [incidentType, setIncidentType] = useState<IncidentType>("other");
+  const [incidentTitle, setIncidentTitle] = useState("");
+  const [incidentDescription, setIncidentDescription] = useState("");
+  const [incidentDate, setIncidentDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [incidentVisible, setIncidentVisible] = useState(false);
+  const [incidentSaving, setIncidentSaving] = useState(false);
+  const [incidentNotice, setIncidentNotice] = useState<string | null>(null);
 
   const selectedRecentPerson =
     RECENT_PEOPLE.find((person) => person.id === selectedRecentPersonId) ?? null;
+  const activeCase = cases.find((item) => item.id === selectedCaseId) ?? null;
 
   useEffect(() => {
     if (!ocrImageFile) {
@@ -313,6 +339,31 @@ export function WizardScaffold() {
       }
     }
     void loadOcrCapabilities();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadCases() {
+      setCasesLoading(true);
+      setCaseError(null);
+      try {
+        const response = await getCases();
+        if (!mounted) return;
+        setCases(response.cases);
+        if (response.cases.length > 0) {
+          setSelectedCaseId((current) => current ?? response.cases[0].id);
+        }
+      } catch {
+        if (!mounted) return;
+        setCaseError("No se pudo cargar la memoria de casos.");
+      } finally {
+        if (mounted) setCasesLoading(false);
+      }
+    }
+    void loadCases();
     return () => {
       mounted = false;
     };
@@ -401,6 +452,7 @@ export function WizardScaffold() {
         message_text: text,
         mode,
         relationship_type: "otro",
+        case_id: selectedCaseId ?? undefined,
         source_type: sourceType,
         quick_mode: quickMode,
         context: buildContextPayload(),
@@ -429,6 +481,7 @@ export function WizardScaffold() {
         message_text: text,
         mode,
         relationship_type: "otro",
+        case_id: selectedCaseId ?? undefined,
         source_type: sourceType,
         quick_mode: params.quickMode,
         save_session: true,
@@ -482,6 +535,81 @@ export function WizardScaffold() {
     setOcrLoading(false);
   }
 
+  async function handleCreateCase() {
+    const title = newCaseTitle.trim();
+    if (!title) return;
+    setCaseError(null);
+    try {
+      const created = await postCase({
+        title,
+        contact_name: newCaseContactName.trim() || undefined,
+        relationship_type: "otro" as RelationshipType,
+      });
+      setCases((prev) => [created, ...prev.filter((item) => item.id !== created.id)]);
+      setSelectedCaseId(created.id);
+      setNewCaseTitle("");
+      setNewCaseContactName("");
+    } catch {
+      setCaseError("No se pudo crear el caso.");
+    }
+  }
+
+  function suggestIncidentType(): IncidentType {
+    if (!analysisResult) return "other";
+    const riskCodes = new Set(analysisResult.risk_flags.map((item) => item.code));
+    if (riskCodes.has("high_emotion") || riskCodes.has("passive_aggressive")) {
+      return "hostile_message";
+    }
+    if (riskCodes.has("urgency_conflict")) {
+      return "schedule_change";
+    }
+    return "other";
+  }
+
+  function openIncidentCapture() {
+    setIncidentVisible(true);
+    setIncidentNotice(null);
+    setIncidentType(suggestIncidentType());
+    if (!incidentTitle.trim()) {
+      setIncidentTitle("Evento relevante en la conversacion");
+    }
+    if (!incidentDescription.trim()) {
+      const preview = messageText.trim().slice(0, 280);
+      setIncidentDescription(preview ? `Contexto: ${preview}` : "");
+    }
+  }
+
+  async function handleRegisterIncident() {
+    if (!selectedCaseId) {
+      setIncidentNotice("Selecciona un caso activo para registrar el evento.");
+      return;
+    }
+    const normalizedTitle = incidentTitle.trim();
+    if (!normalizedTitle || incidentSaving) return;
+    setIncidentSaving(true);
+    setIncidentNotice(null);
+    try {
+      await postIncident({
+        case_id: selectedCaseId,
+        incident_type: incidentType,
+        title: normalizedTitle,
+        description: incidentDescription.trim(),
+        source_type: "wizard",
+        related_analysis_id: analysisId ?? undefined,
+        related_session_id: advisorResult?.session_id ?? undefined,
+        incident_date: incidentDate,
+      });
+      setIncidentNotice("Evento registrado en el caso activo.");
+      setIncidentVisible(false);
+      setIncidentTitle("");
+      setIncidentDescription("");
+    } catch {
+      setIncidentNotice("No se pudo registrar el evento.");
+    } finally {
+      setIncidentSaving(false);
+    }
+  }
+
   async function handleCopy(text: string, index: number) {
     try {
       await navigator.clipboard.writeText(text);
@@ -521,6 +649,64 @@ export function WizardScaffold() {
       {currentStep === 1 ? (
         <div className="space-y-4">
           <div className="space-y-3">
+            <div className="rounded-2xl border border-[#dbe3ec] bg-[#f8fafc] p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-semibold text-[#1f2937]">Caso activo</span>
+                {activeCase ? (
+                  <span className="rounded-full bg-white px-2 py-0.5 text-xs text-[#334155]">
+                    {activeCase.title}
+                  </span>
+                ) : (
+                  <span className="rounded-full bg-white px-2 py-0.5 text-xs text-gray-500">
+                    Sin caso
+                  </span>
+                )}
+              </div>
+              <div className="mt-2 grid gap-2 md:grid-cols-[minmax(0,1fr)_170px]">
+                <Select
+                  value={selectedCaseId ?? ""}
+                  onChange={(event) => setSelectedCaseId(event.target.value || null)}
+                  disabled={casesLoading}
+                  className="border-[#e5e7eb] bg-white text-[#1f2937]"
+                >
+                  <option value="">Sin caso activo</option>
+                  {cases.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.title}
+                    </option>
+                  ))}
+                </Select>
+                <div className="text-xs text-[#475569]">
+                  {activeCase?.summary ? activeCase.summary : "No hay resumen del caso aun."}
+                </div>
+              </div>
+              <div className="mt-2 grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+                <input
+                  type="text"
+                  value={newCaseTitle}
+                  onChange={(event) => setNewCaseTitle(event.target.value)}
+                  placeholder="Nuevo caso (ej: Coordinacion colegio)"
+                  className="rounded-lg border border-[#e5e7eb] bg-white px-3 py-2 text-sm text-[#1f2937]"
+                />
+                <input
+                  type="text"
+                  value={newCaseContactName}
+                  onChange={(event) => setNewCaseContactName(event.target.value)}
+                  placeholder="Contacto (opcional)"
+                  className="rounded-lg border border-[#e5e7eb] bg-white px-3 py-2 text-sm text-[#1f2937]"
+                />
+                <Button
+                  type="button"
+                  onClick={() => void handleCreateCase()}
+                  disabled={!newCaseTitle.trim()}
+                  variant="secondary"
+                  className="border-[#cbd5e1] bg-white text-[#334155]"
+                >
+                  Crear caso
+                </Button>
+              </div>
+              {caseError ? <p className="mt-2 text-xs text-red-700">{caseError}</p> : null}
+            </div>
             <div>
               <h3 className="text-lg font-semibold text-[#1f2937]">{t("wizard.step1.title")}</h3>
               <p className="mt-1 text-sm text-[#334155]">
@@ -812,6 +998,70 @@ export function WizardScaffold() {
                   {loadingAdvisor ? t("wizard.button.generating") : t("wizard.button.continue")}
                 </Button>
               </div>
+
+              <div className="rounded-2xl border border-[#dbe3ec] bg-[#f8fafc] p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-[#1f2937]">Hecho relevante</p>
+                  <Button
+                    type="button"
+                    onClick={openIncidentCapture}
+                    variant="secondary"
+                    className="border-[#cbd5e1] bg-white text-[#334155]"
+                  >
+                    Registrar incidente
+                  </Button>
+                </div>
+                <p className="mt-1 text-xs text-[#475569]">
+                  Si corresponde, guarda este evento para revisar el historial del caso.
+                </p>
+                {incidentVisible ? (
+                  <div className="mt-3 grid gap-2 md:grid-cols-2">
+                    <Select
+                      value={incidentType}
+                      onChange={(event) => setIncidentType(event.target.value as IncidentType)}
+                      className="border-[#e5e7eb] bg-white text-[#1f2937]"
+                    >
+                      {INCIDENT_TYPE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </Select>
+                    <input
+                      type="date"
+                      value={incidentDate}
+                      onChange={(event) => setIncidentDate(event.target.value)}
+                      className="rounded-lg border border-[#e5e7eb] bg-white px-3 py-2 text-sm text-[#1f2937]"
+                    />
+                    <input
+                      type="text"
+                      value={incidentTitle}
+                      onChange={(event) => setIncidentTitle(event.target.value)}
+                      placeholder="Titulo breve del evento"
+                      className="rounded-lg border border-[#e5e7eb] bg-white px-3 py-2 text-sm text-[#1f2937] md:col-span-2"
+                    />
+                    <Textarea
+                      value={incidentDescription}
+                      onChange={(event) => setIncidentDescription(event.target.value)}
+                      rows={2}
+                      placeholder="Detalle opcional para contexto futuro"
+                      className="border-[#e5e7eb] bg-white text-[#1f2937] md:col-span-2"
+                    />
+                    <div className="md:col-span-2">
+                      <Button
+                        type="button"
+                        onClick={() => void handleRegisterIncident()}
+                        disabled={incidentSaving || !incidentTitle.trim()}
+                        variant="secondary"
+                        className="border-[#cbd5e1] bg-white text-[#334155]"
+                      >
+                        {incidentSaving ? "Guardando..." : "Guardar evento"}
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+                {incidentNotice ? <p className="mt-2 text-xs text-[#334155]">{incidentNotice}</p> : null}
+              </div>
             </>
           ) : null}
         </div>
@@ -888,6 +1138,14 @@ export function WizardScaffold() {
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
             <Button
               type="button"
+              onClick={openIncidentCapture}
+              variant="secondary"
+              className="border-[#cbd5e1] bg-white text-[#334155] hover:bg-[#f8fafc]"
+            >
+              Registrar incidente
+            </Button>
+            <Button
+              type="button"
               onClick={() => setCurrentStep(2)}
               variant="secondary"
               className="border-[#cbd5e1] bg-white text-[#334155] hover:bg-[#f8fafc]"
@@ -903,6 +1161,59 @@ export function WizardScaffold() {
               Iniciar nueva conversacion
             </Button>
           </div>
+          {incidentVisible ? (
+            <div className="rounded-2xl border border-[#dbe3ec] bg-[#f8fafc] p-3">
+              <p className="text-sm font-semibold text-[#1f2937]">Registrar evento del caso</p>
+              <p className="mt-1 text-xs text-[#475569]">
+                Guarda este hecho para mantener contexto cronologico del caso.
+              </p>
+              <div className="mt-3 grid gap-2 md:grid-cols-2">
+                <Select
+                  value={incidentType}
+                  onChange={(event) => setIncidentType(event.target.value as IncidentType)}
+                  className="border-[#e5e7eb] bg-white text-[#1f2937]"
+                >
+                  {INCIDENT_TYPE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </Select>
+                <input
+                  type="date"
+                  value={incidentDate}
+                  onChange={(event) => setIncidentDate(event.target.value)}
+                  className="rounded-lg border border-[#e5e7eb] bg-white px-3 py-2 text-sm text-[#1f2937]"
+                />
+                <input
+                  type="text"
+                  value={incidentTitle}
+                  onChange={(event) => setIncidentTitle(event.target.value)}
+                  placeholder="Titulo breve del evento"
+                  className="rounded-lg border border-[#e5e7eb] bg-white px-3 py-2 text-sm text-[#1f2937] md:col-span-2"
+                />
+                <Textarea
+                  value={incidentDescription}
+                  onChange={(event) => setIncidentDescription(event.target.value)}
+                  rows={2}
+                  placeholder="Detalle opcional para contexto futuro"
+                  className="border-[#e5e7eb] bg-white text-[#1f2937] md:col-span-2"
+                />
+                <div className="md:col-span-2">
+                  <Button
+                    type="button"
+                    onClick={() => void handleRegisterIncident()}
+                    disabled={incidentSaving || !incidentTitle.trim()}
+                    variant="secondary"
+                    className="border-[#cbd5e1] bg-white text-[#334155]"
+                  >
+                    {incidentSaving ? "Guardando..." : "Guardar evento"}
+                  </Button>
+                </div>
+              </div>
+              {incidentNotice ? <p className="mt-2 text-xs text-[#334155]">{incidentNotice}</p> : null}
+            </div>
+          ) : null}
         </div>
       ) : null}
 

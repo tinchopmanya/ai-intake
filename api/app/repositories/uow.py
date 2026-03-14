@@ -1,8 +1,10 @@
 from app.repositories.analysis_results import AnalysisResultRepository
 from app.repositories.advisor_outputs import AdvisorOutputRepository
 from app.repositories.advisor_sessions import AdvisorSessionRepository
+from app.repositories.cases import CaseRepository
 from app.repositories.contacts import ContactRepository
 from app.repositories.conversation_memory import ConversationMemoryRepository
+from app.repositories.incidents import IncidentRepository
 from app.repositories.protocols import ConnectionFactory
 from app.repositories.protocols import ConnectionProtocol
 from app.repositories.tracking_events import TrackingEventRepository
@@ -19,10 +21,12 @@ class UnitOfWork:
         self._tracking_repository = tracking_repository
 
         self.contacts: ContactRepository
+        self.cases: CaseRepository
         self.analyses: AnalysisResultRepository
         self.sessions: AdvisorSessionRepository
         self.outputs: AdvisorOutputRepository
         self.memory: ConversationMemoryRepository
+        self.incidents: IncidentRepository
 
     @property
     def tracking(self) -> TrackingEventRepository | None:
@@ -31,10 +35,12 @@ class UnitOfWork:
     def __enter__(self) -> "UnitOfWork":
         self._connection = self._connection_factory()
         self.contacts = ContactRepository(self._connection)
+        self.cases = CaseRepository(self._connection)
         self.analyses = AnalysisResultRepository(self._connection)
         self.sessions = AdvisorSessionRepository(self._connection)
         self.outputs = AdvisorOutputRepository(self._connection)
         self.memory = ConversationMemoryRepository(self._connection)
+        self.incidents = IncidentRepository(self._connection)
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:

@@ -4,15 +4,22 @@ import type { AdvisorRequest } from "@/lib/api/types";
 import type { AdvisorResponse } from "@/lib/api/types";
 import type { AnalysisRequest } from "@/lib/api/types";
 import type { AnalysisResponse } from "@/lib/api/types";
+import type { CaseCreateRequest } from "@/lib/api/types";
+import type { CaseListResponse } from "@/lib/api/types";
+import type { CaseSummary } from "@/lib/api/types";
+import type { CaseUpdateRequest } from "@/lib/api/types";
+import type { IncidentCreateRequest } from "@/lib/api/types";
+import type { IncidentListResponse } from "@/lib/api/types";
+import type { IncidentSummary } from "@/lib/api/types";
+import type { IncidentUpdateRequest } from "@/lib/api/types";
 import type { WizardEventRequest } from "@/lib/api/types";
 import type { WizardEventResponse } from "@/lib/api/types";
 
-async function postJson<T>(path: string, payload: unknown): Promise<T> {
-  const response = await authFetch(`${API_URL}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+async function requestJson<T>(
+  path: string,
+  init: RequestInit,
+): Promise<T> {
+  const response = await authFetch(`${API_URL}${path}`, init);
 
   if (!response.ok) {
     const errorPayload = (await response.json().catch(() => null)) as
@@ -24,6 +31,29 @@ async function postJson<T>(path: string, payload: unknown): Promise<T> {
   }
 
   return (await response.json()) as T;
+}
+
+async function postJson<T>(path: string, payload: unknown): Promise<T> {
+  return requestJson<T>(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+async function patchJson<T>(path: string, payload: unknown): Promise<T> {
+  return requestJson<T>(path, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+async function getJson<T>(path: string): Promise<T> {
+  return requestJson<T>(path, {
+    method: "GET",
+    cache: "no-store",
+  });
 }
 
 /**
@@ -45,5 +75,37 @@ export function postAdvisor(payload: AdvisorRequest): Promise<AdvisorResponse> {
  */
 export function postWizardEvent(payload: WizardEventRequest): Promise<WizardEventResponse> {
   return postJson<WizardEventResponse>("/v1/events", payload);
+}
+
+export function postCase(payload: CaseCreateRequest): Promise<CaseSummary> {
+  return postJson<CaseSummary>("/v1/cases", payload);
+}
+
+export function getCases(): Promise<CaseListResponse> {
+  return getJson<CaseListResponse>("/v1/cases");
+}
+
+export function getCaseById(caseId: string): Promise<CaseSummary> {
+  return getJson<CaseSummary>(`/v1/cases/${caseId}`);
+}
+
+export function patchCase(caseId: string, payload: CaseUpdateRequest): Promise<CaseSummary> {
+  return patchJson<CaseSummary>(`/v1/cases/${caseId}`, payload);
+}
+
+export function postIncident(payload: IncidentCreateRequest): Promise<IncidentSummary> {
+  return postJson<IncidentSummary>("/v1/incidents", payload);
+}
+
+export function getIncidents(caseId?: string): Promise<IncidentListResponse> {
+  const suffix = caseId ? `?case_id=${encodeURIComponent(caseId)}` : "";
+  return getJson<IncidentListResponse>(`/v1/incidents${suffix}`);
+}
+
+export function patchIncident(
+  incidentId: string,
+  payload: IncidentUpdateRequest,
+): Promise<IncidentSummary> {
+  return patchJson<IncidentSummary>(`/v1/incidents/${incidentId}`, payload);
 }
 

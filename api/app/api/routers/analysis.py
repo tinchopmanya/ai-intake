@@ -37,6 +37,16 @@ async def create_analysis(
     uow: Annotated[UnitOfWork | None, Depends(get_uow)],
 ) -> AnalysisResponse:
     """Analyze a candidate outbound message and return emotional/risk signals."""
+    if payload.case_id is not None:
+        if uow is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="case_memory_unavailable",
+            )
+        case_row = uow.cases.get_by_id(user_id=current_user.id, case_id=payload.case_id)
+        if case_row is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="case_not_found")
+
     analysis_skipped = payload.quick_mode
     user_id = current_user.id
     linter_result = run_emotional_linter(
@@ -102,6 +112,12 @@ async def create_analysis(
                 input_text=payload.message_text,
                 analysis_json=response.model_dump(mode="json"),
             )
+            if payload.case_id is not None:
+                uow.cases.append_summary_entry(
+                    user_id=user_id,
+                    case_id=payload.case_id,
+                    entry=f"Analisis: {response.summary}",
+                )
         except Exception as exc:
             logger.exception("Failed to persist analysis result: analysis_id=%s", response.analysis_id)
             raise HTTPException(

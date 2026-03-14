@@ -35,6 +35,16 @@ async def create_advisor_response(
     provider: Annotated[AIProvider, Depends(get_ai_provider)],
 ) -> AdvisorResponse:
     """Generate three advisor-style reply suggestions using analysis context."""
+    if payload.case_id is not None:
+        if uow is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="case_memory_unavailable",
+            )
+        case_row = uow.cases.get_by_id(user_id=current_user.id, case_id=payload.case_id)
+        if case_row is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="case_not_found")
+
     advisor_lineup = advisor_catalog.resolve(
         country_code=current_user.country_code,
         language_code=current_user.language_code,
@@ -57,7 +67,16 @@ async def create_advisor_response(
 
     orchestrator = AdvisorOrchestrator(provider=provider)
     try:
-        return orchestrator.run(payload, uow=uow)
+        response = orchestrator.run(payload, uow=uow)
+        if payload.case_id is not None and uow is not None:
+            preview = response.responses[0].text if response.responses else ""
+            snippet = preview[:220].strip()
+            uow.cases.append_summary_entry(
+                user_id=current_user.id,
+                case_id=payload.case_id,
+                entry=f"Respuestas generadas: {snippet}",
+            )
+        return response
     except AnalysisOwnershipError as exc:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
