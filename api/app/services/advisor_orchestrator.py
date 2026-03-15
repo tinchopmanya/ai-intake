@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from dataclasses import dataclass
 from datetime import UTC
@@ -17,12 +18,16 @@ from app.schemas.advisor import AdvisorResponse
 from app.schemas.advisor import AnalysisSnapshot
 from app.schemas.advisor import PersistenceMetadata
 from app.schemas.advisor import SuggestedResponse
+from app.schemas.rewrite import SafeRewriteRequest
 from app.services.analysis_registry import AnalysisOwnershipError
 from app.services.analysis_registry import analysis_registry
 from app.services.emotional_linter import run_emotional_linter
+from app.services.safe_rewrite_engine import SafeRewriteEngine
 from app.services.user_identity import resolve_user_id
 from providers.base import AIProvider
 from providers.base import AIProviderError
+
+logger = logging.getLogger(__name__)
 
 
 class AnalysisNotFoundError(Exception):
@@ -35,6 +40,8 @@ class OrchestrationContext:
     memory_opt_in: bool
     relationship_type: str
     user_style: str
+    relationship_mode: str
+    response_style: str
     contact_context: str | None
     analysis: AnalysisSnapshot | None
     risk_flags: list[str]
@@ -86,10 +93,14 @@ class AdvisorOrchestrator:
                 advisor_lineup=context.advisor_lineup,
             )
             user_payload = build_advisor_user_payload(variables)
-
-            raw_model_output = self._call_model(user_payload)
-            advisor_ids = _advisor_ids_from_lineup(context.advisor_lineup)
-            responses = _coerce_responses(raw_model_output, advisor_ids=advisor_ids)
+            responses = self._generate_safe_rewrites(
+                sanitized_text=sanitized_text,
+                context=context,
+            )
+            if not responses:
+                raw_model_output = self._call_model(user_payload)
+                advisor_ids = _advisor_ids_from_lineup(context.advisor_lineup)
+                responses = _coerce_responses(raw_model_output, advisor_ids=advisor_ids)
 
             if payload.quick_mode:
                 analysis = None
@@ -160,6 +171,15 @@ class AdvisorOrchestrator:
                 created_at=datetime.now(UTC),
             )
         except Exception:
+            logger.exception(
+                "advisor_generation_failed",
+                extra={
+                    "session_id": str(session_id),
+                    "user_id": str(context.user_id),
+                    "mode": payload.mode,
+                    "quick_mode": payload.quick_mode,
+                },
+            )
             if uow is not None:
                 try:
                     uow.sessions.mark_error(session_id=session_id, user_id=context.user_id)
@@ -203,6 +223,8 @@ class AdvisorOrchestrator:
         user_id = resolve_user_id(context.get("user_id"))
         memory_opt_in = bool(context.get("memory_opt_in", False))
         user_style = str(context.get("user_style") or "neutral_claro")
+        relationship_mode = _normalize_relationship_mode(context.get("relationship_mode"))
+        response_style = _normalize_response_style(context.get("response_style"))
 
         contact_context: str | None = (
             str(context.get("contact_context")).strip()
@@ -263,6 +285,8 @@ class AdvisorOrchestrator:
             memory_opt_in=memory_opt_in,
             relationship_type=relationship_type,
             user_style=_adjust_user_style(user_style, risk_flags, mode=payload.mode),
+            relationship_mode=relationship_mode,
+            response_style=response_style,
             contact_context=contact_context,
             analysis=analysis,
             risk_flags=risk_flags,
@@ -319,6 +343,30 @@ class AdvisorOrchestrator:
             return ""
         except Exception:
             return ""
+
+    def _generate_safe_rewrites(
+        self,
+        *,
+        sanitized_text: str,
+        context: OrchestrationContext,
+    ) -> list[SuggestedResponse]:
+        try:
+            engine = SafeRewriteEngine(self._provider)
+            rewritten = engine.rewrite(
+                SafeRewriteRequest(
+                    relationship_mode=context.relationship_mode,
+                    response_style=context.response_style,
+                    original_message=sanitized_text,
+                )
+            )
+        except Exception:
+            return []
+
+        mapped: list[SuggestedResponse] = []
+        for option in rewritten.responses:
+            emotion = _emotion_for_rewrite_style(option.style)
+            mapped.append(SuggestedResponse(text=option.text, emotion_label=emotion))
+        return mapped[:3]
 
     def _persist_outputs_and_memory(
         self,
@@ -425,8 +473,23 @@ class AdvisorOrchestrator:
                     "analysis": analysis.model_dump() if analysis else None,
                 },
             )
+            logger.info(
+                "advisor_persisted",
+                extra={
+                    "session_id": str(session_id),
+                    "user_id": str(user_id),
+                    "success": True,
+                },
+            )
         except Exception:
-            pass
+            logger.exception(
+                "advisor_persistence_failed",
+                extra={
+                    "session_id": str(session_id),
+                    "user_id": str(user_id),
+                    "success": False,
+                },
+            )
 
     def _track_reply_generated_events(
         self,
@@ -655,4 +718,34 @@ def _resolve_optional_uuid(value: object) -> UUID | None:
         return UUID(text)
     except ValueError:
         return None
+
+
+def _normalize_relationship_mode(value: object) -> str:
+    normalized = str(value or "").strip().lower()
+    if normalized in {"coparenting", "relationship_separation"}:
+        return normalized
+    return "relationship_separation"
+
+
+def _normalize_response_style(value: object) -> str:
+    normalized = str(value or "").strip().lower()
+    aliases = {
+        "estrictamente_parental": "strict_parental",
+        "strict_parental": "strict_parental",
+        "cordial_colaborativo": "cordial_collaborative",
+        "cordial_collaborative": "cordial_collaborative",
+        "amistoso_cercano": "friendly_close",
+        "friendly_close": "friendly_close",
+        "abierto_reconciliacion": "open_reconciliation",
+        "open_reconciliation": "open_reconciliation",
+    }
+    return aliases.get(normalized, "cordial_collaborative")
+
+
+def _emotion_for_rewrite_style(style: str) -> str:
+    if style == "calm":
+        return "empathetic"
+    if style == "firm":
+        return "assertive"
+    return "neutral"
 

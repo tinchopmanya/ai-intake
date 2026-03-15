@@ -1,5 +1,6 @@
 from typing import Annotated
 from uuid import UUID
+import logging
 
 from fastapi import APIRouter
 from fastapi import Depends
@@ -17,6 +18,7 @@ from app.schemas.incidents import IncidentUpdateRequest
 from app.services.auth_service import AuthenticatedUser
 
 router = APIRouter(prefix="/v1/incidents", tags=["incidents"])
+logger = logging.getLogger(__name__)
 
 
 def _to_incident_summary(row: dict) -> IncidentSummary:
@@ -106,24 +108,47 @@ async def create_incident(
         related_session_id=payload.related_session_id,
     )
 
-    created = uow.incidents.create(
-        user_id=current_user.id,
-        case_id=payload.case_id,
-        contact_id=payload.contact_id,
-        incident_type=payload.incident_type,
-        title=payload.title.strip(),
-        description=payload.description.strip(),
-        source_type=payload.source_type,
-        related_analysis_id=payload.related_analysis_id,
-        related_session_id=payload.related_session_id,
-        incident_date=payload.incident_date,
-        confirmed=payload.confirmed,
-    )
-    uow.cases.append_summary_entry(
-        user_id=current_user.id,
-        case_id=payload.case_id,
-        entry=f"Evento registrado: {payload.title.strip()} ({payload.incident_date.isoformat()})",
-    )
+    try:
+        created = uow.incidents.create(
+            user_id=current_user.id,
+            case_id=payload.case_id,
+            contact_id=payload.contact_id,
+            incident_type=payload.incident_type,
+            title=payload.title.strip(),
+            description=payload.description.strip(),
+            source_type=payload.source_type,
+            related_analysis_id=payload.related_analysis_id,
+            related_session_id=payload.related_session_id,
+            incident_date=payload.incident_date,
+            confirmed=payload.confirmed,
+        )
+        uow.cases.append_summary_entry(
+            user_id=current_user.id,
+            case_id=payload.case_id,
+            entry=f"Evento registrado: {payload.title.strip()} ({payload.incident_date.isoformat()})",
+        )
+        logger.info(
+            "incident_created",
+            extra={
+                "incident_id": str(created["id"]),
+                "user_id": str(current_user.id),
+                "case_id": str(payload.case_id),
+                "success": True,
+            },
+        )
+    except Exception as exc:
+        logger.exception(
+            "incident_creation_failed",
+            extra={
+                "user_id": str(current_user.id),
+                "case_id": str(payload.case_id),
+                "success": False,
+            },
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="incident_creation_failed",
+        ) from exc
     return _to_incident_summary(dict(created))
 
 

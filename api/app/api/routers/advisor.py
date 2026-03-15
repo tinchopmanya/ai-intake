@@ -54,6 +54,31 @@ async def create_advisor_response(
     trusted_context["memory_opt_in"] = current_user.memory_opt_in
     trusted_context["country_code"] = current_user.country_code
     trusted_context["language_code"] = current_user.language_code
+    trusted_context["relationship_mode"] = (
+        current_user.relationship_mode or trusted_context.get("relationship_mode") or "relationship_separation"
+    )
+    trusted_context["response_style"] = (
+        current_user.response_style or trusted_context.get("response_style") or "cordial_collaborative"
+    )
+    has_children = (current_user.children_count_category or "").strip().lower() in {"one", "two_plus"}
+    relationship_goal = (current_user.relationship_goal or "").strip().lower()
+    breakup_initiator = (current_user.breakup_initiator or "").strip().lower()
+
+    base_user_style = str(trusted_context.get("user_style") or "neutral_claro").strip() or "neutral_claro"
+    if has_children:
+        base_user_style = (
+            f"{base_user_style}|short|neutral|logistics_first|child_focused|deescalate|ignore_unrelated_conflict"
+        )
+    else:
+        base_user_style = f"{base_user_style}|short|clear_boundaries|distance_preferred"
+    if relationship_goal == "open_reconciliation":
+        base_user_style = f"{base_user_style}|calm_open_not_pushy"
+
+    trusted_context["user_style"] = base_user_style
+    trusted_context["has_children"] = has_children
+    trusted_context["relationship_goal"] = relationship_goal or None
+    trusted_context["who_ended_relationship"] = breakup_initiator or None
+
     trusted_context["advisor_lineup"] = [
         {
             "id": advisor.id,

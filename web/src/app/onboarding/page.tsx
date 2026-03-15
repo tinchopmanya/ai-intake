@@ -1,55 +1,149 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
-import { OnboardingBottomAction } from "@/components/onboarding/OnboardingBottomAction";
 import { OnboardingOptionCard } from "@/components/onboarding/OnboardingOptionCard";
 import { OnboardingStepTitle } from "@/components/onboarding/OnboardingStepTitle";
 import { OnboardingWizardShell } from "@/components/onboarding/OnboardingWizardShell";
-import { authFetch, getCurrentUser } from "@/lib/auth/client";
-import { API_URL } from "@/lib/config";
-import { resolveRuntimeLocale, tRuntime } from "@/lib/i18n/runtime";
+import { toUiErrorMessage } from "@/lib/api/errors";
+import { getOnboardingProfile, putOnboardingProfile } from "@/lib/api/client";
+import type {
+  BreakupInitiator,
+  BreakupTimeRange,
+  ChildrenCountCategory,
+  CustodyType,
+  OnboardingProfile,
+  RelationshipMode,
+  ResponseStyle,
+} from "@/lib/api/types";
+import { getCurrentUser } from "@/lib/auth/client";
 
-type OnboardingProfileResponse = {
-  objective: string | null;
-  has_children: boolean | null;
-  breakup_side: "yo" | "mi_ex" | "mutuo" | null;
-  country_code: string;
-  language_code: "es" | "en" | "pt";
-  onboarding_completed: boolean;
-};
+const inputClassName =
+  "h-12 w-full rounded-xl border border-[#CBD5E1] bg-white px-4 text-[16px] text-[#0F172A] outline-none transition-all focus:border-[#2563EB] focus:ring-4 focus:ring-[rgba(37,99,235,0.22)]";
+const labelClassName = "block text-[15px] font-semibold text-[#334155]";
 
-const PROFILE_URL = `${API_URL}/v1/onboarding/profile`;
-const COUNTRY_OPTIONS = [
-  { code: "UY", label: "Uruguay" },
-  { code: "AR", label: "Argentina" },
-  { code: "CL", label: "Chile" },
-  { code: "MX", label: "Mexico" },
-  { code: "ES", label: "Espana" },
-  { code: "US", label: "Estados Unidos" },
-  { code: "BR", label: "Brasil" },
+const RELATIONSHIP_MODE_OPTIONS: Array<{ value: RelationshipMode; label: string; description: string }> = [
+  {
+    value: "coparenting",
+    label: "Tenemos hijos en común",
+    description: "Necesito apoyo de comunicación enfocada en crianza y coordinación parental.",
+  },
+  {
+    value: "relationship_separation",
+    label: "No tenemos hijos en común",
+    description: "Busco orientación emocional y claridad para atravesar la separación.",
+  },
+];
+
+const BREAKUP_TIME_OPTIONS: Array<{ value: BreakupTimeRange; label: string }> = [
+  { value: "lt_2m", label: "Menos de 2 meses" },
+  { value: "between_2m_1y", label: "Entre 2 meses y un año" },
+  { value: "between_1y_3y", label: "Entre 1 año y 3 años" },
+  { value: "gt_3y", label: "Más de 3 años" },
+];
+
+const RELATIONSHIP_GOAL_OPTIONS = [
+  {
+    value: "emotional_recovery",
+    label: "Recuperarme emocionalmente",
+    description: "No quiero volver con él o ella. Prefiero distancia y foco en mí.",
+  },
+  {
+    value: "friendly_close",
+    label: "Amistosa y cercana",
+    description: "Quiero un vínculo personal sano y una dinámica más flexible.",
+  },
+  {
+    value: "open_reconciliation",
+    label: "Abierta a la reconciliación",
+    description: "Tengo interés en acercarme y evaluar retomar la relación.",
+  },
 ] as const;
-const LANGUAGE_OPTIONS = [
-  { code: "es", label: "Espanol" },
-  { code: "en", label: "English" },
-  { code: "pt", label: "Portugues" },
-] as const;
+
+const BREAKUP_INITIATOR_OPTIONS: Array<{ value: BreakupInitiator; label: string }> = [
+  { value: "mutual", label: "Fue mutuo" },
+  { value: "partner", label: "Fue decisión de él o ella" },
+  { value: "me", label: "Fue decisión mía" },
+];
+
+const CHILDREN_COUNT_OPTIONS: Array<{ value: ChildrenCountCategory; label: string }> = [
+  { value: "one", label: "Sí, 1" },
+  { value: "two_plus", label: "Sí, 2 o más" },
+];
+
+const CUSTODY_OPTIONS: Array<{ value: CustodyType; label: string }> = [
+  {
+    value: "partner_custody_visits",
+    label: "La tenencia la tiene mi pareja y yo régimen de visitas",
+  },
+  { value: "shared_custody", label: "Tenencia compartida" },
+  {
+    value: "my_custody_partner_visits",
+    label: "Yo tengo la tenencia y mi pareja régimen de visitas",
+  },
+  {
+    value: "undefined",
+    label: "Aún no definimos la tenencia y las visitas",
+  },
+];
+
+const RESPONSE_STYLE_OPTIONS: Array<{ value: ResponseStyle; label: string; description: string }> = [
+  {
+    value: "strict_parental",
+    label: "Estrictamente parental",
+    description: "Límites firmes y foco exclusivo en temas de crianza.",
+  },
+  {
+    value: "cordial_collaborative",
+    label: "Cordial y colaborativa",
+    description: "Comunicación respetuosa, pacífica y práctica por los niños.",
+  },
+  {
+    value: "friendly_close",
+    label: "Amistosa y cercana",
+    description: "Buen vínculo personal y dinámica flexible.",
+  },
+  {
+    value: "open_reconciliation",
+    label: "Abierta a la reconciliación",
+    description: "Interés en recuperar cercanía a nivel personal.",
+  },
+];
+
+function getTotalSteps(mode: RelationshipMode | null): number {
+  if (mode === "coparenting") return 7;
+  if (mode === "relationship_separation") return 5;
+  return 5;
+}
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const locale = resolveRuntimeLocale();
-  const t = (key: string) => tRuntime(key, locale);
+  const searchParams = useSearchParams();
+  const editMode = searchParams.get("edit") === "1";
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [objective, setObjective] = useState("");
-  const [hasChildren, setHasChildren] = useState(false);
-  const [breakupSide, setBreakupSide] = useState<"yo" | "mi_ex" | "mutuo">("mutuo");
+
+  const [step, setStep] = useState(1);
+  const [relationshipMode, setRelationshipMode] = useState<RelationshipMode | null>(null);
+  const [userName, setUserName] = useState("");
+  const [userAge, setUserAge] = useState<number | "">("");
+  const [exPartnerName, setExPartnerName] = useState("");
+  const [exPartnerPronoun, setExPartnerPronoun] = useState<"el" | "ella">("el");
+  const [breakupTimeRange, setBreakupTimeRange] = useState<BreakupTimeRange | null>(null);
+  const [childrenCountCategory, setChildrenCountCategory] = useState<ChildrenCountCategory>("none");
+  const [relationshipGoal, setRelationshipGoal] = useState<
+    "emotional_recovery" | "friendly_close" | "open_reconciliation" | null
+  >(null);
+  const [breakupInitiator, setBreakupInitiator] = useState<BreakupInitiator | null>(null);
+  const [custodyType, setCustodyType] = useState<CustodyType | null>(null);
+  const [responseStyle, setResponseStyle] = useState<ResponseStyle | null>(null);
   const [countryCode, setCountryCode] = useState("UY");
   const [languageCode, setLanguageCode] = useState<"es" | "en" | "pt">("es");
-  const [currentStep, setCurrentStep] = useState<0 | 1 | 2 | 3 | 4>(0);
-  const [useCustomCountry, setUseCustomCountry] = useState(false);
+
+  const totalSteps = getTotalSteps(relationshipMode);
+  const progress = useMemo(() => (step / totalSteps) * 100, [step, totalSteps]);
 
   useEffect(() => {
     let mounted = true;
@@ -61,235 +155,359 @@ export default function OnboardingPage() {
         return;
       }
       try {
-        const response = await authFetch(PROFILE_URL, { method: "GET", cache: "no-store" });
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        const profile = (await response.json()) as OnboardingProfileResponse;
-        if (profile.onboarding_completed) {
+        const profile = await getOnboardingProfile();
+        if (!mounted) return;
+        hydrateProfile(profile, user.name, user.country_code, user.language_code);
+        if (profile.onboarding_completed && !editMode) {
           router.replace("/mvp");
           return;
         }
-        setObjective(profile.objective ?? "");
-        setHasChildren(Boolean(profile.has_children));
-        setBreakupSide((profile.breakup_side ?? "mutuo") as "yo" | "mi_ex" | "mutuo");
-        const resolvedCountryCode = (profile.country_code || user.country_code || "UY").toUpperCase();
-        setCountryCode(resolvedCountryCode);
-        setLanguageCode((profile.language_code || user.language_code || "es") as "es" | "en" | "pt");
-        setUseCustomCountry(!COUNTRY_OPTIONS.some((item) => item.code === resolvedCountryCode));
       } catch {
+        setUserName(user.name ?? "");
         setCountryCode((user.country_code || "UY").toUpperCase());
         setLanguageCode((user.language_code || "es") as "es" | "en" | "pt");
       } finally {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     }
+
+    function hydrateProfile(
+      profile: OnboardingProfile,
+      fallbackName: string | null,
+      fallbackCountry: string,
+      fallbackLanguage: string,
+    ) {
+      const inferredMode: RelationshipMode =
+        profile.relationship_mode ??
+        (profile.children_count_category && profile.children_count_category !== "none"
+          ? "coparenting"
+          : "relationship_separation");
+      setRelationshipMode(inferredMode);
+      setUserName(profile.user_name ?? fallbackName ?? "");
+      setUserAge(profile.user_age ?? "");
+      setExPartnerName(profile.ex_partner_name ?? "");
+      setExPartnerPronoun(profile.ex_partner_pronoun ?? "el");
+      setBreakupTimeRange(profile.breakup_time_range ?? null);
+      setChildrenCountCategory(profile.children_count_category ?? "none");
+      setRelationshipGoal(profile.relationship_goal ?? null);
+      setBreakupInitiator(profile.breakup_initiator ?? null);
+      setCustodyType(profile.custody_type ?? null);
+      setResponseStyle(profile.response_style ?? null);
+      setCountryCode((profile.country_code || fallbackCountry || "UY").toUpperCase());
+      setLanguageCode((profile.language_code || fallbackLanguage || "es") as "es" | "en" | "pt");
+    }
+
     void bootstrap();
     return () => {
       mounted = false;
     };
-  }, [router]);
+  }, [editMode, router]);
 
-  const progress = useMemo(() => ((currentStep + 1) / 5) * 100, [currentStep]);
+  function applyMode(value: RelationshipMode) {
+    setRelationshipMode(value);
+    const maxSteps = getTotalSteps(value);
+    setStep((current) => Math.min(current, maxSteps));
+    if (value === "relationship_separation") {
+      setChildrenCountCategory("none");
+      setCustodyType(null);
+      setResponseStyle(null);
+    } else {
+      if (childrenCountCategory === "none") {
+        setChildrenCountCategory("one");
+      }
+      setRelationshipGoal(null);
+    }
+  }
 
-  async function handleSubmit() {
-    if (!objective.trim() || saving) return;
+  function canGoNext(): boolean {
+    if (step === 1) return relationshipMode !== null;
+    if (step === 2) {
+      return userName.trim().length > 0 && typeof userAge === "number" && userAge >= 18 && userAge <= 120;
+    }
+    if (step === 3) {
+      return exPartnerName.trim().length > 0 && breakupTimeRange !== null;
+    }
+    if (relationshipMode === "relationship_separation") {
+      if (step === 4) return relationshipGoal !== null;
+      if (step === 5) return breakupInitiator !== null;
+      return true;
+    }
+    if (relationshipMode === "coparenting") {
+      if (step === 4) return childrenCountCategory === "one" || childrenCountCategory === "two_plus";
+      if (step === 5) return custodyType !== null;
+      if (step === 6) return responseStyle !== null;
+      if (step === 7) return breakupInitiator !== null;
+      return true;
+    }
+    return false;
+  }
+
+  function nextStep() {
+    if (!canGoNext()) return;
+    setStep((prev) => Math.min(totalSteps, prev + 1));
+  }
+
+  function prevStep() {
+    setStep((prev) => Math.max(1, prev - 1));
+  }
+
+  async function submitProfile() {
+    if (!canGoNext() || saving || !relationshipMode || !breakupTimeRange || !breakupInitiator) return;
     setSaving(true);
     setError(null);
     try {
-      const response = await authFetch(PROFILE_URL, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          objective: objective.trim(),
-          has_children: hasChildren,
-          breakup_side: breakupSide,
-          country_code: countryCode.trim().toUpperCase().slice(0, 2),
-          language_code: languageCode,
-        }),
+      const isCoparenting = relationshipMode === "coparenting";
+      await putOnboardingProfile({
+        relationship_mode: relationshipMode,
+        user_name: userName.trim(),
+        user_age: Number(userAge),
+        ex_partner_name: exPartnerName.trim(),
+        ex_partner_pronoun: exPartnerPronoun,
+        breakup_time_range: breakupTimeRange,
+        children_count_category: isCoparenting ? childrenCountCategory : "none",
+        relationship_goal: isCoparenting ? null : relationshipGoal,
+        breakup_initiator: breakupInitiator,
+        custody_type: isCoparenting ? custodyType : null,
+        response_style: isCoparenting ? responseStyle : null,
+        country_code: countryCode.toUpperCase().slice(0, 2),
+        language_code: languageCode,
       });
-      if (!response.ok) {
-        const payload = (await response.json().catch(() => null)) as
-          | { message?: string; detail?: string }
-          | null;
-        throw new Error(payload?.message || payload?.detail || `HTTP ${response.status}`);
-      }
       router.replace("/mvp");
     } catch (exc) {
-      setError(exc instanceof Error ? exc.message : "No se pudo guardar onboarding.");
+      setError(toUiErrorMessage(exc, "No se pudo guardar tus datos de onboarding."));
     } finally {
       setSaving(false);
     }
   }
 
-  function chooseBreakupSide(value: "yo" | "mi_ex" | "mutuo") {
-    if (saving) return;
-    setBreakupSide(value);
-    window.setTimeout(() => setCurrentStep(2), 120);
-  }
-
-  function chooseHasChildren(value: boolean) {
-    if (saving) return;
-    setHasChildren(value);
-    window.setTimeout(() => setCurrentStep(3), 120);
-  }
-
-  function chooseCountry(code: string) {
-    if (saving) return;
-    setUseCustomCountry(false);
-    setCountryCode(code);
-    window.setTimeout(() => setCurrentStep(4), 120);
-  }
-
-  async function chooseLanguage(value: "es" | "en" | "pt") {
-    if (saving) return;
-    setLanguageCode(value);
-    await handleSubmit();
-  }
-
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#f3f4f6] p-6 text-sm text-[#667085]">
+      <main className="flex min-h-screen items-center justify-center bg-[#F8FAFC] p-6 text-sm text-[#64748B]">
         Cargando onboarding...
       </main>
     );
   }
 
-  const breakupOptions: Array<{ value: "yo" | "mi_ex" | "mutuo"; label: string }> = [
-    { value: "yo", label: t("onboarding.breakup_i_left") },
-    { value: "mi_ex", label: t("onboarding.breakup_ex_left") },
-    { value: "mutuo", label: t("onboarding.breakup_mutual") },
-  ];
+  const isLastStep = step === totalSteps;
+  const primaryLabel = isLastStep ? (saving ? "Guardando..." : "Guardar y continuar") : "Siguiente";
 
   return (
     <OnboardingWizardShell
       progress={progress}
       error={error}
       bottomAction={
-        currentStep === 0 ? (
-          <OnboardingBottomAction
-            label="Next"
-            disabled={objective.trim().length === 0 || saving}
-            onClick={() => setCurrentStep(1)}
-          />
-        ) : currentStep === 3 && useCustomCountry ? (
-          <OnboardingBottomAction
-            label="Next"
-            disabled={countryCode.trim().length < 2 || saving}
-            onClick={() => setCurrentStep(4)}
-          />
-        ) : null
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={prevStep}
+            disabled={step === 1 || saving}
+            className="h-12 min-w-[112px] rounded-xl border border-[#CBD5E1] bg-white px-4 text-[16px] font-semibold text-[#334155] transition-colors hover:bg-[#F1F5F9] disabled:cursor-not-allowed disabled:bg-[#E2E8F0] disabled:text-[#94A3B8]"
+          >
+            Atrás
+          </button>
+          <button
+            type="button"
+            onClick={() => (isLastStep ? void submitProfile() : nextStep())}
+            disabled={!canGoNext() || saving}
+            className="h-12 flex-1 rounded-xl bg-[#2563EB] px-5 text-[17px] font-semibold text-white transition-colors hover:bg-[#1D4ED8] active:bg-[#1E40AF] disabled:cursor-not-allowed disabled:bg-[#E2E8F0] disabled:text-[#94A3B8]"
+          >
+            {primaryLabel}
+          </button>
+        </div>
       }
     >
-      {currentStep === 0 ? (
+      {step === 1 ? (
         <>
           <OnboardingStepTitle
-            title={t("onboarding.objective")}
-            subtitle={t("onboarding.subtitle")}
-          />
-          <div className="rounded-2xl border border-[#e3e7ee] bg-[#eceff3] p-1.5">
-            <textarea
-              value={objective}
-              onChange={(event) => setObjective(event.target.value)}
-              className="min-h-[180px] w-full resize-none rounded-xl border border-transparent bg-transparent px-4 py-3 text-[16px] leading-6 text-[#1f2a44] placeholder:text-[#667085] focus:border-[#d1d8e4] focus:bg-white/40 focus:outline-none"
-              placeholder={t("onboarding.objective_placeholder")}
-              required
-            />
-          </div>
-        </>
-      ) : null}
-
-      {currentStep === 1 ? (
-        <>
-          <OnboardingStepTitle
-            title={t("onboarding.breakup_side")}
-            subtitle="Selecciona una opcion y avanzamos automaticamente."
+            title="¿Cuál describe mejor tu situación actual?"
+            subtitle="Esto define cómo personalizamos tus respuestas en ExReply."
           />
           <div className="space-y-3">
-            {breakupOptions.map((item) => (
+            {RELATIONSHIP_MODE_OPTIONS.map((item) => (
               <OnboardingOptionCard
                 key={item.value}
                 label={item.label}
-                selected={breakupSide === item.value}
-                onClick={() => chooseBreakupSide(item.value)}
+                description={item.description}
+                selected={relationshipMode === item.value}
+                onClick={() => applyMode(item.value)}
               />
             ))}
           </div>
         </>
       ) : null}
 
-      {currentStep === 2 ? (
+      {step === 2 ? (
         <>
-          <OnboardingStepTitle
-            title={t("onboarding.has_children")}
-            subtitle="Esto nos ayuda a ajustar mejor el tono de las sugerencias."
-          />
-          <div className="space-y-3">
-            <OnboardingOptionCard
-              label="Si, tenemos hijos"
-              selected={hasChildren === true}
-              onClick={() => chooseHasChildren(true)}
+          <OnboardingStepTitle title="Contanos sobre vos" subtitle="Solo usamos estos datos para personalizar el tono." />
+          <div className="space-y-3 rounded-2xl border border-[#E2E8F0] bg-white p-4">
+            <label className={labelClassName}>Tu nombre</label>
+            <input
+              value={userName}
+              onChange={(event) => setUserName(event.target.value)}
+              className={inputClassName}
+              placeholder="Tu nombre"
             />
-            <OnboardingOptionCard
-              label="No tenemos hijos"
-              selected={hasChildren === false}
-              onClick={() => chooseHasChildren(false)}
+            <label className={labelClassName}>Tu edad</label>
+            <input
+              type="number"
+              min={18}
+              max={120}
+              value={userAge}
+              onChange={(event) => {
+                const value = event.target.value;
+                setUserAge(value === "" ? "" : Number(value));
+              }}
+              className={inputClassName}
+              placeholder="Edad"
             />
           </div>
         </>
       ) : null}
 
-      {currentStep === 3 ? (
+      {step === 3 ? (
         <>
           <OnboardingStepTitle
-            title={t("onboarding.country")}
-            subtitle="Selecciona tu pais principal."
+            title="Contexto de separación"
+            subtitle="Definimos contexto para ajustar redacción y sugerencias."
           />
-          <div className="space-y-3">
-            {COUNTRY_OPTIONS.map((item) => (
-              <OnboardingOptionCard
-                key={item.code}
-                label={item.label}
-                description={item.code}
-                selected={!useCustomCountry && countryCode === item.code}
-                onClick={() => chooseCountry(item.code)}
-              />
-            ))}
-            <OnboardingOptionCard
-              label="Otro pais (ISO-2)"
-              selected={useCustomCountry}
-              onClick={() => setUseCustomCountry(true)}
+          <div className="space-y-3 rounded-2xl border border-[#E2E8F0] bg-white p-4">
+            <label className={labelClassName}>Nombre de tu ex pareja</label>
+            <input
+              value={exPartnerName}
+              onChange={(event) => setExPartnerName(event.target.value)}
+              className={inputClassName}
+              placeholder="Nombre"
             />
-            {useCustomCountry ? (
-              <div className="rounded-2xl border border-[#e3e7ee] bg-[#eceff3] p-1.5">
-                <input
-                  value={countryCode}
-                  onChange={(event) =>
-                    setCountryCode(event.target.value.trim().toUpperCase().slice(0, 2))
-                  }
-                  className="h-14 w-full rounded-xl border border-transparent bg-transparent px-4 text-base font-semibold uppercase text-[#1f2a44] placeholder:text-[#667085] focus:border-[#d1d8e4] focus:bg-white/40 focus:outline-none"
-                  placeholder="Ej: UY"
-                  maxLength={2}
+            <label className={labelClassName}>Hace cuánto se separaron</label>
+            <div className="space-y-2">
+              {BREAKUP_TIME_OPTIONS.map((item) => (
+                <OnboardingOptionCard
+                  key={item.value}
+                  label={item.label}
+                  selected={breakupTimeRange === item.value}
+                  onClick={() => setBreakupTimeRange(item.value)}
                 />
-              </div>
-            ) : null}
+              ))}
+            </div>
+            <label className={labelClassName}>
+              Cuando hablemos de tu ex pareja, ¿cómo querés que nos refiramos?
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <OnboardingOptionCard
+                label="Él"
+                selected={exPartnerPronoun === "el"}
+                onClick={() => setExPartnerPronoun("el")}
+              />
+              <OnboardingOptionCard
+                label="Ella"
+                selected={exPartnerPronoun === "ella"}
+                onClick={() => setExPartnerPronoun("ella")}
+              />
+            </div>
           </div>
         </>
       ) : null}
 
-      {currentStep === 4 ? (
+      {relationshipMode === "relationship_separation" && step === 4 ? (
+        <>
+          <OnboardingStepTitle title="¿Cuál es tu objetivo?" subtitle="Seleccioná una opción predefinida." />
+          <div className="space-y-3">
+            {RELATIONSHIP_GOAL_OPTIONS.map((item) => (
+              <OnboardingOptionCard
+                key={item.value}
+                label={item.label}
+                description={item.description}
+                selected={relationshipGoal === item.value}
+                onClick={() => setRelationshipGoal(item.value)}
+              />
+            ))}
+          </div>
+        </>
+      ) : null}
+
+      {relationshipMode === "relationship_separation" && step === 5 ? (
+        <>
+          <OnboardingStepTitle title="¿Quién dejó a quién?" subtitle="Último paso para completar tu perfil." />
+          <div className="space-y-3">
+            {BREAKUP_INITIATOR_OPTIONS.map((item) => (
+              <OnboardingOptionCard
+                key={item.value}
+                label={item.label}
+                selected={breakupInitiator === item.value}
+                onClick={() => setBreakupInitiator(item.value)}
+              />
+            ))}
+          </div>
+        </>
+      ) : null}
+
+      {relationshipMode === "coparenting" && step === 4 ? (
         <>
           <OnboardingStepTitle
-            title={t("onboarding.language")}
-            subtitle={saving ? t("onboarding.saving") : "Selecciona idioma y finalizamos."}
+            title="Cantidad de hijos en común"
+            subtitle="Solo guardamos categoría agregada. No guardamos datos de menores."
           />
           <div className="space-y-3">
-            {LANGUAGE_OPTIONS.map((item) => (
+            {CHILDREN_COUNT_OPTIONS.map((item) => (
               <OnboardingOptionCard
-                key={item.code}
+                key={item.value}
                 label={item.label}
-                selected={languageCode === item.code}
-                onClick={() => void chooseLanguage(item.code)}
+                selected={childrenCountCategory === item.value}
+                onClick={() => setChildrenCountCategory(item.value)}
+              />
+            ))}
+          </div>
+        </>
+      ) : null}
+
+      {relationshipMode === "coparenting" && step === 5 ? (
+        <>
+          <OnboardingStepTitle title="Tenencia" subtitle="Elegí la opción que mejor represente tu situación." />
+          <div className="space-y-3">
+            {CUSTODY_OPTIONS.map((item) => (
+              <OnboardingOptionCard
+                key={item.value}
+                label={item.label}
+                selected={custodyType === item.value}
+                onClick={() => setCustodyType(item.value)}
+              />
+            ))}
+          </div>
+        </>
+      ) : null}
+
+      {relationshipMode === "coparenting" && step === 6 ? (
+        <>
+          <OnboardingStepTitle
+            title="¿Cómo deseás que sean tus respuestas?"
+            subtitle="Definimos estilo de comunicación para tu wizard."
+          />
+          <div className="space-y-3">
+            {RESPONSE_STYLE_OPTIONS.map((item) => (
+              <OnboardingOptionCard
+                key={item.value}
+                label={item.label}
+                description={item.description}
+                selected={responseStyle === item.value}
+                onClick={() => setResponseStyle(item.value)}
+              />
+            ))}
+          </div>
+        </>
+      ) : null}
+
+      {relationshipMode === "coparenting" && step === 7 ? (
+        <>
+          <OnboardingStepTitle title="¿Quién dejó a quién?" subtitle="Último paso para completar tu perfil." />
+          <div className="space-y-3">
+            {BREAKUP_INITIATOR_OPTIONS.map((item) => (
+              <OnboardingOptionCard
+                key={item.value}
+                label={item.label}
+                selected={breakupInitiator === item.value}
+                onClick={() => setBreakupInitiator(item.value)}
               />
             ))}
           </div>

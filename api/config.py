@@ -17,6 +17,7 @@ class Settings:
     app_env: str
     is_local_env: bool
     is_production_env: bool
+    is_validation_env: bool
     allow_inmemory_fallback: bool
     enable_legacy_chat_routes: bool
     database_url: str | None
@@ -60,6 +61,10 @@ def _is_production_env(app_env: str) -> bool:
     return app_env in {"production", "prod"}
 
 
+def _is_validation_env(app_env: str) -> bool:
+    return app_env in {"validation", "mvp_validation"}
+
+
 def get_settings() -> Settings:
     app_env_raw = (
         os.getenv("APP_ENV")
@@ -70,6 +75,7 @@ def get_settings() -> Settings:
     app_env = _normalize_env(app_env_raw)
     is_local_env = _is_local_env(app_env)
     is_production_env = _is_production_env(app_env)
+    is_validation_env = _is_validation_env(app_env)
     allow_inmemory_fallback = _parse_bool(
         os.getenv("ALLOW_INMEMORY_FALLBACK"),
         is_local_env,
@@ -108,6 +114,7 @@ def get_settings() -> Settings:
         app_env=app_env,
         is_local_env=is_local_env,
         is_production_env=is_production_env,
+        is_validation_env=is_validation_env,
         allow_inmemory_fallback=allow_inmemory_fallback,
         enable_legacy_chat_routes=enable_legacy_chat_routes,
         database_url=database_url.strip() if database_url else None,

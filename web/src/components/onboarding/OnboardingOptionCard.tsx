@@ -15,15 +15,15 @@ export function OnboardingOptionCard({
     <button
       type="button"
       onClick={onClick}
-      className={`w-full rounded-2xl border px-4 py-5 text-center transition-all duration-200 ${
+      className={`w-full rounded-xl border px-4 py-3.5 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(37,99,235,0.22)] ${
         selected
-          ? "border-[#a79c8f] bg-[#b8afa6] text-[#2f2a25]"
-          : "border-[#e3e7ee] bg-[#eceff3] text-[#1f2a44] hover:border-[#cfd6e2] hover:bg-[#e6eaf0]"
+          ? "border-[#3B82F6] bg-[#EFF6FF] text-[#1E3A8A] shadow-[0_2px_8px_rgba(37,99,235,0.12)]"
+          : "border-[#E2E8F0] bg-white text-[#0F172A] hover:border-[#CBD5E1] hover:bg-[#F8FAFC] hover:shadow-[0_2px_8px_rgba(15,23,42,0.06)]"
       }`}
     >
-      <p className="text-base font-semibold">{label}</p>
+      <p className="text-[18px] font-semibold leading-6">{label}</p>
       {description ? (
-        <p className={`mt-1.5 text-sm ${selected ? "text-[#463f38]" : "text-[#667085]"}`}>
+        <p className={`mt-1.5 text-[15px] leading-6 ${selected ? "text-[#1E3A8A]" : "text-[#475569]"}`}>
           {description}
         </p>
       ) : null}

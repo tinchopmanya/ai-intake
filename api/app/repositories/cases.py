@@ -64,6 +64,21 @@ class CaseRepository:
             rows = cursor.fetchall()
         return [dict(row) for row in rows]
 
+    def get_default_for_user(self, *, user_id: UUID) -> Mapping[str, Any] | None:
+        query = """
+            SELECT
+                id, user_id, contact_id, title, contact_name, relationship_label,
+                summary, last_activity_at, created_at, updated_at
+            FROM cases
+            WHERE user_id = %s
+            ORDER BY last_activity_at DESC, created_at DESC
+            LIMIT 1
+        """
+        with self._connection.cursor() as cursor:
+            cursor.execute(query, (str(user_id),))
+            row = cursor.fetchone()
+        return dict(row) if row else None
+
     def get_by_id(self, *, user_id: UUID, case_id: UUID) -> Mapping[str, Any] | None:
         query = """
             SELECT

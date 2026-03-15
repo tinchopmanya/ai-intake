@@ -7,11 +7,14 @@ import type { AnalysisResponse } from "@/lib/api/types";
 import type { CaseCreateRequest } from "@/lib/api/types";
 import type { CaseListResponse } from "@/lib/api/types";
 import type { CaseSummary } from "@/lib/api/types";
+import type { CaseTimelineResponse } from "@/lib/api/types";
 import type { CaseUpdateRequest } from "@/lib/api/types";
 import type { IncidentCreateRequest } from "@/lib/api/types";
 import type { IncidentListResponse } from "@/lib/api/types";
 import type { IncidentSummary } from "@/lib/api/types";
 import type { IncidentUpdateRequest } from "@/lib/api/types";
+import type { OnboardingProfile } from "@/lib/api/types";
+import type { OnboardingProfileUpdateRequest } from "@/lib/api/types";
 import type { WizardEventRequest } from "@/lib/api/types";
 import type { WizardEventResponse } from "@/lib/api/types";
 
@@ -23,10 +26,13 @@ async function requestJson<T>(
 
   if (!response.ok) {
     const errorPayload = (await response.json().catch(() => null)) as
-      | { message?: string; detail?: string }
+      | { error_code?: string; message?: string; detail?: string }
       | null;
     throw new Error(
-      errorPayload?.message || errorPayload?.detail || `HTTP ${response.status}`,
+      errorPayload?.error_code ||
+        errorPayload?.message ||
+        errorPayload?.detail ||
+        `http_${response.status}`,
     );
   }
 
@@ -93,6 +99,44 @@ export function patchCase(caseId: string, payload: CaseUpdateRequest): Promise<C
   return patchJson<CaseSummary>(`/v1/cases/${caseId}`, payload);
 }
 
+export function getCaseTimeline(caseId: string): Promise<CaseTimelineResponse> {
+  return getJson<CaseTimelineResponse>(`/v1/cases/${caseId}/timeline`);
+}
+
+export async function downloadCaseExport(caseId: string): Promise<void> {
+  const response = await authFetch(`${API_URL}/v1/cases/${caseId}/export`, {
+    method: "GET",
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    const errorPayload = (await response.json().catch(() => null)) as
+      | { error_code?: string; message?: string; detail?: string }
+      | null;
+    throw new Error(
+      errorPayload?.error_code ||
+        errorPayload?.message ||
+        errorPayload?.detail ||
+        `http_${response.status}`,
+    );
+  }
+  const content = await response.text();
+  const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
+  const url = window.URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `case-${caseId}.md`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.URL.revokeObjectURL(url);
+  void postJson<WizardEventResponse>("/v1/events", {
+    event_name: "case_exported",
+    case_id: caseId,
+  }).catch(() => {
+    // Keep export UX resilient even when tracking persistence fails.
+  });
+}
+
 export function postIncident(payload: IncidentCreateRequest): Promise<IncidentSummary> {
   return postJson<IncidentSummary>("/v1/incidents", payload);
 }
@@ -107,5 +151,19 @@ export function patchIncident(
   payload: IncidentUpdateRequest,
 ): Promise<IncidentSummary> {
   return patchJson<IncidentSummary>(`/v1/incidents/${incidentId}`, payload);
+}
+
+export function getOnboardingProfile(): Promise<OnboardingProfile> {
+  return getJson<OnboardingProfile>("/v1/onboarding/profile");
+}
+
+export function putOnboardingProfile(
+  payload: OnboardingProfileUpdateRequest,
+): Promise<OnboardingProfile> {
+  return requestJson<OnboardingProfile>("/v1/onboarding/profile", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
 }
 

@@ -66,8 +66,9 @@ export type AdvisorRequest = {
 };
 
 export type WizardEventRequest = {
-  event_name: "reply_copied";
-  session_id: string;
+  event_name: "reply_copied" | "case_exported";
+  session_id?: string | null;
+  case_id?: string | null;
   analysis_id?: string | null;
   advisor_id?: string | null;
   response_index?: number | null;
@@ -161,6 +162,17 @@ export type IncidentListResponse = {
   incidents: IncidentSummary[];
 };
 
+export type CaseTimelineEvent = {
+  id: string;
+  event_type: "analysis" | "advisor" | "incident";
+  title: string;
+  event_time: string;
+};
+
+export type CaseTimelineResponse = {
+  events: CaseTimelineEvent[];
+};
+
 export type AdvisorResponse = {
   session_id: string;
   mode: UsageMode;
@@ -194,5 +206,55 @@ export type OcrCapabilitiesResponse = {
   selected_provider: string;
   providers_checked: string[];
   reason_codes: string[];
+};
+
+export type BreakupTimeRange = "lt_2m" | "between_2m_1y" | "between_1y_3y" | "gt_3y";
+export type RelationshipMode = "coparenting" | "relationship_separation";
+export type ChildrenCountCategory = "none" | "one" | "two_plus";
+export type RelationshipGoal = "emotional_recovery" | "friendly_close" | "open_reconciliation";
+export type BreakupInitiator = "mutual" | "partner" | "me";
+export type CustodyType =
+  | "partner_custody_visits"
+  | "shared_custody"
+  | "my_custody_partner_visits"
+  | "undefined";
+export type ResponseStyle =
+  | "strict_parental"
+  | "cordial_collaborative"
+  | "friendly_close"
+  | "open_reconciliation";
+export type ExPartnerPronoun = "el" | "ella";
+
+export type OnboardingProfile = {
+  relationship_mode: RelationshipMode | null;
+  user_name: string | null;
+  user_age: number | null;
+  ex_partner_name: string | null;
+  ex_partner_pronoun: ExPartnerPronoun | null;
+  breakup_time_range: BreakupTimeRange | null;
+  children_count_category: ChildrenCountCategory | null;
+  relationship_goal: RelationshipGoal | null;
+  breakup_initiator: BreakupInitiator | null;
+  custody_type: CustodyType | null;
+  response_style: ResponseStyle | null;
+  country_code: string;
+  language_code: "es" | "en" | "pt";
+  onboarding_completed: boolean;
+};
+
+export type OnboardingProfileUpdateRequest = {
+  relationship_mode: RelationshipMode;
+  user_name: string;
+  user_age: number;
+  ex_partner_name: string;
+  ex_partner_pronoun: ExPartnerPronoun;
+  breakup_time_range: BreakupTimeRange;
+  children_count_category: ChildrenCountCategory;
+  relationship_goal?: RelationshipGoal | null;
+  breakup_initiator: BreakupInitiator;
+  custody_type?: CustodyType | null;
+  response_style?: ResponseStyle | null;
+  country_code: string;
+  language_code: "es" | "en" | "pt";
 };
 

@@ -5,6 +5,7 @@ from app.repositories.cases import CaseRepository
 from app.repositories.contacts import ContactRepository
 from app.repositories.conversation_memory import ConversationMemoryRepository
 from app.repositories.incidents import IncidentRepository
+from app.repositories.mvp_metrics import MvpMetricsRepository
 from app.repositories.protocols import ConnectionFactory
 from app.repositories.protocols import ConnectionProtocol
 from app.repositories.tracking_events import TrackingEventRepository
@@ -27,6 +28,7 @@ class UnitOfWork:
         self.outputs: AdvisorOutputRepository
         self.memory: ConversationMemoryRepository
         self.incidents: IncidentRepository
+        self.mvp_metrics: MvpMetricsRepository
 
     @property
     def tracking(self) -> TrackingEventRepository | None:
@@ -41,6 +43,7 @@ class UnitOfWork:
         self.outputs = AdvisorOutputRepository(self._connection)
         self.memory = ConversationMemoryRepository(self._connection)
         self.incidents = IncidentRepository(self._connection)
+        self.mvp_metrics = MvpMetricsRepository(self._connection)
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:

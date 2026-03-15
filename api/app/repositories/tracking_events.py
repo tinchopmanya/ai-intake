@@ -1,8 +1,11 @@
 from collections.abc import Mapping
+import logging
 from typing import Any
 from uuid import UUID
 
 from app.repositories.protocols import ConnectionFactory
+
+logger = logging.getLogger(__name__)
 
 
 class TrackingEventRepository:
@@ -13,6 +16,7 @@ class TrackingEventRepository:
 
     def __init__(self, connection_factory: ConnectionFactory) -> None:
         self._connection_factory = connection_factory
+        self._append_failures = 0
 
     def append(
         self,
@@ -58,8 +62,35 @@ class TrackingEventRepository:
                     ),
                 )
             connection.commit()
+            logger.info(
+                "event_tracking",
+                extra={
+                    "event": event_name,
+                    "user_id": str(user_id) if user_id else None,
+                    "session_id": str(session_id) if session_id else None,
+                    "success": bool(success),
+                },
+            )
             return True
-        except Exception:
+        except Exception as exc:
+            self._append_failures += 1
+            logger.warning(
+                "tracking_append_failed event_name=%s session_id=%s user_id=%s failures=%s error=%s",
+                event_name,
+                session_id,
+                user_id,
+                self._append_failures,
+                type(exc).__name__,
+            )
+            logger.info(
+                "event_tracking",
+                extra={
+                    "event": event_name,
+                    "user_id": str(user_id) if user_id else None,
+                    "session_id": str(session_id) if session_id else None,
+                    "success": False,
+                },
+            )
             return False
         finally:
             if connection is not None:

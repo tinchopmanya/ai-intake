@@ -41,7 +41,10 @@ class UserRepository:
                 updated_at = now()
             RETURNING
                 id, email, display_name, memory_opt_in, locale, picture_url,
-                country_code, language_code, onboarding_completed
+                country_code, language_code, onboarding_completed,
+                relationship_mode, user_age, ex_partner_name, ex_partner_pronoun, breakup_time_range,
+                children_count_category, relationship_goal, breakup_initiator,
+                custody_type, response_style
         """
         with self._connection.cursor() as cursor:
             cursor.execute(
@@ -63,7 +66,10 @@ class UserRepository:
         query = """
             SELECT
                 id, email, display_name, memory_opt_in, locale, picture_url,
-                country_code, language_code, onboarding_completed
+                country_code, language_code, onboarding_completed,
+                relationship_mode, user_age, ex_partner_name, ex_partner_pronoun, breakup_time_range,
+                children_count_category, relationship_goal, breakup_initiator,
+                custody_type, response_style
             FROM users
             WHERE id = %s
         """
@@ -75,8 +81,20 @@ class UserRepository:
     def get_onboarding_profile(self, *, user_id: UUID) -> Mapping[str, Any] | None:
         query = """
             SELECT
-                objective, has_children, breakup_side,
-                country_code, language_code, onboarding_completed
+                display_name,
+                relationship_mode,
+                user_age,
+                ex_partner_name,
+                ex_partner_pronoun,
+                breakup_time_range,
+                children_count_category,
+                relationship_goal,
+                breakup_initiator,
+                custody_type,
+                response_style,
+                country_code,
+                language_code,
+                onboarding_completed
             FROM users
             WHERE id = %s
         """
@@ -89,9 +107,17 @@ class UserRepository:
         self,
         *,
         user_id: UUID,
-        objective: str,
-        has_children: bool,
-        breakup_side: str,
+        relationship_mode: str,
+        user_name: str,
+        user_age: int,
+        ex_partner_name: str,
+        ex_partner_pronoun: str,
+        breakup_time_range: str,
+        children_count_category: str,
+        relationship_goal: str | None,
+        breakup_initiator: str,
+        custody_type: str | None,
+        response_style: str | None,
         country_code: str,
         language_code: str,
     ) -> Mapping[str, Any] | None:
@@ -99,9 +125,17 @@ class UserRepository:
         query = """
             UPDATE users
             SET
-                objective = %s,
-                has_children = %s,
-                breakup_side = %s,
+                display_name = %s,
+                relationship_mode = %s,
+                user_age = %s,
+                ex_partner_name = %s,
+                ex_partner_pronoun = %s,
+                breakup_time_range = %s,
+                children_count_category = %s,
+                relationship_goal = %s,
+                breakup_initiator = %s,
+                custody_type = %s,
+                response_style = %s,
                 country_code = %s,
                 language_code = %s,
                 locale = %s,
@@ -109,16 +143,36 @@ class UserRepository:
                 updated_at = now()
             WHERE id = %s
             RETURNING
-                objective, has_children, breakup_side,
-                country_code, language_code, onboarding_completed
+                display_name,
+                relationship_mode,
+                user_age,
+                ex_partner_name,
+                ex_partner_pronoun,
+                breakup_time_range,
+                children_count_category,
+                relationship_goal,
+                breakup_initiator,
+                custody_type,
+                response_style,
+                country_code,
+                language_code,
+                onboarding_completed
         """
         with self._connection.cursor() as cursor:
             cursor.execute(
                 query,
                 (
-                    objective,
-                    has_children,
-                    breakup_side,
+                    user_name,
+                    relationship_mode,
+                    user_age,
+                    ex_partner_name,
+                    ex_partner_pronoun,
+                    breakup_time_range,
+                    children_count_category,
+                    relationship_goal,
+                    breakup_initiator,
+                    custody_type,
+                    response_style,
                     country_code,
                     language_code,
                     locale,

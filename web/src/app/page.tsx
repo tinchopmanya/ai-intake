@@ -12,14 +12,14 @@ export default async function Home() {
     <main className="p-6">
       <h1 className="text-2xl font-bold">AI Intake</h1>
       <div className="mt-3 flex gap-2">
-        <Link href="/chat" className="rounded bg-gray-900 px-3 py-2 text-sm text-white">
-          Ir a Chat
+        <Link href="/login" className="rounded border border-gray-300 px-3 py-2 text-sm">
+          Login
         </Link>
-        <Link href="/advisor" className="rounded border border-gray-300 px-3 py-2 text-sm">
-          Ir a Advisor
+        <Link href="/onboarding" className="rounded border border-gray-300 px-3 py-2 text-sm">
+          Onboarding
         </Link>
-        <Link href="/mvp" className="rounded border border-gray-300 px-3 py-2 text-sm">
-          Base MVP
+        <Link href="/mvp" className="rounded bg-gray-900 px-3 py-2 text-sm text-white">
+          MVP
         </Link>
       </div>
       <p className="mt-2 text-sm text-gray-600">Backend health:</p>

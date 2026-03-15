@@ -127,5 +127,33 @@ cd api
 .\.venv\Scripts\python.exe -m unittest discover -s tests -p "test_*.py"
 ```
 
+## MVP Validation Metrics
+- Endpoint interno: `GET /v1/metrics/mvp` (requiere sesion autenticada).
+- Script de reporte:
+```bash
+.\api\.venv\Scripts\python.exe .\scripts\mvp_metrics_report.py
+```
+
+Variables opcionales del script:
+- `METRICS_BASE_URL` (default `http://localhost:8000`)
+- `METRICS_ACCESS_TOKEN` (si ya tienes token)
+- `METRICS_GOOGLE_ID_TOKEN` (fallback para login automatico)
+- `METRICS_TIMEOUT_SECONDS` (default `20`)
+
+### Checklist diario (validacion)
+- Revisar `users_logged_in` y `users_completed_onboarding` para confirmar activacion.
+- Revisar `wizard_sessions_created` para verificar uso real del flujo principal.
+- Revisar `replies_generated` vs `replies_copied` para adoption.
+- Revisar `cases_created` e `incidents_created` para continuidad de caso.
+- Revisar `case_exports` para señales de valor percibido.
+- Revisar `returning_users_7d` para retencion temprana.
+
+### Interpretacion rapida
+- `reply_adoption_rate = replies_copied / replies_generated`.
+- Si adoption rate es `< 0.15`: revisar calidad de respuestas o friccion de copy.
+- Si adoption rate esta entre `0.15` y `0.35`: señal intermedia, seguir iterando prompts/UX.
+- Si adoption rate es `> 0.35`: buena señal de utilidad para MVP temprano.
+- Si `returning_users_7d` no crece durante la validacion, priorizar mejoras de retencion antes de nuevas features.
+
 ## Documentacion API
 Detalle en [`docs/API_GUIDE.md`](docs/API_GUIDE.md).

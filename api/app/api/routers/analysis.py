@@ -118,8 +118,25 @@ async def create_analysis(
                     case_id=payload.case_id,
                     entry=f"Analisis: {response.summary}",
                 )
+            logger.info(
+                "analysis_persisted",
+                extra={
+                    "analysis_id": str(response.analysis_id),
+                    "user_id": str(user_id),
+                    "case_id": str(payload.case_id) if payload.case_id else None,
+                    "success": True,
+                },
+            )
         except Exception as exc:
-            logger.exception("Failed to persist analysis result: analysis_id=%s", response.analysis_id)
+            logger.exception(
+                "analysis_persistence_failed",
+                extra={
+                    "analysis_id": str(response.analysis_id),
+                    "user_id": str(user_id),
+                    "case_id": str(payload.case_id) if payload.case_id else None,
+                    "success": False,
+                },
+            )
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="analysis_persistence_failed",

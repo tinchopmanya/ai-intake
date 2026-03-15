@@ -12,6 +12,7 @@ from app.api.routers import auth_router
 from app.api.routers import cases_router
 from app.api.routers import events_router
 from app.api.routers import incidents_router
+from app.api.routers import metrics_router
 from app.api.routers import onboarding_router
 from app.api.routers import ocr_router
 from app.services.i18n_service import i18n_service
@@ -45,13 +46,16 @@ async def startup_validation() -> None:
 
 
 app.include_router(health_router)
-if settings.enable_legacy_chat_routes:
+if settings.enable_legacy_chat_routes and not settings.is_validation_env:
     app.include_router(chat_router)
     logger.warning(
         "Legacy compatibility router enabled: /v1/chat and /v1/conversations/* are deprecated."
     )
 else:
-    logger.info("Legacy chat router disabled (ENABLE_LEGACY_CHAT_ROUTES=false).")
+    if settings.is_validation_env:
+        logger.info("Legacy chat router disabled (validation mode).")
+    else:
+        logger.info("Legacy chat router disabled (ENABLE_LEGACY_CHAT_ROUTES=false).")
 app.include_router(auth_router)
 app.include_router(onboarding_router)
 app.include_router(cases_router)
@@ -59,6 +63,7 @@ app.include_router(incidents_router)
 app.include_router(analysis_router)
 app.include_router(advisor_v1_router)
 app.include_router(events_router)
+app.include_router(metrics_router)
 app.include_router(ocr_router)
 
 

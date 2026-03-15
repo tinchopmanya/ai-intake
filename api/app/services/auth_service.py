@@ -38,9 +38,16 @@ class AuthenticatedUser:
     country_code: str
     language_code: str
     onboarding_completed: bool
-    objective: str | None = None
-    has_children: bool | None = None
-    breakup_side: str | None = None
+    relationship_mode: str | None = None
+    user_age: int | None = None
+    ex_partner_name: str | None = None
+    ex_partner_pronoun: str | None = None
+    breakup_time_range: str | None = None
+    children_count_category: str | None = None
+    relationship_goal: str | None = None
+    breakup_initiator: str | None = None
+    custody_type: str | None = None
+    response_style: str | None = None
 
 
 @dataclass(frozen=True)
@@ -239,9 +246,16 @@ class AuthService:
                         country_code=country_code or existing.country_code,
                         language_code=language_code or existing.language_code,
                         onboarding_completed=existing.onboarding_completed,
-                        objective=existing.objective,
-                        has_children=existing.has_children,
-                        breakup_side=existing.breakup_side,
+                        user_age=existing.user_age,
+                        ex_partner_name=existing.ex_partner_name,
+                        ex_partner_pronoun=existing.ex_partner_pronoun,
+                        breakup_time_range=existing.breakup_time_range,
+                        relationship_mode=existing.relationship_mode,
+                        children_count_category=existing.children_count_category,
+                        relationship_goal=existing.relationship_goal,
+                        breakup_initiator=existing.breakup_initiator,
+                        custody_type=existing.custody_type,
+                        response_style=existing.response_style,
                     )
                 else:
                     user = AuthenticatedUser(
@@ -254,9 +268,16 @@ class AuthService:
                         country_code=country_code,
                         language_code=language_code,
                         onboarding_completed=False,
-                        objective=None,
-                        has_children=None,
-                        breakup_side=None,
+                        user_age=None,
+                        ex_partner_name=None,
+                        ex_partner_pronoun=None,
+                        breakup_time_range=None,
+                        relationship_mode=None,
+                        children_count_category=None,
+                        relationship_goal=None,
+                        breakup_initiator=None,
+                        custody_type=None,
+                        response_style=None,
                     )
                 self._memory_users_by_sub[google_sub] = user
                 self._memory_users_by_id[user.id] = user
@@ -449,12 +470,34 @@ class AuthService:
                 if user is None:
                     raise AuthError(status_code=404, detail="user_not_found")
                 return {
-                    "objective": user.objective,
-                    "has_children": user.has_children,
-                    "breakup_side": user.breakup_side,
+                    "display_name": user.name,
+                    "relationship_mode": user.relationship_mode,
+                    "user_age": user.user_age,
+                    "ex_partner_name": user.ex_partner_name,
+                    "ex_partner_pronoun": user.ex_partner_pronoun,
+                    "breakup_time_range": user.breakup_time_range,
+                    "children_count_category": user.children_count_category,
+                    "relationship_goal": user.relationship_goal,
+                    "breakup_initiator": user.breakup_initiator,
+                    "custody_type": user.custody_type,
+                    "response_style": user.response_style,
                     "country_code": user.country_code,
                     "language_code": user.language_code,
-                    "onboarding_completed": user.onboarding_completed,
+                    "onboarding_completed": _is_onboarding_profile_complete(
+                        {
+                            "display_name": user.name,
+                            "relationship_mode": user.relationship_mode,
+                            "user_age": user.user_age,
+                            "ex_partner_name": user.ex_partner_name,
+                            "ex_partner_pronoun": user.ex_partner_pronoun,
+                            "breakup_time_range": user.breakup_time_range,
+                            "children_count_category": user.children_count_category,
+                            "relationship_goal": user.relationship_goal,
+                            "breakup_initiator": user.breakup_initiator,
+                            "custody_type": user.custody_type,
+                            "response_style": user.response_style,
+                        }
+                    ),
                 }
 
         connection = self._open_connection(operation="get_onboarding_profile")
@@ -463,6 +506,11 @@ class AuthService:
             profile = users.get_onboarding_profile(user_id=user_id)
             if profile is None:
                 raise AuthError(status_code=404, detail="user_not_found")
+            profile["onboarding_completed"] = bool(
+                profile.get("onboarding_completed", False)
+            ) and _is_onboarding_profile_complete(
+                profile
+            )
             return profile
         except AuthError:
             raise
@@ -478,9 +526,17 @@ class AuthService:
         self,
         *,
         user_id: UUID,
-        objective: str,
-        has_children: bool,
-        breakup_side: str,
+        user_name: str,
+        user_age: int,
+        ex_partner_name: str,
+        ex_partner_pronoun: str,
+        breakup_time_range: str,
+        relationship_mode: str,
+        children_count_category: str,
+        relationship_goal: str | None,
+        breakup_initiator: str,
+        custody_type: str | None,
+        response_style: str | None,
         country_code: str,
         language_code: str,
     ) -> dict[str, object]:
@@ -497,22 +553,40 @@ class AuthService:
                 updated = AuthenticatedUser(
                     id=user.id,
                     email=user.email,
-                    name=user.name,
+                    name=user_name,
                     memory_opt_in=user.memory_opt_in,
                     locale=f"{normalized_language}-{normalized_country}",
                     picture_url=user.picture_url,
                     country_code=normalized_country,
                     language_code=normalized_language,
                     onboarding_completed=True,
-                    objective=objective,
-                    has_children=has_children,
-                    breakup_side=breakup_side,
+                    relationship_mode=relationship_mode,
+                    user_age=user_age,
+                    ex_partner_name=ex_partner_name,
+                    ex_partner_pronoun=ex_partner_pronoun,
+                    breakup_time_range=breakup_time_range,
+                    children_count_category=children_count_category,
+                    relationship_goal=relationship_goal,
+                    breakup_initiator=breakup_initiator,
+                    custody_type=custody_type,
+                    response_style=response_style,
                 )
                 self._memory_users_by_id[user_id] = updated
+                for google_sub, cached_user in list(self._memory_users_by_sub.items()):
+                    if cached_user.id == user_id:
+                        self._memory_users_by_sub[google_sub] = updated
                 return {
-                    "objective": updated.objective,
-                    "has_children": updated.has_children,
-                    "breakup_side": updated.breakup_side,
+                    "display_name": updated.name,
+                    "relationship_mode": updated.relationship_mode,
+                    "user_age": updated.user_age,
+                    "ex_partner_name": updated.ex_partner_name,
+                    "ex_partner_pronoun": updated.ex_partner_pronoun,
+                    "breakup_time_range": updated.breakup_time_range,
+                    "children_count_category": updated.children_count_category,
+                    "relationship_goal": updated.relationship_goal,
+                    "breakup_initiator": updated.breakup_initiator,
+                    "custody_type": updated.custody_type,
+                    "response_style": updated.response_style,
                     "country_code": updated.country_code,
                     "language_code": updated.language_code,
                     "onboarding_completed": updated.onboarding_completed,
@@ -523,9 +597,17 @@ class AuthService:
             users = UserRepository(connection)
             updated = users.update_onboarding_profile(
                 user_id=user_id,
-                objective=objective,
-                has_children=has_children,
-                breakup_side=breakup_side,
+                relationship_mode=relationship_mode,
+                user_name=user_name,
+                user_age=user_age,
+                ex_partner_name=ex_partner_name,
+                ex_partner_pronoun=ex_partner_pronoun,
+                breakup_time_range=breakup_time_range,
+                children_count_category=children_count_category,
+                relationship_goal=relationship_goal,
+                breakup_initiator=breakup_initiator,
+                custody_type=custody_type,
+                response_style=response_style,
                 country_code=normalized_country,
                 language_code=normalized_language,
             )
@@ -579,6 +661,23 @@ def _extract_bearer_token(bearer_header: str | None) -> str | None:
 
 
 def _map_user_row(row: dict[str, Any]) -> AuthenticatedUser:
+    relationship_mode = row.get("relationship_mode")
+    children_count_category = row.get("children_count_category")
+    onboarding_completed = bool(row.get("onboarding_completed", False)) and _is_onboarding_profile_complete(
+        {
+            "display_name": row.get("display_name"),
+            "relationship_mode": relationship_mode,
+            "user_age": row.get("user_age"),
+            "ex_partner_name": row.get("ex_partner_name"),
+            "ex_partner_pronoun": row.get("ex_partner_pronoun"),
+            "breakup_time_range": row.get("breakup_time_range"),
+            "children_count_category": children_count_category,
+            "relationship_goal": row.get("relationship_goal"),
+            "breakup_initiator": row.get("breakup_initiator"),
+            "custody_type": row.get("custody_type"),
+            "response_style": row.get("response_style"),
+        }
+    )
     return AuthenticatedUser(
         id=UUID(str(row["id"])),
         email=str(row["email"]),
@@ -588,10 +687,17 @@ def _map_user_row(row: dict[str, Any]) -> AuthenticatedUser:
         picture_url=row.get("picture_url"),
         country_code=str(row.get("country_code") or "UY"),
         language_code=str(row.get("language_code") or "es"),
-        onboarding_completed=bool(row.get("onboarding_completed", False)),
-        objective=row.get("objective"),
-        has_children=row.get("has_children"),
-        breakup_side=row.get("breakup_side"),
+        onboarding_completed=onboarding_completed,
+        relationship_mode=relationship_mode,
+        user_age=row.get("user_age"),
+        ex_partner_name=row.get("ex_partner_name"),
+        ex_partner_pronoun=row.get("ex_partner_pronoun"),
+        breakup_time_range=row.get("breakup_time_range"),
+        children_count_category=children_count_category,
+        relationship_goal=row.get("relationship_goal"),
+        breakup_initiator=row.get("breakup_initiator"),
+        custody_type=row.get("custody_type"),
+        response_style=row.get("response_style"),
     )
 
 
@@ -620,3 +726,34 @@ def _is_db_connection_error(exc: Exception) -> bool:
     ):
         return True
     return False
+
+
+def _is_onboarding_profile_complete(profile: dict[str, Any]) -> bool:
+    required_base = (
+        profile.get("display_name"),
+        profile.get("relationship_mode"),
+        profile.get("user_age"),
+        profile.get("ex_partner_name"),
+        profile.get("ex_partner_pronoun"),
+        profile.get("breakup_time_range"),
+        profile.get("breakup_initiator"),
+    )
+    if any(value in (None, "") for value in required_base):
+        return False
+
+    mode = profile.get("relationship_mode")
+    children_count_category = profile.get("children_count_category")
+    if mode == "coparenting":
+        if children_count_category not in {"one", "two_plus"}:
+            return False
+        if profile.get("custody_type") in (None, ""):
+            return False
+        if profile.get("response_style") in (None, ""):
+            return False
+        return True
+
+    if mode != "relationship_separation":
+        return False
+    if children_count_category != "none":
+        return False
+    return profile.get("relationship_goal") not in (None, "")

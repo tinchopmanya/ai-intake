@@ -3,13 +3,25 @@
 import Image from "next/image";
 import { type ChangeEvent, useEffect, useState } from "react";
 
+import { AdvisorChatModal } from "@/components/mvp/AdvisorChatModal";
 import { AdvisorProfileModal } from "@/components/mvp/AdvisorProfileModal";
 import { Button, Panel, Select, Textarea } from "@/components/mvp/ui";
+import { CaseTimeline } from "@/components/cases/CaseTimeline";
 import { AdvisorAvatarItem } from "@/components/ui/AdvisorAvatarItem";
 import { ADVISOR_PROFILES } from "@/data/advisors";
 import { authFetch } from "@/lib/auth/client";
 import { hasStoredSession } from "@/lib/auth/client";
-import { getCases, postAdvisor, postAnalysis, postCase, postIncident, postWizardEvent } from "@/lib/api/client";
+import { toUiErrorMessage } from "@/lib/api/errors";
+import {
+  downloadCaseExport,
+  getCases,
+  getIncidents,
+  patchIncident,
+  postAdvisor,
+  postAnalysis,
+  postIncident,
+  postWizardEvent,
+} from "@/lib/api/client";
 import type { AdvisorProfile } from "@/data/advisors";
 import { API_URL } from "@/lib/config";
 import { resolveRuntimeLocale, tRuntime } from "@/lib/i18n/runtime";
@@ -18,8 +30,8 @@ import type {
   AnalysisResponse,
   AnalysisRiskFlag,
   CaseSummary,
+  IncidentSummary,
   IncidentType,
-  RelationshipType,
   OcrCapabilitiesResponse,
   OcrExtractResponse,
   UsageMode,
@@ -32,13 +44,20 @@ const ADVISOR_FALLBACK_VISUAL = {
   avatar64: "/advisors/generic.svg",
 };
 
-const RECENT_PEOPLE = [
-  { id: "marcela", name: "Marcela", context: "Ex pareja" },
-  { id: "maria", name: "Maria", context: "Amiga" },
-  { id: "julio", name: "Julio", context: "Jefe" },
+const responseStyleBadgeByIndex = ["Empatica", "Estrategica", "Directa"] as const;
+const responseStyleOptions = [
+  { value: "cordial", label: "Cordial" },
+  { value: "firme_respetuoso", label: "Firme pero respetuoso" },
+  { value: "amigable", label: "Amigable" },
 ] as const;
 
-const responseStyleBadgeByIndex = ["Empatica", "Estrategica", "Directa"] as const;
+type ChatSender = "incoming" | "outgoing";
+type ResponseTone = (typeof responseStyleOptions)[number]["value"];
+type ConversationMessage = {
+  id: string;
+  sender: ChatSender;
+  text: string;
+};
 
 type AnalysisStatusKind = "ok" | "observation" | "risk";
 
@@ -110,6 +129,24 @@ function resolveOcrErrorMessage(detail?: string, message?: string): string {
 
 function getAdvisorVisualByIndex(index: number) {
   return ADVISOR_PROFILES[index] ?? ADVISOR_FALLBACK_VISUAL;
+}
+
+function formatConversationForAdvisorContext(
+  history: ConversationMessage[],
+  latestIncomingMessage: string,
+): string {
+  const lines: string[] = [];
+  for (const item of history) {
+    const prefix = item.sender === "incoming" ? "Ex-partner" : "User";
+    const text = item.text.trim();
+    if (!text) continue;
+    lines.push(`${prefix}: ${text}`);
+  }
+  const latest = latestIncomingMessage.trim();
+  if (latest) {
+    lines.push(`Ex-partner: ${latest}`);
+  }
+  return lines.join("\n");
 }
 
 /**
@@ -272,8 +309,12 @@ export function WizardScaffold() {
   const [advisorError, setAdvisorError] = useState<string | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [contextOptional, setContextOptional] = useState("");
-  const [selectedRecentPersonId, setSelectedRecentPersonId] = useState<string | null>(null);
+  const [responseTone, setResponseTone] = useState<ResponseTone>("cordial");
   const [selectedProfile, setSelectedProfile] = useState<AdvisorProfile | null>(null);
+  const [conversationHistory, setConversationHistory] = useState<ConversationMessage[]>([]);
+  const [historyInputOpen, setHistoryInputOpen] = useState(false);
+  const [historySender, setHistorySender] = useState<ChatSender>("incoming");
+  const [historyMessageText, setHistoryMessageText] = useState("");
   const [ocrImageFile, setOcrImageFile] = useState<File | null>(null);
   const [ocrImagePreviewUrl, setOcrImagePreviewUrl] = useState<string | null>(null);
   const [ocrLoading, setOcrLoading] = useState(false);
@@ -281,11 +322,7 @@ export function WizardScaffold() {
   const [ocrInfo, setOcrInfo] = useState<OcrExtractResponse | null>(null);
   const [ocrCapabilities, setOcrCapabilities] = useState<OcrCapabilitiesResponse | null>(null);
   const [ocrCapabilitiesLoading, setOcrCapabilitiesLoading] = useState(true);
-  const [cases, setCases] = useState<CaseSummary[]>([]);
-  const [casesLoading, setCasesLoading] = useState(true);
-  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
-  const [newCaseTitle, setNewCaseTitle] = useState("");
-  const [newCaseContactName, setNewCaseContactName] = useState("");
+  const [activeCase, setActiveCase] = useState<CaseSummary | null>(null);
   const [caseError, setCaseError] = useState<string | null>(null);
   const [incidentType, setIncidentType] = useState<IncidentType>("other");
   const [incidentTitle, setIncidentTitle] = useState("");
@@ -294,10 +331,19 @@ export function WizardScaffold() {
   const [incidentVisible, setIncidentVisible] = useState(false);
   const [incidentSaving, setIncidentSaving] = useState(false);
   const [incidentNotice, setIncidentNotice] = useState<string | null>(null);
-
-  const selectedRecentPerson =
-    RECENT_PEOPLE.find((person) => person.id === selectedRecentPersonId) ?? null;
-  const activeCase = cases.find((item) => item.id === selectedCaseId) ?? null;
+  const [exportingCase, setExportingCase] = useState(false);
+  const [caseIncidents, setCaseIncidents] = useState<IncidentSummary[]>([]);
+  const [incidentsLoading, setIncidentsLoading] = useState(false);
+  const [incidentsError, setIncidentsError] = useState<string | null>(null);
+  const [confirmingIncidentId, setConfirmingIncidentId] = useState<string | null>(null);
+  const [advisorChatOpen, setAdvisorChatOpen] = useState(false);
+  const [advisorChatIndex, setAdvisorChatIndex] = useState<number | null>(null);
+  const [advisorChatInput, setAdvisorChatInput] = useState("");
+  const [advisorChatSending, setAdvisorChatSending] = useState(false);
+  const [advisorChatMessages, setAdvisorChatMessages] = useState<
+    Array<{ id: string; role: "user" | "advisor"; text: string }>
+  >([]);
+  const selectedCaseId = activeCase?.id ?? null;
 
   useEffect(() => {
     if (!ocrImageFile) {
@@ -346,21 +392,47 @@ export function WizardScaffold() {
 
   useEffect(() => {
     let mounted = true;
+    async function loadCaseIncidents() {
+      if (!selectedCaseId) {
+        setCaseIncidents([]);
+        setIncidentsError(null);
+        setIncidentsLoading(false);
+        return;
+      }
+      setIncidentsLoading(true);
+      setIncidentsError(null);
+      try {
+        const payload = await getIncidents(selectedCaseId);
+        if (!mounted) return;
+        setCaseIncidents(payload.incidents);
+      } catch (exc) {
+        if (!mounted) return;
+        setIncidentsError(toUiErrorMessage(exc, "No se pudieron cargar incidentes del caso."));
+      } finally {
+        if (mounted) setIncidentsLoading(false);
+      }
+    }
+    void loadCaseIncidents();
+    return () => {
+      mounted = false;
+    };
+  }, [selectedCaseId]);
+
+  useEffect(() => {
+    let mounted = true;
     async function loadCases() {
-      setCasesLoading(true);
       setCaseError(null);
       try {
         const response = await getCases();
         if (!mounted) return;
-        setCases(response.cases);
-        if (response.cases.length > 0) {
-          setSelectedCaseId((current) => current ?? response.cases[0].id);
+        const defaultCase = response.cases[0] ?? null;
+        setActiveCase(defaultCase);
+        if (!defaultCase) {
+          setCaseError("No se encontro contexto de caso para este usuario.");
         }
-      } catch {
+      } catch (exc) {
         if (!mounted) return;
-        setCaseError("No se pudo cargar la memoria de casos.");
-      } finally {
-        if (mounted) setCasesLoading(false);
+        setCaseError(toUiErrorMessage(exc, "No se pudo cargar el contexto del caso."));
       }
     }
     void loadCases();
@@ -377,7 +449,23 @@ export function WizardScaffold() {
   function buildContextPayload() {
     const context: Record<string, unknown> = {};
     if (contextOptional.trim()) context.contact_context = contextOptional.trim();
-    if (selectedRecentPerson) context.recent_person = selectedRecentPerson.name;
+    context.user_style = responseTone;
+    const structuredConversation = formatConversationForAdvisorContext(
+      conversationHistory,
+      messageText,
+    );
+    if (structuredConversation) {
+      context.conversation_structured = structuredConversation;
+    }
+    if (messageText.trim()) {
+      context.latest_ex_partner_message = messageText.trim();
+    }
+    if (conversationHistory.length > 0) {
+      context.conversation_history = conversationHistory.map((item) => ({
+        sender: item.sender,
+        text: item.text,
+      }));
+    }
     return Object.keys(context).length > 0 ? context : undefined;
   }
 
@@ -459,8 +547,8 @@ export function WizardScaffold() {
       });
       setAnalysisResult(result);
       setAnalysisId(result.analysis_id);
-    } catch {
-      setAnalysisError("No se pudo ejecutar el analisis.");
+    } catch (exc) {
+      setAnalysisError(toUiErrorMessage(exc, "No se pudo ejecutar el analisis."));
     } finally {
       setLoadingAnalysis(false);
     }
@@ -490,8 +578,8 @@ export function WizardScaffold() {
       });
       setAdvisorResult(result);
       setCurrentStep(3);
-    } catch {
-      setAdvisorError("No se pudo generar respuestas de advisor.");
+    } catch (exc) {
+      setAdvisorError(toUiErrorMessage(exc, "No se pudo generar respuestas de advisor."));
     } finally {
       setLoadingAdvisor(false);
     }
@@ -527,31 +615,16 @@ export function WizardScaffold() {
     setAnalysisError(null);
     setAdvisorResult(null);
     setAdvisorError(null);
-    setSelectedRecentPersonId(null);
     setCopiedIndex(null);
     setOcrImageFile(null);
     setOcrInfo(null);
     setOcrError(null);
     setOcrLoading(false);
-  }
-
-  async function handleCreateCase() {
-    const title = newCaseTitle.trim();
-    if (!title) return;
-    setCaseError(null);
-    try {
-      const created = await postCase({
-        title,
-        contact_name: newCaseContactName.trim() || undefined,
-        relationship_type: "otro" as RelationshipType,
-      });
-      setCases((prev) => [created, ...prev.filter((item) => item.id !== created.id)]);
-      setSelectedCaseId(created.id);
-      setNewCaseTitle("");
-      setNewCaseContactName("");
-    } catch {
-      setCaseError("No se pudo crear el caso.");
-    }
+    setConversationHistory([]);
+    setHistoryInputOpen(false);
+    setHistorySender("incoming");
+    setHistoryMessageText("");
+    setResponseTone("cordial");
   }
 
   function suggestIncidentType(): IncidentType {
@@ -581,7 +654,7 @@ export function WizardScaffold() {
 
   async function handleRegisterIncident() {
     if (!selectedCaseId) {
-      setIncidentNotice("Selecciona un caso activo para registrar el evento.");
+      setIncidentNotice("Necesitas contexto de caso para registrar el evento.");
       return;
     }
     const normalizedTitle = incidentTitle.trim();
@@ -589,7 +662,7 @@ export function WizardScaffold() {
     setIncidentSaving(true);
     setIncidentNotice(null);
     try {
-      await postIncident({
+      const created = await postIncident({
         case_id: selectedCaseId,
         incident_type: incidentType,
         title: normalizedTitle,
@@ -599,14 +672,115 @@ export function WizardScaffold() {
         related_session_id: advisorResult?.session_id ?? undefined,
         incident_date: incidentDate,
       });
-      setIncidentNotice("Evento registrado en el caso activo.");
+      setCaseIncidents((previous) => [created, ...previous.filter((item) => item.id !== created.id)]);
+      setIncidentNotice("Evento registrado en el contexto actual.");
       setIncidentVisible(false);
       setIncidentTitle("");
       setIncidentDescription("");
-    } catch {
-      setIncidentNotice("No se pudo registrar el evento.");
+    } catch (exc) {
+      setIncidentNotice(toUiErrorMessage(exc, "No se pudo registrar el evento."));
     } finally {
       setIncidentSaving(false);
+    }
+  }
+
+  async function handleConfirmIncident(incidentId: string) {
+    if (confirmingIncidentId) return;
+    setConfirmingIncidentId(incidentId);
+    setIncidentsError(null);
+    try {
+      const updated = await patchIncident(incidentId, { confirmed: true });
+      setCaseIncidents((previous) =>
+        previous.map((item) => (item.id === incidentId ? updated : item)),
+      );
+    } catch (exc) {
+      setIncidentsError(toUiErrorMessage(exc, "No se pudo confirmar el incidente."));
+    } finally {
+      setConfirmingIncidentId(null);
+    }
+  }
+
+  async function handleExportCase() {
+    if (!selectedCaseId || exportingCase) return;
+    setExportingCase(true);
+    setCaseError(null);
+    try {
+      await downloadCaseExport(selectedCaseId);
+    } catch (exc) {
+      setCaseError(toUiErrorMessage(exc, "No se pudo exportar el caso."));
+    } finally {
+      setExportingCase(false);
+    }
+  }
+
+  function handleAddHistoryMessage() {
+    const normalized = historyMessageText.trim();
+    if (!normalized) return;
+    const message: ConversationMessage = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      sender: historySender,
+      text: normalized,
+    };
+    setConversationHistory((prev) => [...prev, message]);
+    setHistoryMessageText("");
+    setHistoryInputOpen(false);
+  }
+
+  function openAdvisorChat(index: number) {
+    if (!advisorResult?.responses[index]?.text) return;
+    setAdvisorChatIndex(index);
+    setAdvisorChatMessages([
+      {
+        id: `advisor-initial-${index}`,
+        role: "advisor",
+        text: advisorResult.responses[index]!.text,
+      },
+    ]);
+    setAdvisorChatInput("");
+    setAdvisorChatOpen(true);
+  }
+
+  async function handleSendAdvisorRefinement() {
+    if (advisorChatIndex === null || !advisorResult || advisorChatSending) return;
+    const instruction = advisorChatInput.trim();
+    if (!instruction) return;
+    const baseText = advisorResult.responses[advisorChatIndex]?.text ?? "";
+    if (!baseText) return;
+
+    setAdvisorChatSending(true);
+    try {
+      const refinementPrompt = `Mensaje base:\n${baseText}\n\nInstruccion del usuario:\n${instruction}`;
+      const result = await postAdvisor({
+        message_text: refinementPrompt,
+        mode,
+        relationship_type: "otro",
+        case_id: selectedCaseId ?? undefined,
+        source_type: "text",
+        quick_mode: true,
+        save_session: false,
+        context: buildContextPayload(),
+      });
+      const refinedText = result.responses[advisorChatIndex]?.text ?? result.responses[0]?.text ?? baseText;
+      setAdvisorResult((previous) => {
+        if (!previous) return previous;
+        const nextResponses = [...previous.responses];
+        if (!nextResponses[advisorChatIndex]) return previous;
+        nextResponses[advisorChatIndex] = {
+          ...nextResponses[advisorChatIndex],
+          text: refinedText,
+        };
+        return { ...previous, responses: nextResponses };
+      });
+      setAdvisorChatMessages((previous) => [
+        ...previous,
+        { id: `u-${Date.now()}`, role: "user", text: instruction },
+        { id: `a-${Date.now() + 1}`, role: "advisor", text: refinedText },
+      ]);
+      setAdvisorChatInput("");
+    } catch (exc) {
+      setAdvisorError(toUiErrorMessage(exc, "No se pudo refinar la respuesta de este adviser."));
+    } finally {
+      setAdvisorChatSending(false);
     }
   }
 
@@ -648,102 +822,42 @@ export function WizardScaffold() {
 
       {currentStep === 1 ? (
         <div className="space-y-4">
-          <div className="space-y-3">
-            <div className="rounded-2xl border border-[#dbe3ec] bg-[#f8fafc] p-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm font-semibold text-[#1f2937]">Caso activo</span>
-                {activeCase ? (
-                  <span className="rounded-full bg-white px-2 py-0.5 text-xs text-[#334155]">
-                    {activeCase.title}
-                  </span>
-                ) : (
-                  <span className="rounded-full bg-white px-2 py-0.5 text-xs text-gray-500">
-                    Sin caso
-                  </span>
-                )}
+          <div className="rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#64748B]">Contexto del caso</p>
+                <p className="text-sm font-semibold text-[#0F172A]">
+                  {activeCase?.title || "Sin contexto disponible"}
+                </p>
               </div>
-              <div className="mt-2 grid gap-2 md:grid-cols-[minmax(0,1fr)_170px]">
-                <Select
-                  value={selectedCaseId ?? ""}
-                  onChange={(event) => setSelectedCaseId(event.target.value || null)}
-                  disabled={casesLoading}
-                  className="border-[#e5e7eb] bg-white text-[#1f2937]"
-                >
-                  <option value="">Sin caso activo</option>
-                  {cases.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.title}
-                    </option>
-                  ))}
-                </Select>
-                <div className="text-xs text-[#475569]">
-                  {activeCase?.summary ? activeCase.summary : "No hay resumen del caso aun."}
-                </div>
-              </div>
-              <div className="mt-2 grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-                <input
-                  type="text"
-                  value={newCaseTitle}
-                  onChange={(event) => setNewCaseTitle(event.target.value)}
-                  placeholder="Nuevo caso (ej: Coordinacion colegio)"
-                  className="rounded-lg border border-[#e5e7eb] bg-white px-3 py-2 text-sm text-[#1f2937]"
-                />
-                <input
-                  type="text"
-                  value={newCaseContactName}
-                  onChange={(event) => setNewCaseContactName(event.target.value)}
-                  placeholder="Contacto (opcional)"
-                  className="rounded-lg border border-[#e5e7eb] bg-white px-3 py-2 text-sm text-[#1f2937]"
-                />
-                <Button
-                  type="button"
-                  onClick={() => void handleCreateCase()}
-                  disabled={!newCaseTitle.trim()}
-                  variant="secondary"
-                  className="border-[#cbd5e1] bg-white text-[#334155]"
-                >
-                  Crear caso
-                </Button>
-              </div>
-              {caseError ? <p className="mt-2 text-xs text-red-700">{caseError}</p> : null}
+              <Button
+                type="button"
+                onClick={() => void handleExportCase()}
+                disabled={!selectedCaseId || exportingCase}
+                variant="secondary"
+                className="border-[#CBD5E1] bg-white text-[#334155]"
+              >
+                {exportingCase ? "Exportando..." : "Exportar caso"}
+              </Button>
             </div>
-            <div>
-              <h3 className="text-lg font-semibold text-[#1f2937]">{t("wizard.step1.title")}</h3>
-              <p className="mt-1 text-sm text-[#334155]">
-                {t("wizard.step1.subtitle")}
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[#334155]">
-              <span className="font-medium text-[#1f2937]">Responderas con ayuda de</span>
-              {ADVISOR_PROFILES.map((advisor) => (
-                <button
-                  key={advisor.id}
-                  type="button"
-                  onClick={() => openAdvisorProfileById(advisor.id)}
-                  className="flex items-center gap-2 rounded-full px-1 py-0.5 text-left transition hover:bg-[#f8fafc] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/20"
-                  aria-label={`Abrir perfil de ${advisor.name}`}
-                >
-                  <Image
-                    src={advisor.avatar64}
-                    alt={advisor.name}
-                    width={28}
-                    height={28}
-                    className="h-7 w-7 rounded-full border border-[#dbe3ec] object-cover"
-                  />
-                  <span>{advisor.name}</span>
-                </button>
-              ))}
-            </div>
+            {activeCase?.summary ? (
+              <p className="mt-2 text-xs text-[#475569]">{activeCase.summary}</p>
+            ) : null}
+            {caseError ? <p className="mt-2 text-xs text-red-700">{caseError}</p> : null}
           </div>
 
-          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_260px] md:items-start">
-            <div className="min-w-0 space-y-3">
+          <div>
+            <h3 className="text-lg font-semibold text-[#1f2937]">Mensaje recibido</h3>
+            <p className="mt-1 text-sm text-[#334155]">
+              Escribe el mensaje y agrega contexto para generar respuestas mas claras.
+            </p>
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-2">
+            <section className="min-w-0 space-y-3 rounded-2xl border border-[#E2E8F0] bg-white p-4">
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-[#1f2937]">
-                  {t("wizard.input.message")}
-                </label>
-                <div className="rounded-xl border border-dashed border-[#cbd5e1] bg-[#f8fafc] p-3">
+                <label className="block text-sm font-medium text-[#1f2937]">Mensaje recibido</label>
+                <div className="rounded-xl border border-dashed border-[#CBD5E1] bg-[#F8FAFC] p-3">
                   <div className="flex flex-wrap items-center gap-2">
                     <input
                       type="file"
@@ -761,7 +875,7 @@ export function WizardScaffold() {
                         ocrCapabilities?.available === false
                       }
                       variant="secondary"
-                      className="border-[#cbd5e1] bg-white px-3 py-1.5 text-xs text-[#334155]"
+                      className="border-[#CBD5E1] bg-white px-3 py-1.5 text-xs text-[#334155]"
                     >
                       {ocrLoading
                         ? "Leyendo texto..."
@@ -772,8 +886,7 @@ export function WizardScaffold() {
                   </div>
                   {ocrCapabilities?.available === false ? (
                     <p className="mt-2 text-xs text-amber-700">
-                      OCR no disponible:{" "}
-                      {resolveOcrErrorMessage(ocrCapabilities.reason_codes[0])}
+                      OCR no disponible: {resolveOcrErrorMessage(ocrCapabilities.reason_codes[0])}
                     </p>
                   ) : null}
                   {ocrImagePreviewUrl ? (
@@ -782,15 +895,13 @@ export function WizardScaffold() {
                       alt="Preview OCR"
                       width={560}
                       height={260}
-                      className="mt-3 max-h-56 w-full rounded-lg border border-[#dbe3ec] object-contain"
+                      className="mt-3 max-h-56 w-full rounded-lg border border-[#DBE3EC] object-contain"
                     />
                   ) : null}
                   {ocrInfo ? (
                     <p className="mt-2 text-xs text-[#334155]">
                       Texto cargado desde imagen ({ocrInfo.provider})
-                      {ocrInfo.confidence !== null
-                        ? `, confianza ${(ocrInfo.confidence * 100).toFixed(1)}%`
-                        : ""}
+                      {ocrInfo.confidence !== null ? `, confianza ${(ocrInfo.confidence * 100).toFixed(1)}%` : ""}
                     </p>
                   ) : null}
                   {ocrError ? <p className="mt-2 text-xs text-red-700">{ocrError}</p> : null}
@@ -799,49 +910,49 @@ export function WizardScaffold() {
                   value={messageText}
                   onChange={(event) => setMessageText(event.target.value)}
                   rows={6}
-                  placeholder="Pega aqui el mensaje o revisa el texto leido desde la imagen..."
-                  className="min-h-[164px] rounded-xl border-[#e5e7eb] bg-white text-[#1f2937] focus:border-[#3b82f6] focus:ring-[#3b82f6]/20"
+                  placeholder="Pega aquí el mensaje que recibiste o copia la conversación de WhatsApp"
+                  className="min-h-[170px] rounded-xl border-[#E2E8F0] bg-white text-[#1F2937]"
                 />
               </div>
 
-              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_240px] md:items-end">
-                <div className="space-y-2">
-                    <label className="block text-sm font-medium text-[#1f2937]">
-                      {t("wizard.input.context_optional")}
-                    </label>
-                  <Textarea
-                    value={contextOptional}
-                    onChange={(event) => setContextOptional(event.target.value)}
-                    rows={2}
-                    placeholder="Ej: quiero responder con firmeza sin escalar"
-                    className="border-[#e5e7eb] bg-white text-[#1f2937]"
-                  />
-                </div>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-[#1f2937]">Contexto adicional (opcional)</label>
+                <Textarea
+                  value={contextOptional}
+                  onChange={(event) => setContextOptional(event.target.value)}
+                  rows={3}
+                  placeholder="Escribe lo que creas necesario para que entendamos mejor la conversación"
+                  className="border-[#E2E8F0] bg-white text-[#1F2937]"
+                />
+              </div>
 
-                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] md:grid-cols-1">
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium text-[#1f2937]">
-                      {t("wizard.input.mode")}
-                    </label>
-                    <Select
-                      value={mode}
-                      onChange={(event) => setMode(event.target.value as UsageMode)}
-                      className="max-w-full border-[#e5e7eb] bg-white text-[#1f2937]"
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-[#1f2937]">Modo de respuesta</label>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {responseStyleOptions.map((item) => (
+                    <button
+                      key={item.value}
+                      type="button"
+                      onClick={() => setResponseTone(item.value)}
+                      className={`rounded-xl border px-3 py-2 text-sm font-medium transition ${
+                        responseTone === item.value
+                          ? "border-[#3B82F6] bg-[#EFF6FF] text-[#1E3A8A]"
+                          : "border-[#E2E8F0] bg-white text-[#334155] hover:border-[#CBD5E1] hover:bg-[#F8FAFC]"
+                      }`}
                     >
-                      <option value="reactive">Reactivo</option>
-                      <option value="preventive">Preventivo</option>
-                    </Select>
-                  </div>
+                      {item.label}
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              <div className="flex min-h-10 flex-wrap items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3 pt-1">
                 <Button
                   type="button"
                   onClick={handleContinueFromStep1}
                   disabled={!messageText.trim() || loadingAnalysis}
                   variant="primary"
-                  className="min-w-[170px] bg-[#1f2937] hover:bg-[#111827]"
+                  className="min-w-[170px] bg-[#1F2937] hover:bg-[#111827]"
                 >
                   {loadingAnalysis ? t("wizard.button.analyzing") : t("wizard.button.continue")}
                 </Button>
@@ -853,50 +964,136 @@ export function WizardScaffold() {
                   }}
                   disabled={!messageText.trim() || loadingAdvisor}
                   variant="secondary"
-                  className="min-w-[170px] border-[#cbd5e1] bg-white text-[#334155] hover:bg-[#f8fafc]"
+                  className="min-w-[170px] border-[#CBD5E1] bg-white text-[#334155] hover:bg-[#F8FAFC]"
                 >
                   {loadingAdvisor ? t("wizard.button.generating") : t("wizard.button.quick_reply")}
                 </Button>
               </div>
+              {advisorError ? <p className="text-sm text-red-700">{advisorError}</p> : null}
+            </section>
 
-              <div className="min-h-5">
-                {advisorError ? <p className="text-sm text-red-700">{advisorError}</p> : null}
+            <section className="min-w-0 space-y-3 rounded-2xl border border-[#E2E8F0] bg-white p-4">
+              <div className="flex items-center justify-between gap-2">
+                <h4 className="text-sm font-semibold text-[#0F172A]">Historial conversacion</h4>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setHistoryInputOpen((prev) => !prev)}
+                  className="border-[#CBD5E1] bg-white px-3 py-1.5 text-xs text-[#334155]"
+                >
+                  Agregar mensaje previo
+                </Button>
               </div>
-            </div>
 
-            <aside className="rounded-2xl border border-[#e5e7eb] bg-[#f8fafc] p-3">
-              <h4 className="text-sm font-semibold text-[#1f2937]">Personas recientes</h4>
-              <ul className="mt-3 space-y-2">
-                {RECENT_PEOPLE.map((person) => {
-                  const isSelected = selectedRecentPersonId === person.id;
-                  return (
-                    <li key={person.id}>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedRecentPersonId(person.id)}
-                        className={`w-full rounded-xl border px-3 py-2 text-left text-sm transition ${
-                          isSelected
-                            ? "border-[#cbd5e1] bg-white text-[#1f2937]"
-                            : "border-transparent bg-white/60 text-[#334155] hover:border-[#dbe3ec] hover:bg-white"
-                        }`}
-                      >
-                        <span className="block font-medium">{person.name}</span>
-                        <span className="block text-xs text-gray-500">{person.context}</span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-              <div className="mt-3 min-h-5">
-                {selectedRecentPerson ? (
-                  <p className="text-xs text-[#334155]">
-                    Asociado a <span className="font-medium">{selectedRecentPerson.name}</span>.
+              <div className="max-h-[340px] space-y-2 overflow-y-auto rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-3">
+                {conversationHistory.length === 0 && !messageText.trim() ? (
+                  <p className="text-xs text-[#64748B]">
+                    Agrega mensajes previos para dar contexto visual a la conversacion.
                   </p>
+                ) : null}
+                {conversationHistory.map((item) => (
+                  <div
+                    key={item.id}
+                    className={`max-w-[86%] rounded-2xl px-3 py-2 text-sm leading-6 ${
+                      item.sender === "incoming"
+                        ? "mr-auto bg-[#EEF2F7] text-[#0F172A]"
+                        : "ml-auto bg-[#DBEAFE] text-[#1E3A8A]"
+                    }`}
+                  >
+                    {item.text}
+                  </div>
+                ))}
+                {messageText.trim() ? (
+                  <div className="max-w-[86%] rounded-2xl bg-[#EEF2F7] px-3 py-2 text-sm leading-6 text-[#0F172A]">
+                    {messageText.trim()}
+                  </div>
+                ) : null}
+              </div>
+
+              {historyInputOpen ? (
+                <div className="space-y-2 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-3">
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-[#64748B]">
+                    Mensaje de
+                  </label>
+                  <Select
+                    value={historySender}
+                    onChange={(event) => setHistorySender(event.target.value as ChatSender)}
+                    className="border-[#E2E8F0] bg-white text-[#1F2937]"
+                  >
+                    <option value="incoming">Mi expareja</option>
+                    <option value="outgoing">Yo</option>
+                  </Select>
+                  <Textarea
+                    value={historyMessageText}
+                    onChange={(event) => setHistoryMessageText(event.target.value)}
+                    rows={3}
+                    placeholder="Escribe el mensaje previo"
+                    className="border-[#E2E8F0] bg-white text-[#1F2937]"
+                  />
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      onClick={handleAddHistoryMessage}
+                      disabled={!historyMessageText.trim()}
+                      variant="secondary"
+                      className="border-[#CBD5E1] bg-white text-[#334155]"
+                    >
+                      Guardar mensaje
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-3">
+                <p className="text-sm font-semibold text-[#1F2937]">Case Context</p>
+                {!selectedCaseId ? (
+                  <p className="mt-2 text-xs text-[#475569]">Sin contexto disponible.</p>
                 ) : (
-                  <p className="text-xs text-gray-500">Seleccion opcional para dar mas contexto.</p>
+                  <div className="mt-2 grid gap-3 lg:grid-cols-2">
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold text-[#1f2937]">Timeline</p>
+                      <CaseTimeline caseId={selectedCaseId} />
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold text-[#1f2937]">Incidents</p>
+                      {incidentsLoading ? (
+                        <p className="text-xs text-[#475569]">Cargando incidentes...</p>
+                      ) : incidentsError ? (
+                        <p className="text-xs text-red-700">{incidentsError}</p>
+                      ) : caseIncidents.length === 0 ? (
+                        <p className="text-xs text-[#475569]">Sin incidentes para este caso.</p>
+                      ) : (
+                        <ul className="space-y-2">
+                          {caseIncidents.map((incident) => (
+                            <li key={incident.id} className="rounded-lg border border-[#E2E8F0] bg-white p-2 text-xs text-[#334155]">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <span className="font-medium text-[#1f2937]">{incident.incident_type}</span>
+                                <span>{new Date(incident.incident_date).toLocaleDateString()}</span>
+                              </div>
+                              <p className="mt-1">{incident.title}</p>
+                              <div className="mt-2 flex items-center justify-between">
+                                <span>{incident.confirmed ? "Confirmado" : "Pendiente confirmar"}</span>
+                                {!incident.confirmed ? (
+                                  <Button
+                                    type="button"
+                                    variant="secondary"
+                                    className="border-[#CBD5E1] bg-white text-[#334155]"
+                                    disabled={confirmingIncidentId === incident.id}
+                                    onClick={() => void handleConfirmIncident(incident.id)}
+                                  >
+                                    {confirmingIncidentId === incident.id ? "Confirmando..." : "Confirm incident"}
+                                  </Button>
+                                ) : null}
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
-            </aside>
+            </section>
           </div>
         </div>
       ) : null}
@@ -1087,11 +1284,15 @@ export function WizardScaffold() {
             {Array.from({ length: 3 }).map((_, index) => {
               const advisorVisual = getAdvisorVisualByIndex(index);
               const responseText = advisorResult?.responses[index]?.text ?? "";
+              const isRecommended = index === 0;
 
               return (
                 <article
                   key={`${advisorVisual.id}-${index}`}
-                  className={`flex min-w-0 flex-col rounded-2xl border border-[#e5e7eb] bg-white p-3 shadow-sm ${ADVISOR_ACCENT_CLASS[index]}`}
+                  onClick={() => openAdvisorChat(index)}
+                  className={`flex min-w-0 cursor-pointer flex-col rounded-2xl border bg-white p-3 shadow-sm ${
+                    isRecommended ? "border-[#16A34A]" : "border-[#e5e7eb]"
+                  } ${ADVISOR_ACCENT_CLASS[index]}`}
                 >
                   <header className="rounded-xl bg-[#334155] px-3 py-2 text-white">
                     <div className="flex items-center justify-between gap-3">
@@ -1109,25 +1310,45 @@ export function WizardScaffold() {
                         {responseStyleBadgeByIndex[index]}
                       </span>
                     </div>
+                    {isRecommended ? (
+                      <p className="mt-2 inline-flex rounded-full bg-[#DCFCE7] px-2 py-0.5 text-[11px] font-semibold text-[#166534]">
+                        Recomendado
+                      </p>
+                    ) : null}
                   </header>
 
                   <p className="mt-4 flex-1 break-words text-[15px] leading-7 text-[#1f2937]">
                     {responseText || "Sin respuesta disponible."}
                   </p>
 
-                  <div className="mt-5 flex justify-end">
+                  <div className="mt-5 flex flex-wrap justify-end gap-2">
                     <Button
                       type="button"
-                      onClick={() => handleCopy(responseText, index)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        openAdvisorChat(index);
+                      }}
                       disabled={!responseText}
                       variant="secondary"
+                      className="border-[#CBD5E1] bg-white px-3 py-2 text-sm text-[#334155] hover:bg-[#F8FAFC]"
+                    >
+                      Refinar con adviser
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void handleCopy(responseText, index);
+                      }}
+                      disabled={!responseText}
+                      variant="primary"
                       className={`px-3 py-2 text-sm ${
                         copiedIndex === index
-                          ? "border-[#10b981] bg-[#ecfdf5] text-[#047857] hover:bg-[#ecfdf5]"
-                          : "border-[#cbd5e1] bg-white text-[#334155] hover:bg-[#f8fafc]"
+                          ? "bg-[#16A34A] text-white hover:bg-[#15803d]"
+                          : "bg-[#2563EB] text-white hover:bg-[#1D4ED8]"
                       }`}
                     >
-                      {copiedIndex === index ? "✓ Copiado" : "📋 Copiar"}
+                      {copiedIndex === index ? "Respuesta copiada ✓" : "Usar esta respuesta"}
                     </Button>
                   </div>
                 </article>
@@ -1160,6 +1381,14 @@ export function WizardScaffold() {
             >
               Iniciar nueva conversacion
             </Button>
+              <Button
+                type="button"
+                onClick={() => setCurrentStep(1)}
+                variant="secondary"
+                className="border-[#cbd5e1] bg-white text-[#334155] hover:bg-[#f8fafc]"
+              >
+                Ninguna me sirve / Quiero explicar más contexto
+              </Button>
           </div>
           {incidentVisible ? (
             <div className="rounded-2xl border border-[#dbe3ec] bg-[#f8fafc] p-3">
@@ -1217,6 +1446,17 @@ export function WizardScaffold() {
         </div>
       ) : null}
 
+      <AdvisorChatModal
+        isOpen={advisorChatOpen}
+        advisorName={advisorChatIndex !== null ? getAdvisorVisualByIndex(advisorChatIndex).name : "Adviser"}
+        messages={advisorChatMessages}
+        draft={advisorChatInput}
+        sending={advisorChatSending}
+        onDraftChange={setAdvisorChatInput}
+        onSend={() => void handleSendAdvisorRefinement()}
+        onUseResponse={() => setAdvisorChatOpen(false)}
+        onClose={() => setAdvisorChatOpen(false)}
+      />
       <AdvisorProfileModal profile={selectedProfile} onClose={() => setSelectedProfile(null)} />
     </Panel>
   );
