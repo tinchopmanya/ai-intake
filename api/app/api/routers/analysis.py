@@ -25,6 +25,15 @@ from app.services.emotional_linter import run_emotional_linter
 router = APIRouter(prefix="/v1/analysis", tags=["analysis"])
 logger = logging.getLogger(__name__)
 
+def _resolve_analysis_input_text(payload: AnalysisRequest) -> str:
+    context = payload.context or {}
+    structured = context.get("conversation_structured")
+    if isinstance(structured, str):
+        normalized = structured.strip()
+        if normalized:
+            return normalized[:8000]
+    return payload.message_text
+
 
 @router.post(
     "",
@@ -49,8 +58,9 @@ async def create_analysis(
 
     analysis_skipped = payload.quick_mode
     user_id = current_user.id
+    analysis_input_text = _resolve_analysis_input_text(payload)
     linter_result = run_emotional_linter(
-        payload.message_text,
+        analysis_input_text,
         quick_mode=analysis_skipped,
     )
 
@@ -109,7 +119,7 @@ async def create_analysis(
                 case_id=payload.case_id,
                 contact_id=payload.contact_id,
                 source_type=payload.source_type,
-                input_text=payload.message_text,
+                input_text=analysis_input_text,
                 analysis_json=response.model_dump(mode="json"),
             )
             if payload.case_id is not None:
