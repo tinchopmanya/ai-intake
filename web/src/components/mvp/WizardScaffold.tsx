@@ -73,11 +73,6 @@ const SEVERITY_LABELS: Record<AnalysisRiskFlag["severity"], string> = {
   high: "gravedad alta",
 };
 
-const ADVISOR_ACCENT_CLASS = [
-  "border-t-[3px] border-t-emerald-500",
-  "border-t-[3px] border-t-blue-500",
-  "border-t-[3px] border-t-amber-500",
-] as const;
 const INCIDENT_TYPE_OPTIONS: Array<{ value: IncidentType; label: string }> = [
   { value: "schedule_change", label: "Cambio de horario" },
   { value: "cancellation", label: "Cancelacion" },
@@ -969,9 +964,10 @@ export function WizardScaffold() {
   }
 
   const analysisStatus = analysisResult ? getAnalysisStatus(analysisResult) : null;
+  const hasConversationInput = messageText.trim().length > 0 || conversationBlocks.length > 0;
 
   return (
-    <Panel className="mx-auto w-full min-w-0 space-y-5 overflow-x-hidden border-[#e5e7eb] bg-white p-4 shadow-sm sm:p-5">
+    <Panel className="mx-auto flex h-[calc(100vh-180px)] w-full min-w-0 flex-col space-y-4 overflow-hidden border-[#e5e7eb] bg-white p-4 shadow-sm sm:p-5">
       <Stepper
         currentStep={currentStep}
         labels={[
@@ -982,7 +978,7 @@ export function WizardScaffold() {
       />
 
       {currentStep === 1 ? (
-        <div className="space-y-4">
+        <div className="flex min-h-0 flex-1 flex-col space-y-4">
           <div>
             <h3 className="text-lg font-semibold text-[#1f2937]">Mensaje recibido</h3>
             <p className="mt-1 text-sm text-[#334155]">
@@ -991,52 +987,56 @@ export function WizardScaffold() {
             {caseError ? <p className="mt-2 text-xs text-red-700">{caseError}</p> : null}
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-2">
+          <div className="grid min-h-0 flex-1 items-start gap-6 xl:grid-cols-2">
             <section
-              className="min-w-0 space-y-3 rounded-2xl border border-[#E2E8F0] bg-white p-4"
+              className="min-h-0 min-w-0 space-y-3 overflow-y-auto rounded-2xl border border-[#E2E8F0] bg-white p-3 xl:max-h-[calc(100vh-360px)]"
               onPaste={handleStepOnePaste}
             >
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-[#1f2937]">Captura o texto</label>
-                <div className="rounded-xl border border-dashed border-[#CBD5E1] bg-[#F8FAFC] p-3">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageSelection}
-                      disabled={ocrCapabilities?.available === false || ocrCapabilitiesLoading}
-                      className="text-xs text-[#334155]"
-                    />
-                    <p className="text-xs text-[#64748B]">
-                      Puedes pegar una captura desde clipboard. El OCR corre automaticamente.
-                    </p>
-                  </div>
-                  {ocrCapabilities?.available === false ? (
-                    <p className="mt-2 text-xs text-amber-700">
-                      OCR no disponible: {resolveOcrErrorMessage(ocrCapabilities.reason_codes[0])}
-                    </p>
-                  ) : null}
-                  {ocrLoading || autoParsing ? (
-                    <p className="mt-2 text-xs text-[#334155]">
-                      Procesando captura e interpretando mensajes...
-                    </p>
-                  ) : null}
-                  {ocrStatusMessage ? (
-                    <p className="mt-2 text-xs text-[#334155]">
-                      {ocrStatusMessage}
-                      {ocrInfo?.provider ? ` (${ocrInfo.provider})` : ""}
-                    </p>
-                  ) : null}
-                  {ocrError ? <p className="mt-2 text-xs text-red-700">{ocrError}</p> : null}
-                  {autoParseError ? <p className="mt-2 text-xs text-amber-700">{autoParseError}</p> : null}
-                </div>
+                <label className="block text-sm font-medium text-[#1f2937]">Conversacion</label>
                 <Textarea
                   value={messageText}
                   onChange={(event) => handleMessageTextChange(event.target.value)}
                   rows={6}
                   placeholder="Pega aqui el mensaje que recibiste o copia la conversacion de WhatsApp"
-                  className="min-h-[170px] rounded-xl border-[#E2E8F0] bg-white text-[#1F2937]"
+                  spellCheck={false}
+                  className="min-h-[170px] whitespace-pre-wrap break-words rounded-[10px] border border-[#ddd] bg-white p-4 text-[15px] leading-[1.5] text-[#1F2937]"
                 />
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageSelection}
+                  disabled={ocrCapabilities?.available === false || ocrCapabilitiesLoading}
+                  className="hidden"
+                  id="wizard-file-input"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const input = document.getElementById("wizard-file-input") as HTMLInputElement | null;
+                    input?.click();
+                  }}
+                  disabled={ocrCapabilities?.available === false || ocrCapabilitiesLoading}
+                  className="rounded-[6px] border border-[#ddd] bg-white px-[10px] py-[6px] text-[13px] text-[#111] hover:bg-[#fafafa] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Seleccionar archivo
+                </button>
+                {ocrCapabilities?.available === false ? (
+                  <p className="text-xs text-amber-700">
+                    OCR no disponible: {resolveOcrErrorMessage(ocrCapabilities.reason_codes[0])}
+                  </p>
+                ) : null}
+                {ocrLoading || autoParsing ? (
+                  <p className="text-xs text-[#334155]">Procesando captura e interpretando mensajes...</p>
+                ) : null}
+                {ocrStatusMessage ? (
+                  <p className="text-xs text-[#334155]">
+                    {ocrStatusMessage}
+                    {ocrInfo?.provider ? ` (${ocrInfo.provider})` : ""}
+                  </p>
+                ) : null}
+                {ocrError ? <p className="text-xs text-red-700">{ocrError}</p> : null}
+                {autoParseError ? <p className="text-xs text-amber-700">{autoParseError}</p> : null}
               </div>
 
               <div className="space-y-2">
@@ -1046,63 +1046,19 @@ export function WizardScaffold() {
                   onChange={(event) => setContextOptional(event.target.value)}
                   rows={3}
                   placeholder="Escribe lo que creas necesario para entender mejor la conversacion"
-                  className="border-[#E2E8F0] bg-white text-[#1F2937]"
+                  spellCheck={false}
+                  className="rounded-[10px] border border-[#ddd] bg-[#fafafa] p-3 text-[14px] text-[#1F2937]"
                 />
               </div>
-
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-[#1f2937]">Modo de respuesta</label>
-                <div className="grid gap-2 sm:grid-cols-3">
-                  {responseStyleOptions.map((item) => (
-                    <button
-                      key={item.value}
-                      type="button"
-                      onClick={() => setResponseTone(item.value)}
-                      className={`rounded-xl border px-3 py-2 text-sm font-medium transition ${
-                        responseTone === item.value
-                          ? "border-[#3B82F6] bg-[#EFF6FF] text-[#1E3A8A]"
-                          : "border-[#E2E8F0] bg-white text-[#334155] hover:border-[#CBD5E1] hover:bg-[#F8FAFC]"
-                      }`}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3 pt-1">
-                <Button
-                  type="button"
-                  onClick={handleContinueFromStep1}
-                  disabled={(!messageText.trim() && conversationBlocks.length === 0) || loadingAnalysis}
-                  variant="primary"
-                  className="min-w-[170px] bg-[#1F2937] hover:bg-[#111827]"
-                >
-                  {loadingAnalysis ? t("wizard.button.analyzing") : t("wizard.button.continue")}
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() => {
-                    setQuickMode(true);
-                    void handleQuickResponse();
-                  }}
-                  disabled={(!messageText.trim() && conversationBlocks.length === 0) || loadingAdvisor}
-                  variant="secondary"
-                  className="min-w-[170px] border-[#CBD5E1] bg-white text-[#334155] hover:bg-[#F8FAFC]"
-                >
-                  {loadingAdvisor ? t("wizard.button.generating") : t("wizard.button.quick_reply")}
-                </Button>
-              </div>
-              {advisorError ? <p className="text-sm text-red-700">{advisorError}</p> : null}
             </section>
 
-            <section className="min-h-0 min-w-0 space-y-3 rounded-2xl border border-[#E2E8F0] bg-white p-4">
+            <section className="min-h-0 min-w-0 space-y-3 overflow-y-auto rounded-2xl border border-[#E2E8F0] bg-white p-3 xl:max-h-[calc(100vh-360px)]">
               <h4 className="text-sm font-semibold text-[#0F172A]">Conversacion interpretada</h4>
               <p className="text-xs text-[#64748B]">
                 Revisa quien dijo cada mensaje antes de generar la respuesta.
               </p>
 
-              <div className="h-[52vh] min-h-[380px] max-h-[620px] space-y-2 overflow-y-auto rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-3 pr-2">
+              <div className="max-h-[calc(100vh-400px)] min-h-[320px] space-y-2 overflow-y-auto rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-3 pr-2">
                 {conversationBlocks.length === 0 ? (
                   <p className="text-xs text-[#64748B]">
                     Cuando detectemos una conversacion, aparecera aqui en bloques editables.
@@ -1111,21 +1067,21 @@ export function WizardScaffold() {
                 {conversationBlocks.map((item) => (
                   <div
                     key={item.id}
-                    className={`max-w-[94%] break-words rounded-2xl px-3 py-2 text-sm leading-6 ${
+                    className={`max-w-[96%] break-words rounded-[10px] border p-3 text-sm leading-6 transition-colors hover:border-[#d4d4d4] ${
                       item.speaker === "ex_partner"
-                        ? "mr-auto bg-[#EEF2F7] text-[#0F172A]"
+                        ? "mr-auto border-[#f2d675] bg-[#fff7cc] text-[#3f3a23]"
                         : item.speaker === "user"
-                          ? "ml-auto bg-[#DBEAFE] text-[#1E3A8A]"
-                          : "mr-auto bg-[#F1F5F9] text-[#334155]"
+                          ? "ml-auto border-[#bcd4ff] bg-[#eaf3ff] text-[#213d6a]"
+                          : "mr-auto border-[#f5b6c8] bg-[#fde7ef] text-[#5f3343]"
                     }`}
                   >
-                    <div className="mb-2 inline-flex rounded-full border border-[#CBD5E1] bg-white p-0.5 text-[11px]">
+                    <div className="mb-2 inline-flex rounded-[14px] border border-[#ddd] bg-white p-0.5 text-[12px]">
                       <button
                         type="button"
                         onClick={() => updateConversationBlockSpeaker(item.id, "ex_partner")}
-                        className={`rounded-full px-2 py-0.5 ${
+                        className={`inline-block rounded-[14px] px-2 py-[3px] ${
                           item.speaker === "ex_partner"
-                            ? "bg-[#E2E8F0] font-semibold text-[#0F172A]"
+                            ? "border border-[#f2d675] bg-[#fff7cc] font-semibold text-[#6b5a26]"
                             : "text-[#64748B]"
                         }`}
                       >
@@ -1134,9 +1090,9 @@ export function WizardScaffold() {
                       <button
                         type="button"
                         onClick={() => updateConversationBlockSpeaker(item.id, "user")}
-                        className={`rounded-full px-2 py-0.5 ${
+                        className={`inline-block rounded-[14px] px-2 py-[3px] ${
                           item.speaker === "user"
-                            ? "bg-[#BFDBFE] font-semibold text-[#1E3A8A]"
+                            ? "border border-[#bcd4ff] bg-[#eaf3ff] font-semibold text-[#264a87]"
                             : "text-[#64748B]"
                         }`}
                       >
@@ -1145,9 +1101,9 @@ export function WizardScaffold() {
                       <button
                         type="button"
                         onClick={() => updateConversationBlockSpeaker(item.id, "unknown")}
-                        className={`rounded-full px-2 py-0.5 ${
+                        className={`inline-block rounded-[14px] px-2 py-[3px] ${
                           item.speaker === "unknown"
-                            ? "bg-[#E2E8F0] font-semibold text-[#334155]"
+                            ? "border border-[#f5b6c8] bg-[#fde7ef] font-semibold text-[#7d3d52]"
                             : "text-[#64748B]"
                         }`}
                       >
@@ -1158,18 +1114,70 @@ export function WizardScaffold() {
                       value={item.content}
                       onChange={(event) => updateConversationBlockText(item.id, event.target.value)}
                       rows={Math.max(2, Math.ceil(item.content.length / 42))}
-                      className={`w-full resize-none overflow-hidden whitespace-pre-wrap break-words border-0 bg-transparent p-0 text-sm leading-6 focus-visible:ring-0 ${
-                        item.speaker === "user"
-                          ? "text-[#1E3A8A]"
-                          : item.speaker === "ex_partner"
-                            ? "text-[#0F172A]"
-                            : "text-[#334155]"
-                      }`}
+                      spellCheck={false}
+                      className="w-full resize-none overflow-hidden whitespace-pre-wrap break-words border-0 bg-transparent p-0 text-sm leading-[1.6] focus-visible:ring-0"
                     />
                   </div>
                 ))}
               </div>
             </section>
+          </div>
+
+          <div className="sticky bottom-0 z-10 mt-auto rounded-b-xl border-t border-[#eee] bg-white px-4 py-3">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-[#1f2937]">Modo de respuesta</label>
+                <div className="flex flex-wrap gap-2">
+                  {responseStyleOptions.map((item) => (
+                    <button
+                      key={item.value}
+                      type="button"
+                      onClick={() => setResponseTone(item.value)}
+                      className={`rounded-full border px-3 py-1.5 text-[13px] font-medium transition ${
+                        responseTone === item.value
+                          ? "border-[#bbb] bg-[#f3f4f6] text-[#111]"
+                          : "border-[#ddd] bg-white text-[#666] hover:bg-[#fafafa]"
+                      }`}
+                    >
+                      {item.value === "firme_respetuoso" ? "Firme" : item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {hasConversationInput ? (
+                  <button
+                    type="button"
+                    onClick={handleStartNewConversation}
+                    className="h-9 rounded-[8px] border border-[#ddd] bg-transparent px-4 text-[13px] text-[#111] hover:bg-[#fafafa]"
+                  >
+                    Limpiar
+                  </button>
+                ) : null}
+                <Button
+                  type="button"
+                  onClick={handleContinueFromStep1}
+                  disabled={(!messageText.trim() && conversationBlocks.length === 0) || loadingAnalysis}
+                  variant="primary"
+                  className="h-9 rounded-[8px] bg-[#111] px-4 text-[13px] text-white hover:bg-[#222]"
+                >
+                  {loadingAnalysis ? t("wizard.button.analyzing") : "Generar respuestas"}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setQuickMode(true);
+                    void handleQuickResponse();
+                  }}
+                  disabled={(!messageText.trim() && conversationBlocks.length === 0) || loadingAdvisor}
+                  variant="secondary"
+                  className="h-9 border-[#ddd] bg-transparent px-3 text-[13px] text-[#666] hover:bg-[#fafafa]"
+                >
+                  {loadingAdvisor ? t("wizard.button.generating") : "Rapida"}
+                </Button>
+              </div>
+            </div>
+            {advisorError ? <p className="mt-2 text-sm text-red-700">{advisorError}</p> : null}
           </div>
         </div>
       ) : null}
@@ -1316,6 +1324,7 @@ export function WizardScaffold() {
                       value={incidentDescription}
                       onChange={(event) => setIncidentDescription(event.target.value)}
                       rows={2}
+                      spellCheck={false}
                       placeholder="Detalle opcional para contexto futuro"
                       className="border-[#e5e7eb] bg-white text-[#1f2937] md:col-span-2"
                     />
@@ -1365,11 +1374,11 @@ export function WizardScaffold() {
                 <article
                   key={`${advisorVisual.id}-${index}`}
                   onClick={() => openAdvisorChat(index)}
-                  className={`flex min-w-0 cursor-pointer flex-col rounded-2xl border bg-white p-3 shadow-sm ${
-                    isRecommended ? "border-[#16A34A]" : "border-[#e5e7eb]"
-                  } ${ADVISOR_ACCENT_CLASS[index]}`}
+                  className={`mb-3 flex min-w-0 cursor-pointer flex-col rounded-[10px] border bg-white p-4 transition-all duration-150 ease-in-out hover:border-[#d4d4d4] hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)] ${
+                    isRecommended ? "border-[#22c55e]" : "border-[#e5e5e5]"
+                  }`}
                 >
-                  <header className="rounded-xl bg-[#334155] px-3 py-2 text-white">
+                  <header className="rounded-[10px] border border-[#e5e5e5] bg-[#fafafa] px-3 py-3 text-[#111]">
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
                         <AdvisorAvatarItem
@@ -1381,22 +1390,22 @@ export function WizardScaffold() {
                           onClick={() => openAdvisorProfileById(advisorVisual.id)}
                         />
                       </div>
-                      <span className="shrink-0 rounded-full bg-white/15 px-2 py-1 text-[11px] font-medium text-white">
+                      <span className="shrink-0 rounded-[6px] bg-[#f3f4f6] px-2 py-1 text-[12px] text-[#444]">
                         {responseStyleBadgeByIndex[index]}
                       </span>
                     </div>
                     {isRecommended ? (
-                      <p className="mt-2 inline-flex rounded-full bg-[#DCFCE7] px-2 py-0.5 text-[11px] font-semibold text-[#166534]">
+                      <p className="mt-2 inline-flex rounded-[6px] border border-[#22c55e] bg-[#ecfdf5] px-2 py-0.5 text-[11px] font-semibold text-[#166534]">
                         Recomendado
                       </p>
                     ) : null}
                   </header>
 
-                  <p className="mt-4 flex-1 break-words text-[15px] leading-7 text-[#1f2937]">
+                  <p className="mt-4 flex-1 whitespace-pre-wrap break-words text-[14px] leading-[1.6] text-[#222]">
                     {responseText || "Sin respuesta disponible."}
                   </p>
 
-                  <div className="mt-5 flex flex-wrap justify-end gap-2">
+                  <div className="mt-4 flex flex-wrap justify-end gap-2">
                     <Button
                       type="button"
                       onClick={(event) => {
@@ -1405,9 +1414,9 @@ export function WizardScaffold() {
                       }}
                       disabled={!responseText}
                       variant="secondary"
-                      className="border-[#CBD5E1] bg-white px-3 py-2 text-sm text-[#334155] hover:bg-[#F8FAFC]"
+                      className="h-9 border-[#ddd] bg-transparent px-3 text-[13px] text-[#111] hover:bg-[#fafafa]"
                     >
-                      Refinar con adviser
+                      Refinar
                     </Button>
                     <Button
                       type="button"
@@ -1417,13 +1426,13 @@ export function WizardScaffold() {
                       }}
                       disabled={!responseText}
                       variant="primary"
-                      className={`px-3 py-2 text-sm ${
+                      className={`h-9 rounded-[8px] px-4 text-[13px] ${
                         copiedIndex === index
                           ? "bg-[#16A34A] text-white hover:bg-[#15803d]"
-                          : "bg-[#2563EB] text-white hover:bg-[#1D4ED8]"
+                          : "bg-[#111] text-white hover:bg-[#222]"
                       }`}
                     >
-                      {copiedIndex === index ? "Respuesta copiada ✓" : "Usar esta respuesta"}
+                      {copiedIndex === index ? "Respuesta copiada" : "Usar esta respuesta"}
                     </Button>
                   </div>
                 </article>
@@ -1500,6 +1509,7 @@ export function WizardScaffold() {
                   value={incidentDescription}
                   onChange={(event) => setIncidentDescription(event.target.value)}
                   rows={2}
+                  spellCheck={false}
                   placeholder="Detalle opcional para contexto futuro"
                   className="border-[#e5e7eb] bg-white text-[#1f2937] md:col-span-2"
                 />

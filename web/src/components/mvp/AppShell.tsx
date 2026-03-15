@@ -2,7 +2,6 @@
 
 import type { ReactNode } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -130,32 +129,24 @@ export function AppShell({ children }: AppShellProps) {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-[1080px] min-w-0 flex-col gap-4 overflow-x-hidden bg-[#F8FAFC] px-4 py-5 sm:px-5 sm:py-6">
-      <Panel className="mx-auto flex w-full items-center justify-between border-[#E2E8F0] bg-white px-4 py-3">
-        <div>
-          <h1 className="text-xl font-bold text-[#0F172A]">Consejero de Conversaciones</h1>
-          <p className="mt-1 text-sm text-[#475569]">
-            Pega una conversacion dificil y revisa tres perspectivas antes de responder.
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Link href="/" className="text-sm text-[#334155] underline underline-offset-2">
-            Inicio
-          </Link>
+    <main className="mx-auto flex min-h-screen w-full max-w-[980px] min-w-0 flex-col gap-4 overflow-x-hidden bg-white px-4 py-5 sm:px-6">
+      <Panel className="mx-auto flex w-full items-center justify-between border-[#e5e5e5] bg-white px-4 py-3">
+        <h1 className="text-[20px] font-semibold text-[#111]">Consejero de Conversaciones</h1>
+        <div className="flex items-center gap-2">
           <div ref={advisorDropdownRef} className="relative">
             <button
               type="button"
               onClick={() => setAdvisorMenuOpen((prev) => !prev)}
               aria-haspopup="menu"
               aria-expanded={advisorMenuOpen}
-              className="h-10 rounded-full border border-[#CBD5E1] bg-white px-4 text-sm font-semibold text-[#0F172A] transition-colors hover:bg-[#F1F5F9] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(37,99,235,0.22)]"
+              className="h-9 rounded-md border border-[#ddd] bg-white px-3 text-[13px] font-medium text-[#111] transition-colors hover:bg-[#fafafa] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(17,17,17,0.2)]"
             >
-              Hablar con un adviser
+              Hablar con un advisor
             </button>
             {advisorMenuOpen ? (
               <div
                 role="menu"
-                className="absolute right-0 z-20 mt-2 w-[320px] rounded-xl border border-[#E2E8F0] bg-white p-2 shadow-[0_10px_30px_rgba(15,23,42,0.16)]"
+                className="absolute right-0 z-20 mt-2 w-[320px] rounded-xl border border-[#e5e5e5] bg-white p-2 shadow-[0_8px_20px_rgba(0,0,0,0.08)]"
               >
                 <ul className="space-y-1">
                   {ADVISOR_PROFILES.map((advisor, index) => (
@@ -164,18 +155,18 @@ export function AppShell({ children }: AppShellProps) {
                         type="button"
                         role="menuitem"
                         onClick={() => handleSelectAdvisor(index)}
-                        className="flex w-full items-start gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-[#F1F5F9]"
+                        className="flex w-full items-start gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-[#fafafa]"
                       >
                         <Image
                           src={advisor.avatar128}
                           alt={advisor.name}
                           width={40}
                           height={40}
-                          className="h-10 w-10 rounded-full border border-[#E2E8F0] object-cover"
+                          className="h-10 w-10 rounded-full border border-[#e5e5e5] object-cover"
                         />
                         <div className="min-w-0">
-                          <p className="text-sm font-semibold text-[#0F172A]">{advisor.name}</p>
-                          <p className="line-clamp-2 text-xs text-[#475569]">{advisor.description}</p>
+                          <p className="text-[14px] font-semibold text-[#111]">{advisor.name}</p>
+                          <p className="line-clamp-2 text-[12px] text-[#666]">{advisor.description}</p>
                         </div>
                       </button>
                     </li>
@@ -190,9 +181,9 @@ export function AppShell({ children }: AppShellProps) {
               onClick={() => setMenuOpen((prev) => !prev)}
               aria-haspopup="menu"
               aria-expanded={menuOpen}
-              className="flex h-10 items-center gap-2 rounded-full border border-[#CBD5E1] bg-white px-3 text-sm font-semibold text-[#0F172A] transition-colors hover:bg-[#F1F5F9] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(37,99,235,0.22)]"
+              className="flex h-9 items-center gap-2 rounded-full border border-[#ddd] bg-white px-3 text-[13px] font-medium text-[#111] transition-colors hover:bg-[#fafafa] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(17,17,17,0.2)]"
             >
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#2563EB] text-xs font-bold text-white">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#111] text-xs font-bold text-white">
                 {initials}
               </span>
               <span className="max-w-[110px] truncate">{displayName}</span>
@@ -200,7 +191,7 @@ export function AppShell({ children }: AppShellProps) {
             {menuOpen ? (
               <div
                 role="menu"
-                className="absolute right-0 z-20 mt-2 w-52 rounded-xl border border-[#E2E8F0] bg-white p-1 shadow-[0_10px_30px_rgba(15,23,42,0.16)]"
+                className="absolute right-0 z-20 mt-2 w-52 rounded-xl border border-[#e5e5e5] bg-white p-1 shadow-[0_8px_20px_rgba(0,0,0,0.08)]"
               >
                 <button
                   type="button"
@@ -209,7 +200,7 @@ export function AppShell({ children }: AppShellProps) {
                     router.push("/onboarding?edit=1");
                   }}
                   role="menuitem"
-                  className="block w-full rounded-lg px-3 py-2 text-left text-sm text-[#0F172A] transition-colors hover:bg-[#F1F5F9]"
+                  className="block w-full rounded-lg px-3 py-2 text-left text-sm text-[#111] transition-colors hover:bg-[#fafafa]"
                 >
                   Editar mis datos
                 </button>
