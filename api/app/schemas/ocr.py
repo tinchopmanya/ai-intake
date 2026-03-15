@@ -32,7 +32,15 @@ class OcrInterpretRequest(BaseModel):
     source: Literal["ocr", "text"] = "ocr"
 
 
+class OcrConversationBlock(BaseModel):
+    id: str = Field(min_length=1)
+    speaker: Literal["ex_partner", "user"]
+    content: str = Field(min_length=1)
+    confidence: float | None = Field(default=None, ge=0, le=1)
+
+
 class OcrInterpretResponse(BaseModel):
-    conversation_turns: list[OcrConversationTurn] = Field(default_factory=list)
+    blocks: list[OcrConversationBlock] = Field(default_factory=list)
     method: Literal["gemini", "heuristic"]
     warnings: list[str] = Field(default_factory=list)
+    conversation_turns: list[OcrConversationTurn] | None = None

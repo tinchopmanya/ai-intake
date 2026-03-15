@@ -221,13 +221,19 @@ export type OcrInterpretRequest = {
 };
 
 export type OcrInterpretResponse = {
-  conversation_turns: Array<{
-    speaker: "me" | "them";
-    text: string;
-    time?: string | null;
+  blocks: Array<{
+    id: string;
+    speaker: "ex_partner" | "user";
+    content: string;
+    confidence?: number | null;
   }>;
   method: "gemini" | "heuristic";
   warnings: string[];
+  conversation_turns?: Array<{
+    speaker: "me" | "them";
+    text: string;
+    time?: string | null;
+  }> | null;
 };
 
 export type BreakupTimeRange = "lt_2m" | "between_2m_1y" | "between_1y_3y" | "gt_3y";

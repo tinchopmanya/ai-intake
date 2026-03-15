@@ -52,6 +52,7 @@ type ConversationBlock = {
   id: string;
   speaker: "ex_partner" | "user";
   content: string;
+  confidence?: number;
   source?: "manual" | "ocr";
 };
 
@@ -131,11 +132,13 @@ function createConversationBlock(
   speaker: ConversationBlock["speaker"],
   content: string,
   source: ConversationBlock["source"] = "manual",
+  confidence?: number,
 ): ConversationBlock {
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     speaker,
     content: content.trim(),
+    confidence,
     source,
   };
 }
@@ -493,6 +496,7 @@ export function WizardScaffold() {
       context.conversation_blocks = conversationBlocks.map((item) => ({
         speaker: item.speaker,
         content: item.content,
+        confidence: item.confidence ?? null,
         source: item.source ?? "manual",
       }));
       context.conversation_history = conversationBlocks.map((item) => ({
@@ -536,17 +540,29 @@ export function WizardScaffold() {
         return;
       }
       const interpreted = await postOcrInterpret({ text: normalized, source });
-      const apiBlocks: ConversationBlock[] = interpreted.conversation_turns
-        .map((turn) =>
-          createConversationBlock(
-            turn.speaker === "me" ? "user" : "ex_partner",
-            turn.text,
-            source === "ocr" ? "ocr" : "manual",
-          ),
-        )
+      const apiBlocks: ConversationBlock[] = interpreted.blocks
+        .map((block) => ({
+          id: block.id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          speaker: block.speaker,
+          content: block.content.trim(),
+          confidence: typeof block.confidence === "number" ? block.confidence : undefined,
+          source: source === "ocr" ? "ocr" : "manual",
+        }))
         .filter((block) => block.content.length > 0);
-      if (apiBlocks.length > 0) {
-        syncConversationBlocks(apiBlocks);
+      const legacyBlocks: ConversationBlock[] = !apiBlocks.length
+        ? (interpreted.conversation_turns ?? [])
+            .map((turn) =>
+              createConversationBlock(
+                turn.speaker === "me" ? "user" : "ex_partner",
+                turn.text,
+                source === "ocr" ? "ocr" : "manual",
+              ),
+            )
+            .filter((block) => block.content.length > 0)
+        : [];
+      const resolvedBlocks = apiBlocks.length > 0 ? apiBlocks : legacyBlocks;
+      if (resolvedBlocks.length > 0) {
+        syncConversationBlocks(resolvedBlocks);
         return;
       }
       if (localFallback.length > 0) {
