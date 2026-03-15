@@ -15,6 +15,8 @@ import type { IncidentSummary } from "@/lib/api/types";
 import type { IncidentUpdateRequest } from "@/lib/api/types";
 import type { OnboardingProfile } from "@/lib/api/types";
 import type { OnboardingProfileUpdateRequest } from "@/lib/api/types";
+import type { OcrInterpretRequest } from "@/lib/api/types";
+import type { OcrInterpretResponse } from "@/lib/api/types";
 import type { WizardEventRequest } from "@/lib/api/types";
 import type { WizardEventResponse } from "@/lib/api/types";
 
@@ -165,5 +167,9 @@ export function putOnboardingProfile(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
+}
+
+export function postOcrInterpret(payload: OcrInterpretRequest): Promise<OcrInterpretResponse> {
+  return postJson<OcrInterpretResponse>("/v1/ocr/interpret", payload);
 }
 

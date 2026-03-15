@@ -19,6 +19,8 @@ from .incidents import IncidentUpdateRequest
 from .onboarding import OnboardingProfileResponse
 from .onboarding import OnboardingProfileUpdateRequest
 from .ocr import OcrExtractResponse
+from .ocr import OcrInterpretRequest
+from .ocr import OcrInterpretResponse
 
 __all__ = [
     "AdvisorRequest",
@@ -41,6 +43,8 @@ __all__ = [
     "OnboardingProfileResponse",
     "OnboardingProfileUpdateRequest",
     "OcrExtractResponse",
+    "OcrInterpretRequest",
+    "OcrInterpretResponse",
     "RefreshSessionRequest",
 ]
 

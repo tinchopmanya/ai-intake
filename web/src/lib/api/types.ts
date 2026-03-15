@@ -199,6 +199,13 @@ export type OcrExtractResponse = {
   provider: string;
   confidence: number | null;
   warnings: string[];
+  conversation_turns?: Array<{
+    speaker: "me" | "them";
+    text: string;
+    time?: string | null;
+  }> | null;
+  raw_text?: string | null;
+  metadata?: Record<string, unknown> | null;
 };
 
 export type OcrCapabilitiesResponse = {
@@ -206,6 +213,21 @@ export type OcrCapabilitiesResponse = {
   selected_provider: string;
   providers_checked: string[];
   reason_codes: string[];
+};
+
+export type OcrInterpretRequest = {
+  text: string;
+  source: "ocr" | "text";
+};
+
+export type OcrInterpretResponse = {
+  conversation_turns: Array<{
+    speaker: "me" | "them";
+    text: string;
+    time?: string | null;
+  }>;
+  method: "gemini" | "heuristic";
+  warnings: string[];
 };
 
 export type BreakupTimeRange = "lt_2m" | "between_2m_1y" | "between_1y_3y" | "gt_3y";

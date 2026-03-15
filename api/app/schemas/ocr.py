@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel
 from pydantic import Field
 
@@ -23,3 +25,14 @@ class OcrCapabilitiesResponse(BaseModel):
     selected_provider: str
     providers_checked: list[str] = Field(default_factory=list)
     reason_codes: list[str] = Field(default_factory=list)
+
+
+class OcrInterpretRequest(BaseModel):
+    text: str = Field(min_length=1)
+    source: Literal["ocr", "text"] = "ocr"
+
+
+class OcrInterpretResponse(BaseModel):
+    conversation_turns: list[OcrConversationTurn] = Field(default_factory=list)
+    method: Literal["gemini", "heuristic"]
+    warnings: list[str] = Field(default_factory=list)

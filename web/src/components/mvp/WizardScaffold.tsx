@@ -1,25 +1,21 @@
 "use client";
 
-import Image from "next/image";
-import { type ChangeEvent, useEffect, useState } from "react";
+import { type ChangeEvent, type ClipboardEvent, useEffect, useRef, useState } from "react";
 
 import { AdvisorChatModal } from "@/components/mvp/AdvisorChatModal";
 import { AdvisorProfileModal } from "@/components/mvp/AdvisorProfileModal";
 import { Button, Panel, Select, Textarea } from "@/components/mvp/ui";
-import { CaseTimeline } from "@/components/cases/CaseTimeline";
 import { AdvisorAvatarItem } from "@/components/ui/AdvisorAvatarItem";
 import { ADVISOR_PROFILES } from "@/data/advisors";
 import { authFetch } from "@/lib/auth/client";
 import { hasStoredSession } from "@/lib/auth/client";
 import { toUiErrorMessage } from "@/lib/api/errors";
 import {
-  downloadCaseExport,
   getCases,
-  getIncidents,
-  patchIncident,
   postAdvisor,
   postAnalysis,
   postIncident,
+  postOcrInterpret,
   postWizardEvent,
 } from "@/lib/api/client";
 import type { AdvisorProfile } from "@/data/advisors";
@@ -30,7 +26,6 @@ import type {
   AnalysisResponse,
   AnalysisRiskFlag,
   CaseSummary,
-  IncidentSummary,
   IncidentType,
   OcrCapabilitiesResponse,
   OcrExtractResponse,
@@ -51,12 +46,13 @@ const responseStyleOptions = [
   { value: "amigable", label: "Amigable" },
 ] as const;
 
-type ChatSender = "incoming" | "outgoing";
 type ResponseTone = (typeof responseStyleOptions)[number]["value"];
-type ConversationMessage = {
+
+type ConversationBlock = {
   id: string;
-  sender: ChatSender;
-  text: string;
+  speaker: "ex_partner" | "user";
+  content: string;
+  source?: "manual" | "ocr";
 };
 
 type AnalysisStatusKind = "ok" | "observation" | "risk";
@@ -131,22 +127,93 @@ function getAdvisorVisualByIndex(index: number) {
   return ADVISOR_PROFILES[index] ?? ADVISOR_FALLBACK_VISUAL;
 }
 
-function formatConversationForAdvisorContext(
-  history: ConversationMessage[],
-  latestIncomingMessage: string,
-): string {
-  const lines: string[] = [];
-  for (const item of history) {
-    const prefix = item.sender === "incoming" ? "Ex-partner" : "User";
-    const text = item.text.trim();
-    if (!text) continue;
-    lines.push(`${prefix}: ${text}`);
+function createConversationBlock(
+  speaker: ConversationBlock["speaker"],
+  content: string,
+  source: ConversationBlock["source"] = "manual",
+): ConversationBlock {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    speaker,
+    content: content.trim(),
+    source,
+  };
+}
+
+function formatConversationBlocksForContext(blocks: ConversationBlock[]): string {
+  return blocks
+    .map((block) => {
+      const text = block.content.trim();
+      if (!text) return null;
+      const prefix = block.speaker === "user" ? "Yo" : "Ex pareja";
+      return `${prefix}: ${text}`;
+    })
+    .filter((line): line is string => Boolean(line))
+    .join("\n");
+}
+
+function looksLikeConversationInput(text: string): boolean {
+  const normalized = text.trim();
+  if (!normalized) return false;
+  const lines = normalized.split(/\r?\n/).filter((line) => line.trim().length > 0);
+  if (lines.length >= 3) return true;
+  if (/(yo|me|ex|ex pareja|tu|vos)\s*[:\-]/i.test(normalized)) return true;
+  return /\d{1,2}:\d{2}/.test(normalized) && lines.length >= 2;
+}
+
+function heuristicSegmentConversation(
+  text: string,
+  source: ConversationBlock["source"],
+): ConversationBlock[] {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  if (lines.length === 0) return [];
+
+  const blocks: ConversationBlock[] = [];
+  let currentSpeaker: ConversationBlock["speaker"] = "ex_partner";
+  let currentLines: string[] = [];
+
+  for (const line of lines) {
+    const cleaned = line.replace(/\s+\d{1,2}:\d{2}(?:\s*[ap]\.?\s*m\.?)?$/i, "").trim();
+    if (!cleaned) continue;
+
+    const marker = cleaned.match(
+      /^(yo|me|mi|tu|vos|ex|expareja|ex pareja|ella|el)\s*[:\-]\s*(.+)$/i,
+    );
+    let speaker = currentSpeaker;
+    let content = cleaned;
+
+    if (marker) {
+      const label = marker[1].toLowerCase();
+      speaker = ["yo", "me", "mi", "tu", "vos"].includes(label) ? "user" : "ex_partner";
+      content = marker[2].trim();
+    }
+
+    if (currentLines.length > 0 && speaker !== currentSpeaker) {
+      blocks.push(createConversationBlock(currentSpeaker, currentLines.join(" "), source));
+      currentLines = [];
+    }
+    currentSpeaker = speaker;
+    currentLines.push(content);
   }
-  const latest = latestIncomingMessage.trim();
-  if (latest) {
-    lines.push(`Ex-partner: ${latest}`);
+
+  if (currentLines.length > 0) {
+    blocks.push(createConversationBlock(currentSpeaker, currentLines.join(" "), source));
   }
-  return lines.join("\n");
+  return blocks.filter((block) => block.content.length > 0);
+}
+
+function getLatestExPartnerMessage(blocks: ConversationBlock[]): string | null {
+  for (let index = blocks.length - 1; index >= 0; index -= 1) {
+    const block = blocks[index];
+    if (!block) continue;
+    if (block.speaker === "ex_partner" && block.content.trim()) {
+      return block.content.trim();
+    }
+  }
+  return null;
 }
 
 /**
@@ -311,15 +378,13 @@ export function WizardScaffold() {
   const [contextOptional, setContextOptional] = useState("");
   const [responseTone, setResponseTone] = useState<ResponseTone>("cordial");
   const [selectedProfile, setSelectedProfile] = useState<AdvisorProfile | null>(null);
-  const [conversationHistory, setConversationHistory] = useState<ConversationMessage[]>([]);
-  const [historyInputOpen, setHistoryInputOpen] = useState(false);
-  const [historySender, setHistorySender] = useState<ChatSender>("incoming");
-  const [historyMessageText, setHistoryMessageText] = useState("");
-  const [ocrImageFile, setOcrImageFile] = useState<File | null>(null);
-  const [ocrImagePreviewUrl, setOcrImagePreviewUrl] = useState<string | null>(null);
+  const [conversationBlocks, setConversationBlocks] = useState<ConversationBlock[]>([]);
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrError, setOcrError] = useState<string | null>(null);
   const [ocrInfo, setOcrInfo] = useState<OcrExtractResponse | null>(null);
+  const [ocrStatusMessage, setOcrStatusMessage] = useState<string | null>(null);
+  const [autoParsing, setAutoParsing] = useState(false);
+  const [autoParseError, setAutoParseError] = useState<string | null>(null);
   const [ocrCapabilities, setOcrCapabilities] = useState<OcrCapabilitiesResponse | null>(null);
   const [ocrCapabilitiesLoading, setOcrCapabilitiesLoading] = useState(true);
   const [activeCase, setActiveCase] = useState<CaseSummary | null>(null);
@@ -331,11 +396,6 @@ export function WizardScaffold() {
   const [incidentVisible, setIncidentVisible] = useState(false);
   const [incidentSaving, setIncidentSaving] = useState(false);
   const [incidentNotice, setIncidentNotice] = useState<string | null>(null);
-  const [exportingCase, setExportingCase] = useState(false);
-  const [caseIncidents, setCaseIncidents] = useState<IncidentSummary[]>([]);
-  const [incidentsLoading, setIncidentsLoading] = useState(false);
-  const [incidentsError, setIncidentsError] = useState<string | null>(null);
-  const [confirmingIncidentId, setConfirmingIncidentId] = useState<string | null>(null);
   const [advisorChatOpen, setAdvisorChatOpen] = useState(false);
   const [advisorChatIndex, setAdvisorChatIndex] = useState<number | null>(null);
   const [advisorChatInput, setAdvisorChatInput] = useState("");
@@ -344,18 +404,7 @@ export function WizardScaffold() {
     Array<{ id: string; role: "user" | "advisor"; text: string }>
   >([]);
   const selectedCaseId = activeCase?.id ?? null;
-
-  useEffect(() => {
-    if (!ocrImageFile) {
-      setOcrImagePreviewUrl(null);
-      return;
-    }
-    const nextUrl = URL.createObjectURL(ocrImageFile);
-    setOcrImagePreviewUrl(nextUrl);
-    return () => {
-      URL.revokeObjectURL(nextUrl);
-    };
-  }, [ocrImageFile]);
+  const manualInterpretTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -392,34 +441,6 @@ export function WizardScaffold() {
 
   useEffect(() => {
     let mounted = true;
-    async function loadCaseIncidents() {
-      if (!selectedCaseId) {
-        setCaseIncidents([]);
-        setIncidentsError(null);
-        setIncidentsLoading(false);
-        return;
-      }
-      setIncidentsLoading(true);
-      setIncidentsError(null);
-      try {
-        const payload = await getIncidents(selectedCaseId);
-        if (!mounted) return;
-        setCaseIncidents(payload.incidents);
-      } catch (exc) {
-        if (!mounted) return;
-        setIncidentsError(toUiErrorMessage(exc, "No se pudieron cargar incidentes del caso."));
-      } finally {
-        if (mounted) setIncidentsLoading(false);
-      }
-    }
-    void loadCaseIncidents();
-    return () => {
-      mounted = false;
-    };
-  }, [selectedCaseId]);
-
-  useEffect(() => {
-    let mounted = true;
     async function loadCases() {
       setCaseError(null);
       try {
@@ -441,6 +462,14 @@ export function WizardScaffold() {
     };
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (manualInterpretTimerRef.current !== null) {
+        window.clearTimeout(manualInterpretTimerRef.current);
+      }
+    };
+  }, []);
+
   function openAdvisorProfileById(advisorId: string) {
     const profile = ADVISOR_PROFILES.find((advisor) => advisor.id === advisorId) ?? null;
     setSelectedProfile(profile);
@@ -450,40 +479,97 @@ export function WizardScaffold() {
     const context: Record<string, unknown> = {};
     if (contextOptional.trim()) context.contact_context = contextOptional.trim();
     context.user_style = responseTone;
-    const structuredConversation = formatConversationForAdvisorContext(
-      conversationHistory,
-      messageText,
-    );
+    const structuredConversation = formatConversationBlocksForContext(conversationBlocks);
+    const latestExPartnerMessage = getLatestExPartnerMessage(conversationBlocks);
     if (structuredConversation) {
       context.conversation_structured = structuredConversation;
     }
-    if (messageText.trim()) {
+    if (latestExPartnerMessage) {
+      context.latest_ex_partner_message = latestExPartnerMessage;
+    } else if (messageText.trim()) {
       context.latest_ex_partner_message = messageText.trim();
     }
-    if (conversationHistory.length > 0) {
-      context.conversation_history = conversationHistory.map((item) => ({
-        sender: item.sender,
-        text: item.text,
+    if (conversationBlocks.length > 0) {
+      context.conversation_blocks = conversationBlocks.map((item) => ({
+        speaker: item.speaker,
+        content: item.content,
+        source: item.source ?? "manual",
+      }));
+      context.conversation_history = conversationBlocks.map((item) => ({
+        sender: item.speaker === "user" ? "outgoing" : "incoming",
+        text: item.content,
       }));
     }
     return Object.keys(context).length > 0 ? context : undefined;
   }
 
-  function handleImageSelection(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0] ?? null;
-    if (file && !file.type.startsWith("image/")) {
-      setOcrImageFile(null);
-      setOcrError("Selecciona una imagen valida (PNG, JPG o WebP).");
-      setOcrInfo(null);
-      return;
+  function syncConversationBlocks(blocks: ConversationBlock[]) {
+    setConversationBlocks(blocks);
+    const structuredText = formatConversationBlocksForContext(blocks);
+    if (structuredText) {
+      setMessageText(structuredText);
     }
-    setOcrImageFile(file);
-    setOcrError(null);
-    setOcrInfo(null);
   }
 
-  async function handleExtractTextFromImage() {
-    if (!ocrImageFile || ocrLoading) return;
+  async function interpretConversationText(
+    rawText: string,
+    source: "ocr" | "text",
+    options?: { forceGemini?: boolean },
+  ) {
+    const normalized = rawText.trim();
+    if (!normalized) {
+      setConversationBlocks([]);
+      return;
+    }
+    setAutoParsing(true);
+    setAutoParseError(null);
+    try {
+      const localFallback = heuristicSegmentConversation(
+        normalized,
+        source === "ocr" ? "ocr" : "manual",
+      );
+      const shouldUseGemini = options?.forceGemini || source === "ocr" || localFallback.length < 2;
+      if (!shouldUseGemini) {
+        if (localFallback.length > 0) {
+          syncConversationBlocks(localFallback);
+        }
+        return;
+      }
+      const interpreted = await postOcrInterpret({ text: normalized, source });
+      const apiBlocks: ConversationBlock[] = interpreted.conversation_turns
+        .map((turn) =>
+          createConversationBlock(
+            turn.speaker === "me" ? "user" : "ex_partner",
+            turn.text,
+            source === "ocr" ? "ocr" : "manual",
+          ),
+        )
+        .filter((block) => block.content.length > 0);
+      if (apiBlocks.length > 0) {
+        syncConversationBlocks(apiBlocks);
+        return;
+      }
+      if (localFallback.length > 0) {
+        syncConversationBlocks(localFallback);
+      }
+    } catch {
+      const fallbackBlocks = heuristicSegmentConversation(
+        normalized,
+        source === "ocr" ? "ocr" : "manual",
+      );
+      if (fallbackBlocks.length > 0) {
+        syncConversationBlocks(fallbackBlocks);
+      }
+      setAutoParseError(
+        "No pudimos interpretar perfectamente todos los turnos. Revisa los bloques antes de generar la respuesta.",
+      );
+    } finally {
+      setAutoParsing(false);
+    }
+  }
+
+  async function handleExtractTextFromImage(file: File) {
+    if (ocrLoading) return;
     if (!hasStoredSession()) {
       setOcrError("Tu sesion no esta activa. Inicia sesion para usar esta funcion.");
       return;
@@ -498,7 +584,7 @@ export function WizardScaffold() {
     setOcrInfo(null);
     try {
       const formData = new FormData();
-      formData.append("file", ocrImageFile);
+      formData.append("file", file);
       const response = await authFetch(OCR_EXTRACT_URL, {
         method: "POST",
         body: formData,
@@ -514,6 +600,25 @@ export function WizardScaffold() {
       const payload = (await response.json()) as OcrExtractResponse;
       setMessageText(payload.extracted_text);
       setOcrInfo(payload);
+      setOcrStatusMessage("Texto interpretado automaticamente.");
+      if (payload.conversation_turns && payload.conversation_turns.length > 0) {
+        const blocksFromOcr = payload.conversation_turns
+          .map((turn) =>
+            createConversationBlock(
+              turn.speaker === "me" ? "user" : "ex_partner",
+              turn.text,
+              "ocr",
+            ),
+          )
+          .filter((block) => block.content.length > 0);
+        if (blocksFromOcr.length > 0) {
+          syncConversationBlocks(blocksFromOcr);
+        } else {
+          await interpretConversationText(payload.extracted_text, "ocr", { forceGemini: true });
+        }
+      } else {
+        await interpretConversationText(payload.extracted_text, "ocr", { forceGemini: true });
+      }
     } catch (exc) {
       setOcrError(
         exc instanceof Error
@@ -525,8 +630,80 @@ export function WizardScaffold() {
     }
   }
 
+  async function processImageFile(file: File) {
+    if (!file.type.startsWith("image/")) {
+      setOcrError("Selecciona una imagen valida (PNG, JPG o WebP).");
+      setOcrInfo(null);
+      setOcrStatusMessage(null);
+      return;
+    }
+    setOcrError(null);
+    setOcrInfo(null);
+    setOcrStatusMessage("Procesando captura...");
+    await handleExtractTextFromImage(file);
+  }
+
+  function handleImageSelection(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    if (!file) return;
+    void processImageFile(file);
+    event.target.value = "";
+  }
+
+  function handleStepOnePaste(event: ClipboardEvent<HTMLElement>) {
+    const clipboardItems = Array.from(event.clipboardData?.items ?? []);
+    const imageItem = clipboardItems.find((item) => item.type.startsWith("image/"));
+    if (imageItem) {
+      const file = imageItem.getAsFile();
+      if (file) {
+        event.preventDefault();
+        void processImageFile(file);
+      }
+      return;
+    }
+    const pastedText = event.clipboardData.getData("text");
+    if (pastedText && looksLikeConversationInput(pastedText)) {
+      window.setTimeout(() => {
+        void interpretConversationText(pastedText, "text");
+      }, 0);
+    }
+  }
+
+  function handleMessageTextChange(nextValue: string) {
+    setMessageText(nextValue);
+    if (manualInterpretTimerRef.current !== null) {
+      window.clearTimeout(manualInterpretTimerRef.current);
+      manualInterpretTimerRef.current = null;
+    }
+    if (!looksLikeConversationInput(nextValue)) {
+      return;
+    }
+    manualInterpretTimerRef.current = window.setTimeout(() => {
+      void interpretConversationText(nextValue, "text");
+    }, 450);
+  }
+
+  function updateConversationBlockSpeaker(
+    blockId: string,
+    speaker: ConversationBlock["speaker"],
+  ) {
+    const updated = conversationBlocks.map((block) =>
+      block.id === blockId ? { ...block, speaker } : block,
+    );
+    syncConversationBlocks(updated);
+  }
+
+  function updateConversationBlockText(blockId: string, content: string) {
+    const updated = conversationBlocks.map((block) =>
+      block.id === blockId ? { ...block, content } : block,
+    );
+    syncConversationBlocks(updated);
+  }
+
   async function runAnalysis() {
-    const text = messageText.trim();
+    const text =
+      getLatestExPartnerMessage(conversationBlocks) ??
+      messageText.trim();
     if (!text || loadingAnalysis) return;
     const sourceType = ocrInfo ? "ocr" : "text";
 
@@ -555,7 +732,9 @@ export function WizardScaffold() {
   }
 
   async function requestAdvisor(params: { quickMode: boolean; analysisId?: string | null }) {
-    const text = messageText.trim();
+    const text =
+      getLatestExPartnerMessage(conversationBlocks) ??
+      messageText.trim();
     if (!text || loadingAdvisor) return;
     const sourceType = ocrInfo ? "ocr" : "text";
 
@@ -591,7 +770,7 @@ export function WizardScaffold() {
   }
 
   async function handleContinueFromStep1() {
-    if (!messageText.trim()) return;
+    if (!messageText.trim() && conversationBlocks.length === 0) return;
     setAnalysisResult(null);
     setAnalysisId(null);
     setAnalysisError(null);
@@ -616,14 +795,13 @@ export function WizardScaffold() {
     setAdvisorResult(null);
     setAdvisorError(null);
     setCopiedIndex(null);
-    setOcrImageFile(null);
     setOcrInfo(null);
     setOcrError(null);
+    setOcrStatusMessage(null);
     setOcrLoading(false);
-    setConversationHistory([]);
-    setHistoryInputOpen(false);
-    setHistorySender("incoming");
-    setHistoryMessageText("");
+    setConversationBlocks([]);
+    setAutoParsing(false);
+    setAutoParseError(null);
     setResponseTone("cordial");
   }
 
@@ -662,7 +840,7 @@ export function WizardScaffold() {
     setIncidentSaving(true);
     setIncidentNotice(null);
     try {
-      const created = await postIncident({
+      await postIncident({
         case_id: selectedCaseId,
         incident_type: incidentType,
         title: normalizedTitle,
@@ -672,7 +850,6 @@ export function WizardScaffold() {
         related_session_id: advisorResult?.session_id ?? undefined,
         incident_date: incidentDate,
       });
-      setCaseIncidents((previous) => [created, ...previous.filter((item) => item.id !== created.id)]);
       setIncidentNotice("Evento registrado en el contexto actual.");
       setIncidentVisible(false);
       setIncidentTitle("");
@@ -682,48 +859,6 @@ export function WizardScaffold() {
     } finally {
       setIncidentSaving(false);
     }
-  }
-
-  async function handleConfirmIncident(incidentId: string) {
-    if (confirmingIncidentId) return;
-    setConfirmingIncidentId(incidentId);
-    setIncidentsError(null);
-    try {
-      const updated = await patchIncident(incidentId, { confirmed: true });
-      setCaseIncidents((previous) =>
-        previous.map((item) => (item.id === incidentId ? updated : item)),
-      );
-    } catch (exc) {
-      setIncidentsError(toUiErrorMessage(exc, "No se pudo confirmar el incidente."));
-    } finally {
-      setConfirmingIncidentId(null);
-    }
-  }
-
-  async function handleExportCase() {
-    if (!selectedCaseId || exportingCase) return;
-    setExportingCase(true);
-    setCaseError(null);
-    try {
-      await downloadCaseExport(selectedCaseId);
-    } catch (exc) {
-      setCaseError(toUiErrorMessage(exc, "No se pudo exportar el caso."));
-    } finally {
-      setExportingCase(false);
-    }
-  }
-
-  function handleAddHistoryMessage() {
-    const normalized = historyMessageText.trim();
-    if (!normalized) return;
-    const message: ConversationMessage = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      sender: historySender,
-      text: normalized,
-    };
-    setConversationHistory((prev) => [...prev, message]);
-    setHistoryMessageText("");
-    setHistoryInputOpen(false);
   }
 
   function openAdvisorChat(index: number) {
@@ -822,95 +957,58 @@ export function WizardScaffold() {
 
       {currentStep === 1 ? (
         <div className="space-y-4">
-          <div className="rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] p-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-[#64748B]">Contexto del caso</p>
-                <p className="text-sm font-semibold text-[#0F172A]">
-                  {activeCase?.title || "Sin contexto disponible"}
-                </p>
-              </div>
-              <Button
-                type="button"
-                onClick={() => void handleExportCase()}
-                disabled={!selectedCaseId || exportingCase}
-                variant="secondary"
-                className="border-[#CBD5E1] bg-white text-[#334155]"
-              >
-                {exportingCase ? "Exportando..." : "Exportar caso"}
-              </Button>
-            </div>
-            {activeCase?.summary ? (
-              <p className="mt-2 text-xs text-[#475569]">{activeCase.summary}</p>
-            ) : null}
-            {caseError ? <p className="mt-2 text-xs text-red-700">{caseError}</p> : null}
-          </div>
-
           <div>
             <h3 className="text-lg font-semibold text-[#1f2937]">Mensaje recibido</h3>
             <p className="mt-1 text-sm text-[#334155]">
-              Escribe el mensaje y agrega contexto para generar respuestas mas claras.
+              Sube, pega o escribe la conversacion. ExReply la interpreta automaticamente.
             </p>
+            {caseError ? <p className="mt-2 text-xs text-red-700">{caseError}</p> : null}
           </div>
 
           <div className="grid gap-4 xl:grid-cols-2">
-            <section className="min-w-0 space-y-3 rounded-2xl border border-[#E2E8F0] bg-white p-4">
+            <section
+              className="min-w-0 space-y-3 rounded-2xl border border-[#E2E8F0] bg-white p-4"
+              onPaste={handleStepOnePaste}
+            >
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-[#1f2937]">Mensaje recibido</label>
+                <label className="block text-sm font-medium text-[#1f2937]">Captura o texto</label>
                 <div className="rounded-xl border border-dashed border-[#CBD5E1] bg-[#F8FAFC] p-3">
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-3">
                     <input
                       type="file"
                       accept="image/*"
                       onChange={handleImageSelection}
+                      disabled={ocrCapabilities?.available === false || ocrCapabilitiesLoading}
                       className="text-xs text-[#334155]"
                     />
-                    <Button
-                      type="button"
-                      onClick={() => void handleExtractTextFromImage()}
-                      disabled={
-                        !ocrImageFile ||
-                        ocrLoading ||
-                        ocrCapabilitiesLoading ||
-                        ocrCapabilities?.available === false
-                      }
-                      variant="secondary"
-                      className="border-[#CBD5E1] bg-white px-3 py-1.5 text-xs text-[#334155]"
-                    >
-                      {ocrLoading
-                        ? "Leyendo texto..."
-                        : ocrCapabilitiesLoading
-                          ? "Preparando OCR..."
-                          : "Leer texto de la imagen"}
-                    </Button>
+                    <p className="text-xs text-[#64748B]">
+                      Puedes pegar una captura desde clipboard. El OCR corre automaticamente.
+                    </p>
                   </div>
                   {ocrCapabilities?.available === false ? (
                     <p className="mt-2 text-xs text-amber-700">
                       OCR no disponible: {resolveOcrErrorMessage(ocrCapabilities.reason_codes[0])}
                     </p>
                   ) : null}
-                  {ocrImagePreviewUrl ? (
-                    <Image
-                      src={ocrImagePreviewUrl}
-                      alt="Preview OCR"
-                      width={560}
-                      height={260}
-                      className="mt-3 max-h-56 w-full rounded-lg border border-[#DBE3EC] object-contain"
-                    />
-                  ) : null}
-                  {ocrInfo ? (
+                  {ocrLoading || autoParsing ? (
                     <p className="mt-2 text-xs text-[#334155]">
-                      Texto cargado desde imagen ({ocrInfo.provider})
-                      {ocrInfo.confidence !== null ? `, confianza ${(ocrInfo.confidence * 100).toFixed(1)}%` : ""}
+                      Procesando captura e interpretando mensajes...
+                    </p>
+                  ) : null}
+                  {ocrStatusMessage ? (
+                    <p className="mt-2 text-xs text-[#334155]">
+                      {ocrStatusMessage}
+                      {ocrInfo?.provider ? ` (${ocrInfo.provider})` : ""}
                     </p>
                   ) : null}
                   {ocrError ? <p className="mt-2 text-xs text-red-700">{ocrError}</p> : null}
+                  {autoParseError ? <p className="mt-2 text-xs text-amber-700">{autoParseError}</p> : null}
                 </div>
                 <Textarea
                   value={messageText}
-                  onChange={(event) => setMessageText(event.target.value)}
+                  onChange={(event) => handleMessageTextChange(event.target.value)}
                   rows={6}
-                  placeholder="Pega aquí el mensaje que recibiste o copia la conversación de WhatsApp"
+                  placeholder="Pega aqui el mensaje que recibiste o copia la conversacion de WhatsApp"
                   className="min-h-[170px] rounded-xl border-[#E2E8F0] bg-white text-[#1F2937]"
                 />
               </div>
@@ -921,7 +1019,7 @@ export function WizardScaffold() {
                   value={contextOptional}
                   onChange={(event) => setContextOptional(event.target.value)}
                   rows={3}
-                  placeholder="Escribe lo que creas necesario para que entendamos mejor la conversación"
+                  placeholder="Escribe lo que creas necesario para entender mejor la conversacion"
                   className="border-[#E2E8F0] bg-white text-[#1F2937]"
                 />
               </div>
@@ -950,7 +1048,7 @@ export function WizardScaffold() {
                 <Button
                   type="button"
                   onClick={handleContinueFromStep1}
-                  disabled={!messageText.trim() || loadingAnalysis}
+                  disabled={(!messageText.trim() && conversationBlocks.length === 0) || loadingAnalysis}
                   variant="primary"
                   className="min-w-[170px] bg-[#1F2937] hover:bg-[#111827]"
                 >
@@ -962,7 +1060,7 @@ export function WizardScaffold() {
                     setQuickMode(true);
                     void handleQuickResponse();
                   }}
-                  disabled={!messageText.trim() || loadingAdvisor}
+                  disabled={(!messageText.trim() && conversationBlocks.length === 0) || loadingAdvisor}
                   variant="secondary"
                   className="min-w-[170px] border-[#CBD5E1] bg-white text-[#334155] hover:bg-[#F8FAFC]"
                 >
@@ -973,131 +1071,65 @@ export function WizardScaffold() {
             </section>
 
             <section className="min-w-0 space-y-3 rounded-2xl border border-[#E2E8F0] bg-white p-4">
-              <div className="flex items-center justify-between gap-2">
-                <h4 className="text-sm font-semibold text-[#0F172A]">Historial conversacion</h4>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => setHistoryInputOpen((prev) => !prev)}
-                  className="border-[#CBD5E1] bg-white px-3 py-1.5 text-xs text-[#334155]"
-                >
-                  Agregar mensaje previo
-                </Button>
-              </div>
+              <h4 className="text-sm font-semibold text-[#0F172A]">Conversacion interpretada</h4>
+              <p className="text-xs text-[#64748B]">
+                Revisa quien dijo cada mensaje antes de generar la respuesta.
+              </p>
 
-              <div className="max-h-[340px] space-y-2 overflow-y-auto rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-3">
-                {conversationHistory.length === 0 && !messageText.trim() ? (
+              <div className="max-h-[420px] space-y-2 overflow-y-auto rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-3">
+                {conversationBlocks.length === 0 ? (
                   <p className="text-xs text-[#64748B]">
-                    Agrega mensajes previos para dar contexto visual a la conversacion.
+                    Cuando detectemos una conversacion, aparecera aqui en bloques editables.
                   </p>
                 ) : null}
-                {conversationHistory.map((item) => (
+                {conversationBlocks.map((item) => (
                   <div
                     key={item.id}
-                    className={`max-w-[86%] rounded-2xl px-3 py-2 text-sm leading-6 ${
-                      item.sender === "incoming"
+                    className={`max-w-[90%] rounded-2xl px-3 py-2 text-sm leading-6 ${
+                      item.speaker === "ex_partner"
                         ? "mr-auto bg-[#EEF2F7] text-[#0F172A]"
                         : "ml-auto bg-[#DBEAFE] text-[#1E3A8A]"
                     }`}
                   >
-                    {item.text}
+                    <div className="mb-2 inline-flex rounded-full border border-[#CBD5E1] bg-white p-0.5 text-[11px]">
+                      <button
+                        type="button"
+                        onClick={() => updateConversationBlockSpeaker(item.id, "ex_partner")}
+                        className={`rounded-full px-2 py-0.5 ${
+                          item.speaker === "ex_partner"
+                            ? "bg-[#E2E8F0] font-semibold text-[#0F172A]"
+                            : "text-[#64748B]"
+                        }`}
+                      >
+                        Ex pareja
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => updateConversationBlockSpeaker(item.id, "user")}
+                        className={`rounded-full px-2 py-0.5 ${
+                          item.speaker === "user"
+                            ? "bg-[#BFDBFE] font-semibold text-[#1E3A8A]"
+                            : "text-[#64748B]"
+                        }`}
+                      >
+                        Yo
+                      </button>
+                    </div>
+                    <Textarea
+                      value={item.content}
+                      onChange={(event) => updateConversationBlockText(item.id, event.target.value)}
+                      rows={2}
+                      className={`border-0 bg-transparent p-0 text-sm leading-6 focus-visible:ring-0 ${
+                        item.speaker === "user" ? "text-[#1E3A8A]" : "text-[#0F172A]"
+                      }`}
+                    />
                   </div>
                 ))}
-                {messageText.trim() ? (
-                  <div className="max-w-[86%] rounded-2xl bg-[#EEF2F7] px-3 py-2 text-sm leading-6 text-[#0F172A]">
-                    {messageText.trim()}
-                  </div>
-                ) : null}
-              </div>
-
-              {historyInputOpen ? (
-                <div className="space-y-2 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-3">
-                  <label className="block text-xs font-semibold uppercase tracking-wide text-[#64748B]">
-                    Mensaje de
-                  </label>
-                  <Select
-                    value={historySender}
-                    onChange={(event) => setHistorySender(event.target.value as ChatSender)}
-                    className="border-[#E2E8F0] bg-white text-[#1F2937]"
-                  >
-                    <option value="incoming">Mi expareja</option>
-                    <option value="outgoing">Yo</option>
-                  </Select>
-                  <Textarea
-                    value={historyMessageText}
-                    onChange={(event) => setHistoryMessageText(event.target.value)}
-                    rows={3}
-                    placeholder="Escribe el mensaje previo"
-                    className="border-[#E2E8F0] bg-white text-[#1F2937]"
-                  />
-                  <div className="flex justify-end">
-                    <Button
-                      type="button"
-                      onClick={handleAddHistoryMessage}
-                      disabled={!historyMessageText.trim()}
-                      variant="secondary"
-                      className="border-[#CBD5E1] bg-white text-[#334155]"
-                    >
-                      Guardar mensaje
-                    </Button>
-                  </div>
-                </div>
-              ) : null}
-
-              <div className="rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-3">
-                <p className="text-sm font-semibold text-[#1F2937]">Case Context</p>
-                {!selectedCaseId ? (
-                  <p className="mt-2 text-xs text-[#475569]">Sin contexto disponible.</p>
-                ) : (
-                  <div className="mt-2 grid gap-3 lg:grid-cols-2">
-                    <div className="space-y-2">
-                      <p className="text-xs font-semibold text-[#1f2937]">Timeline</p>
-                      <CaseTimeline caseId={selectedCaseId} />
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-xs font-semibold text-[#1f2937]">Incidents</p>
-                      {incidentsLoading ? (
-                        <p className="text-xs text-[#475569]">Cargando incidentes...</p>
-                      ) : incidentsError ? (
-                        <p className="text-xs text-red-700">{incidentsError}</p>
-                      ) : caseIncidents.length === 0 ? (
-                        <p className="text-xs text-[#475569]">Sin incidentes para este caso.</p>
-                      ) : (
-                        <ul className="space-y-2">
-                          {caseIncidents.map((incident) => (
-                            <li key={incident.id} className="rounded-lg border border-[#E2E8F0] bg-white p-2 text-xs text-[#334155]">
-                              <div className="flex flex-wrap items-center justify-between gap-2">
-                                <span className="font-medium text-[#1f2937]">{incident.incident_type}</span>
-                                <span>{new Date(incident.incident_date).toLocaleDateString()}</span>
-                              </div>
-                              <p className="mt-1">{incident.title}</p>
-                              <div className="mt-2 flex items-center justify-between">
-                                <span>{incident.confirmed ? "Confirmado" : "Pendiente confirmar"}</span>
-                                {!incident.confirmed ? (
-                                  <Button
-                                    type="button"
-                                    variant="secondary"
-                                    className="border-[#CBD5E1] bg-white text-[#334155]"
-                                    disabled={confirmingIncidentId === incident.id}
-                                    onClick={() => void handleConfirmIncident(incident.id)}
-                                  >
-                                    {confirmingIncidentId === incident.id ? "Confirmando..." : "Confirm incident"}
-                                  </Button>
-                                ) : null}
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  </div>
-                )}
               </div>
             </section>
           </div>
         </div>
       ) : null}
-
       {currentStep === 2 ? (
         <div className="space-y-4">
           <div>
