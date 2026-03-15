@@ -14,9 +14,35 @@ from app.schemas.cases import CaseCreateRequest
 from app.schemas.cases import CaseListResponse
 from app.schemas.cases import CaseSummary
 from app.schemas.cases import CaseUpdateRequest
+from app.schemas.analysis import RelationshipType
 from app.services.auth_service import AuthenticatedUser
 
 router = APIRouter(prefix="/v1/cases", tags=["cases"])
+
+_ALLOWED_RELATIONSHIP_TYPES: set[RelationshipType] = {
+    "pareja",
+    "familia",
+    "amistad",
+    "trabajo",
+    "cliente",
+    "otro",
+}
+
+_LEGACY_RELATIONSHIP_MAP: dict[str, RelationshipType] = {
+    "coparenting": "otro",
+    "relationship_separation": "pareja",
+}
+
+
+def _normalize_relationship_type(value: object) -> RelationshipType | None:
+    if value is None:
+        return None
+    normalized = str(value).strip().lower()
+    if not normalized:
+        return None
+    if normalized in _ALLOWED_RELATIONSHIP_TYPES:
+        return normalized  # type: ignore[return-value]
+    return _LEGACY_RELATIONSHIP_MAP.get(normalized, "otro")
 
 
 def _to_case_summary(row: dict) -> CaseSummary:
@@ -24,7 +50,7 @@ def _to_case_summary(row: dict) -> CaseSummary:
         id=row["id"],
         title=str(row.get("title") or ""),
         contact_name=row.get("contact_name"),
-        relationship_type=row.get("relationship_label"),
+        relationship_type=_normalize_relationship_type(row.get("relationship_label")),
         summary=str(row.get("summary") or ""),
         contact_id=row.get("contact_id"),
         last_activity_at=row["last_activity_at"],
