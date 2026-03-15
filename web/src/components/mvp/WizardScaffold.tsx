@@ -50,7 +50,7 @@ type ResponseTone = (typeof responseStyleOptions)[number]["value"];
 
 type ConversationBlock = {
   id: string;
-  speaker: "ex_partner" | "user";
+  speaker: "ex_partner" | "user" | "unknown";
   content: string;
   confidence?: number;
   source?: "manual" | "ocr";
@@ -148,7 +148,12 @@ function formatConversationBlocksForContext(blocks: ConversationBlock[]): string
     .map((block) => {
       const text = block.content.trim();
       if (!text) return null;
-      const prefix = block.speaker === "user" ? "Yo" : "Ex pareja";
+      const prefix =
+        block.speaker === "user"
+          ? "Yo"
+          : block.speaker === "ex_partner"
+            ? "Ex pareja"
+            : "Sin identificar";
       return `${prefix}: ${text}`;
     })
     .filter((line): line is string => Boolean(line))
@@ -212,9 +217,9 @@ function getLatestExPartnerMessage(blocks: ConversationBlock[]): string | null {
   for (let index = blocks.length - 1; index >= 0; index -= 1) {
     const block = blocks[index];
     if (!block) continue;
-    if (block.speaker === "ex_partner" && block.content.trim()) {
-      return block.content.trim();
-    }
+      if (block.speaker === "ex_partner" && block.content.trim()) {
+        return block.content.trim();
+      }
   }
   return null;
 }
@@ -1109,7 +1114,9 @@ export function WizardScaffold() {
                     className={`max-w-[94%] break-words rounded-2xl px-3 py-2 text-sm leading-6 ${
                       item.speaker === "ex_partner"
                         ? "mr-auto bg-[#EEF2F7] text-[#0F172A]"
-                        : "ml-auto bg-[#DBEAFE] text-[#1E3A8A]"
+                        : item.speaker === "user"
+                          ? "ml-auto bg-[#DBEAFE] text-[#1E3A8A]"
+                          : "mr-auto bg-[#F1F5F9] text-[#334155]"
                     }`}
                   >
                     <div className="mb-2 inline-flex rounded-full border border-[#CBD5E1] bg-white p-0.5 text-[11px]">
@@ -1135,13 +1142,28 @@ export function WizardScaffold() {
                       >
                         Yo
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => updateConversationBlockSpeaker(item.id, "unknown")}
+                        className={`rounded-full px-2 py-0.5 ${
+                          item.speaker === "unknown"
+                            ? "bg-[#E2E8F0] font-semibold text-[#334155]"
+                            : "text-[#64748B]"
+                        }`}
+                      >
+                        Sin identificar
+                      </button>
                     </div>
                     <Textarea
                       value={item.content}
                       onChange={(event) => updateConversationBlockText(item.id, event.target.value)}
                       rows={Math.max(2, Math.ceil(item.content.length / 42))}
                       className={`w-full resize-none overflow-hidden whitespace-pre-wrap break-words border-0 bg-transparent p-0 text-sm leading-6 focus-visible:ring-0 ${
-                        item.speaker === "user" ? "text-[#1E3A8A]" : "text-[#0F172A]"
+                        item.speaker === "user"
+                          ? "text-[#1E3A8A]"
+                          : item.speaker === "ex_partner"
+                            ? "text-[#0F172A]"
+                            : "text-[#334155]"
                       }`}
                     />
                   </div>

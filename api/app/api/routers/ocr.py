@@ -14,6 +14,8 @@ from app.api.deps import get_auth_service
 from app.api.deps import get_ai_provider
 from app.api.deps import get_current_user
 from app.api.deps import get_ocr_service
+from app.api.deps import get_uow
+from app.repositories import UnitOfWork
 from app.schemas.ocr import OcrCapabilitiesResponse
 from app.schemas.ocr import OcrConversationTurn
 from app.schemas.ocr import OcrExtractResponse
@@ -163,15 +165,29 @@ else:
 )
 async def interpret_text_as_conversation(
     payload: OcrInterpretRequest,
-    _: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
     provider: Annotated[AIProvider, Depends(get_ai_provider)],
+    uow: Annotated[UnitOfWork | None, Depends(get_uow)],
 ) -> OcrInterpretResponse:
     """Interpret plain OCR/text content into message turns with optional Gemini assist."""
     text = payload.text.strip()
     if not text:
         raise HTTPException(status_code=400, detail="empty_interpretation_text")
+    ex_partner_name: str | None = current_user.ex_partner_name
+    if not ex_partner_name and uow is not None:
+        try:
+            default_case = uow.cases.get_default_for_user(user_id=current_user.id)
+            if default_case:
+                ex_partner_name = str(default_case.get("contact_name") or "").strip() or None
+        except Exception:
+            ex_partner_name = None
     parser = OcrConversationParser(provider=provider)
-    parsed = parser.parse(text=text, source=payload.source)
+    parsed = parser.parse(
+        text=text,
+        source=payload.source,
+        user_name=current_user.name,
+        ex_partner_name=ex_partner_name,
+    )
     legacy_turns = [
         OcrConversationTurn(
             speaker="me" if block.speaker == "user" else "them",

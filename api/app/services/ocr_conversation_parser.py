@@ -46,6 +46,10 @@ OCR text:
 {text}
 """
 
+_WHATSAPP_LINE_PATTERN = re.compile(
+    r"^\[(\d{1,2}:\d{2}),\s*(\d{1,2}/\d{1,2}/\d{4})\]\s*([^:]+):\s*(.*)$"
+)
+
 
 class OcrParseResult(BaseModel):
     blocks: list[OcrConversationBlock] = Field(default_factory=list)
@@ -54,7 +58,7 @@ class OcrParseResult(BaseModel):
 
 
 class _GeminiBlock(BaseModel):
-    speaker: Literal["ex_partner", "user"]
+    speaker: Literal["ex_partner", "user", "unknown"]
     content: str = Field(min_length=1)
     confidence: float = Field(ge=0, le=1)
 
@@ -67,15 +71,37 @@ class OcrConversationParser:
     def __init__(self, provider: AIProvider) -> None:
         self._provider = provider
 
-    def parse(self, *, text: str, source: Literal["ocr", "text"]) -> OcrParseResult:
+    def parse(
+        self,
+        *,
+        text: str,
+        source: Literal["ocr", "text"],
+        user_name: str | None = None,
+        ex_partner_name: str | None = None,
+    ) -> OcrParseResult:
         normalized = text.strip()
         if not normalized:
             return OcrParseResult(blocks=[], method="heuristic", warnings=["conversation_interpretation_empty"])
 
+        if source == "text" and _looks_like_whatsapp_structured(normalized):
+            logger.info("parser_whatsapp_detected")
+            whatsapp_blocks = _parse_whatsapp_structured(
+                normalized,
+                user_name=user_name,
+                ex_partner_name=ex_partner_name,
+            )
+            if whatsapp_blocks:
+                logger.info("parser_whatsapp_blocks_created blocks=%s", len(whatsapp_blocks))
+                unknown_count = sum(1 for block in whatsapp_blocks if block.speaker == "unknown")
+                if unknown_count > 0:
+                    logger.info("parser_whatsapp_unknown_speakers count=%s", unknown_count)
+                return OcrParseResult(blocks=whatsapp_blocks, method="heuristic", warnings=[])
+
         fallback_blocks = _heuristic_segment(normalized)
-        should_use_gemini = source == "ocr" or len(fallback_blocks) < 2
+        should_use_gemini = source == "ocr" or not _looks_like_whatsapp_structured(normalized)
 
         if should_use_gemini:
+            logger.info("parser_gemini_attempted")
             try:
                 prompt = _PARSER_PROMPT.format(text=normalized)
                 raw_response = self._provider.generate_answer(prompt)
@@ -84,7 +110,9 @@ class OcrConversationParser:
                     logger.info("parser_gemini_success blocks=%s", len(gemini_blocks))
                     return OcrParseResult(blocks=gemini_blocks, method="gemini", warnings=[])
                 logger.warning("parser_gemini_failed reason=empty_blocks")
-            except (AIProviderError, ValidationError, ValueError, json.JSONDecodeError) as exc:
+            except (ValueError, json.JSONDecodeError) as exc:
+                logger.warning("parser_gemini_invalid_json error=%s", exc)
+            except (AIProviderError, ValidationError) as exc:
                 logger.warning("parser_gemini_failed error=%s", exc)
             except Exception as exc:
                 logger.warning("parser_gemini_failed error=%s", exc)
@@ -124,8 +152,8 @@ def _heuristic_segment(text: str) -> list[OcrConversationBlock]:
         return []
 
     chunks: list[tuple[str, str, float]] = []
-    current_speaker: Literal["ex_partner", "user"] = "ex_partner"
-    current_confidence = 0.25
+    current_speaker: Literal["ex_partner", "user", "unknown"] = "ex_partner"
+    current_confidence = 0.2
     current_lines: list[str] = []
 
     for raw_line in lines:
@@ -167,14 +195,14 @@ def _heuristic_segment(text: str) -> list[OcrConversationBlock]:
 
 def _parse_labeled_line(
     line: str,
-) -> tuple[Literal["ex_partner", "user"] | None, str, float]:
+) -> tuple[Literal["ex_partner", "user", "unknown"] | None, str, float]:
     pattern = re.compile(
         r"^(yo|me|mi|tu|vos|ex|expareja|ex pareja|ella|el)\s*[:\-]\s*(.+)$",
         re.IGNORECASE,
     )
     match = pattern.match(line)
     if not match:
-        return None, line, 0.25
+        return None, line, 0.2
 
     marker = match.group(1).strip().lower()
     text = match.group(2).strip()
@@ -192,24 +220,98 @@ def _extract_json_object(raw_text: str) -> dict[str, object] | None:
     if not text:
         return None
 
+    text = text.replace("```json", "").replace("```", "").strip()
+    first_brace = text.find("{")
+    last_brace = text.rfind("}")
+    if first_brace != -1 and last_brace != -1 and last_brace >= first_brace:
+        text = text[first_brace : last_brace + 1]
+
     try:
         parsed = json.loads(text)
         if isinstance(parsed, dict):
             return parsed
     except json.JSONDecodeError:
         pass
-
-    fenced_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, flags=re.DOTALL)
-    if fenced_match:
+    decoder = json.JSONDecoder()
+    for index, char in enumerate(text):
+        if char != "{":
+            continue
         try:
-            parsed = json.loads(fenced_match.group(1))
+            parsed, _ = decoder.raw_decode(text[index:])
             if isinstance(parsed, dict):
                 return parsed
         except json.JSONDecodeError:
-            pass
+            continue
+    return None
 
-    bracket_match = re.search(r"\{.*\}", text, flags=re.DOTALL)
-    if not bracket_match:
-        return None
-    parsed = json.loads(bracket_match.group(0))
-    return parsed if isinstance(parsed, dict) else None
+
+def _looks_like_whatsapp_structured(text: str) -> bool:
+    matches = 0
+    for line in text.splitlines():
+        if _WHATSAPP_LINE_PATTERN.match(line.strip()):
+            matches += 1
+            if matches >= 2:
+                return True
+    return False
+
+
+def _normalize_person_name(value: str | None) -> str:
+    if not value:
+        return ""
+    text = value.strip().lower()
+    text = re.sub(r"[^\w\s]", " ", text, flags=re.UNICODE)
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
+
+
+def _parse_whatsapp_structured(
+    text: str,
+    *,
+    user_name: str | None,
+    ex_partner_name: str | None,
+) -> list[OcrConversationBlock]:
+    user_normalized = _normalize_person_name(user_name)
+    ex_normalized = _normalize_person_name(ex_partner_name)
+    records: list[dict[str, str]] = []
+
+    for raw_line in text.splitlines():
+        line = raw_line.rstrip()
+        if not line:
+            continue
+        match = _WHATSAPP_LINE_PATTERN.match(line)
+        if match:
+            records.append(
+                {
+                    "time": match.group(1).strip(),
+                    "date": match.group(2).strip(),
+                    "sender_name": match.group(3).strip(),
+                    "content": match.group(4).strip(),
+                }
+            )
+            continue
+        if records:
+            records[-1]["content"] = f"{records[-1]['content']}\n{line.strip()}".strip()
+
+    blocks: list[OcrConversationBlock] = []
+    for index, record in enumerate(records):
+        sender = _normalize_person_name(record.get("sender_name"))
+        content = str(record.get("content") or "").strip()
+        if not content:
+            continue
+        speaker: Literal["user", "ex_partner", "unknown"] = "unknown"
+        confidence = 0.4
+        if sender and sender == user_normalized:
+            speaker = "user"
+            confidence = 1.0
+        elif sender and sender == ex_normalized:
+            speaker = "ex_partner"
+            confidence = 1.0
+        blocks.append(
+            OcrConversationBlock(
+                id=str(index + 1),
+                speaker=speaker,
+                content=content,
+                confidence=confidence,
+            )
+        )
+    return blocks

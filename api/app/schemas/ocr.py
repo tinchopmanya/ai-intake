@@ -34,7 +34,7 @@ class OcrInterpretRequest(BaseModel):
 
 class OcrConversationBlock(BaseModel):
     id: str = Field(min_length=1)
-    speaker: Literal["ex_partner", "user"]
+    speaker: Literal["ex_partner", "user", "unknown"]
     content: str = Field(min_length=1)
     confidence: float | None = Field(default=None, ge=0, le=1)
 
