@@ -223,7 +223,7 @@ export type OcrInterpretRequest = {
 export type OcrInterpretResponse = {
   blocks: Array<{
     id: string;
-    speaker: "ex_partner" | "user";
+    speaker: "ex_partner" | "user" | "unknown";
     content: string;
     confidence?: number | null;
   }>;
