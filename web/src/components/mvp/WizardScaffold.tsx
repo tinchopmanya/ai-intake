@@ -309,15 +309,11 @@ export function WizardScaffold() {
   const hasResult = !!analysisResult;
 
   return (
-    <section className="mx-auto w-full min-w-0 space-y-6" onPaste={handleStepPaste}>
-      <div className={hasResult ? "grid items-start gap-6 md:grid-cols-2" : "block"}>
-        <div className="space-y-4">
+    <section className="mx-auto flex h-[100vh] w-full min-w-0 flex-col overflow-hidden" onPaste={handleStepPaste}>
+      <div className={hasResult ? "grid min-h-0 flex-1 items-start gap-6 p-3 md:grid-cols-2" : "min-h-0 flex-1 p-3"}>
+        <div className="min-h-0 space-y-4 overflow-y-auto pr-1 md:max-h-[calc(100vh-240px)]">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-[20px] font-semibold text-[#111]">Sube, pega o escribe la conversacion.</h2>
-            <div>
-              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelection} disabled={ocrCapabilities?.available === false || ocrCapabilitiesLoading} className="hidden" />
-              <button type="button" onClick={() => fileInputRef.current?.click()} disabled={ocrCapabilities?.available === false || ocrCapabilitiesLoading} className="h-[34px] rounded-md border border-[#ddd] bg-white px-[10px] text-[13px] text-[#111] hover:bg-[#fafafa] disabled:cursor-not-allowed disabled:opacity-60">Seleccionar archivo</button>
-            </div>
           </div>
           {caseError ? <p className="text-[13px] text-[#b91c1c]">{caseError}</p> : null}
           {ocrLoading || autoParsing ? <p className="text-[13px] text-[#666]">Interpretando conversacion...</p> : null}
@@ -328,24 +324,40 @@ export function WizardScaffold() {
           <div className={`grid gap-6 ${showInterpretedPanel ? "md:grid-cols-2" : "grid-cols-1"}`}>
             <div className="space-y-3">
               {showInterpretedPanel ? <p className="text-[13px] font-semibold text-[#555]">Conversacion original</p> : null}
-              <Textarea value={messageText} onChange={(event) => handleMessageTextChange(event.target.value)} rows={8} placeholder="Pega aqui la conversacion de WhatsApp o el mensaje recibido..." className="min-h-[160px] rounded-[10px] border border-[#e5e5e5] p-[18px] text-[16px] leading-[1.5] text-[#111]" />
+              <Textarea value={messageText} onChange={(event) => handleMessageTextChange(event.target.value)} rows={8} spellCheck={false} placeholder="Pega aqui la conversacion de WhatsApp o el mensaje recibido..." className="min-h-[160px] rounded-[10px] border border-[#ddd] p-4 text-[15px] leading-[1.5] text-[#111]" />
+              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelection} disabled={ocrCapabilities?.available === false || ocrCapabilitiesLoading} className="hidden" />
+              <button type="button" onClick={() => fileInputRef.current?.click()} disabled={ocrCapabilities?.available === false || ocrCapabilitiesLoading} className="rounded-[6px] border border-[#ddd] bg-white px-[10px] py-[6px] text-[13px] text-[#111] hover:bg-[#fafafa] disabled:cursor-not-allowed disabled:opacity-60">Seleccionar archivo</button>
             </div>
             {showInterpretedPanel ? (
-              <section className="min-h-0 rounded-[10px] border border-[#eee] bg-[#fafafa] p-4">
+              <section className="min-h-0 rounded-[10px] border border-[#eee] bg-[#fafafa] p-3">
                 <p className="text-[13px] font-semibold text-[#555]">Conversacion interpretada</p>
                 <p className="mt-1 text-[12px] text-[#666]">Revisa quien dijo cada mensaje antes de generar la respuesta.</p>
-                <div className="mt-3 max-h-[460px] space-y-3 overflow-y-auto pr-1">
+                <div className="mt-3 space-y-3">
                   {conversationBlocks.length === 0 ? <p className="text-[13px] text-[#666]">Aun no hay bloques interpretados.</p> : null}
-                  {conversationBlocks.map((item) => (
-                    <div key={item.id} className="rounded-[10px] border border-[#eee] bg-white p-3">
-                      <div className="mb-2 inline-flex rounded-[16px] border border-[#ddd] bg-white p-0.5 text-[13px]">
-                        <button type="button" onClick={() => updateConversationBlockSpeaker(item.id, "ex_partner")} className={`rounded-[14px] px-2 py-1 ${item.speaker === "ex_partner" ? "bg-[#f3f4f6] text-[#111]" : "text-[#666]"}`}>Ex pareja</button>
-                        <button type="button" onClick={() => updateConversationBlockSpeaker(item.id, "user")} className={`rounded-[14px] px-2 py-1 ${item.speaker === "user" ? "bg-[#f3f4f6] text-[#111]" : "text-[#666]"}`}>Yo</button>
-                        <button type="button" onClick={() => updateConversationBlockSpeaker(item.id, "unknown")} className={`rounded-[14px] px-2 py-1 ${item.speaker === "unknown" ? "bg-[#f3f4f6] text-[#111]" : "text-[#666]"}`}>Sin identificar</button>
+                  {conversationBlocks.map((item) => {
+                    const speakerContainer =
+                      item.speaker === "ex_partner"
+                        ? "border-[#f2d675] bg-[#fff7cc]"
+                        : item.speaker === "user"
+                          ? "border-[#bcd4ff] bg-[#eaf3ff]"
+                          : "border-[#f5b6c8] bg-[#fde7ef]";
+                    const speakerChip =
+                      item.speaker === "ex_partner"
+                        ? "border-[#f2d675] bg-[#fff7cc] text-[#6d5a1f]"
+                        : item.speaker === "user"
+                          ? "border-[#bcd4ff] bg-[#eaf3ff] text-[#264a87]"
+                          : "border-[#f5b6c8] bg-[#fde7ef] text-[#7d3d52]";
+                    return (
+                      <div key={item.id} className={`mb-[10px] rounded-[10px] border p-3 hover:border-[#d4d4d4] ${speakerContainer}`}>
+                        <div className="mb-2 inline-flex rounded-[14px] border border-[#ddd] bg-white p-0.5 text-[12px]">
+                          <button type="button" onClick={() => updateConversationBlockSpeaker(item.id, "ex_partner")} className={`inline-block rounded-[14px] border px-2 py-[3px] ${item.speaker === "ex_partner" ? speakerChip : "border-transparent bg-white text-[#666]"}`}>Ex pareja</button>
+                          <button type="button" onClick={() => updateConversationBlockSpeaker(item.id, "user")} className={`inline-block rounded-[14px] border px-2 py-[3px] ${item.speaker === "user" ? speakerChip : "border-transparent bg-white text-[#666]"}`}>Yo</button>
+                          <button type="button" onClick={() => updateConversationBlockSpeaker(item.id, "unknown")} className={`inline-block rounded-[14px] border px-2 py-[3px] ${item.speaker === "unknown" ? speakerChip : "border-transparent bg-white text-[#666]"}`}>Sin identificar</button>
+                        </div>
+                        <Textarea value={item.content} onChange={(event) => updateConversationBlockText(item.id, event.target.value)} rows={Math.max(2, Math.ceil(item.content.length / 52))} spellCheck={false} className={`w-full resize-none whitespace-pre-wrap break-words rounded-[10px] border p-3 text-[14px] leading-[1.6] text-[#222] ${speakerContainer}`} />
                       </div>
-                      <Textarea value={item.content} onChange={(event) => updateConversationBlockText(item.id, event.target.value)} rows={Math.max(2, Math.ceil(item.content.length / 52))} className="w-full resize-none whitespace-pre-wrap break-words border border-[#e5e5e5] bg-white p-3 text-[14px] leading-6 text-[#111]" />
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </section>
             ) : null}
@@ -353,33 +365,19 @@ export function WizardScaffold() {
 
           <div>
             <button type="button" onClick={() => setContextExpanded((prev) => !prev)} className="text-[13px] text-[#666] hover:text-[#111]">* Agregar contexto (opcional)</button>
-            {contextExpanded ? <Textarea value={contextOptional} onChange={(event) => setContextOptional(event.target.value)} rows={3} className="mt-2 rounded-[10px] border border-[#e5e5e5] bg-white text-[14px] text-[#111]" /> : null}
-          </div>
-
-          <div className="space-y-2">
-            <p className="text-[14px] font-semibold text-[#111]">Modo de respuesta</p>
-            <div className="flex flex-wrap gap-2">
-              {responseStyleOptions.map((item) => (
-                <button key={item.value} type="button" onClick={() => setResponseTone(item.value)} className={`rounded-[16px] border px-[10px] py-[6px] text-[13px] ${responseTone === item.value ? "border-[#bbb] bg-[#f3f4f6] text-[#111]" : "border-[#ddd] bg-white text-[#666] hover:bg-[#fafafa]"}`}>{item.label}</button>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2">
-            {hasConversationInput ? <button type="button" onClick={handleStartNewConversation} className="h-9 rounded-[8px] border border-[#e5e5e5] bg-white px-4 text-[13px] text-[#111] hover:bg-[#fafafa]">Limpiar</button> : null}
-            <Button type="button" onClick={() => void handleGenerateResponses()} disabled={(!messageText.trim() && conversationBlocks.length === 0) || loadingAnalysis || loadingAdvisor} variant="primary" className="h-9 rounded-[8px] bg-[#111] px-4 text-[13px] text-white hover:bg-[#222]">{loadingAnalysis ? "Analizando..." : loadingAdvisor ? "Generando..." : "Generar respuestas"}</Button>
+            {contextExpanded ? <Textarea value={contextOptional} onChange={(event) => setContextOptional(event.target.value)} rows={3} spellCheck={false} className="mt-2 rounded-[10px] border border-[#ddd] p-4 text-[15px] text-[#111]" /> : null}
           </div>
         </div>
 
         {hasResult ? (
-          <aside className="space-y-4">
-            <section className="rounded-[10px] border border-[#e5e5e5] bg-[#fafafa] p-4">
+          <aside className="min-h-0 space-y-4 overflow-y-auto pr-1 md:max-h-[calc(100vh-240px)]">
+            <section className="rounded-[10px] border border-[#e5e5e5] bg-[#fafafa] p-3">
               <h3 className="text-[16px] font-semibold text-[#111]">Analisis</h3>
               <p className="mt-2 whitespace-pre-wrap text-[14px] leading-[1.6] text-[#222]">{analysisResult.summary}</p>
             </section>
 
             {loadingAdvisor && !advisorResult ? (
-              <section className="rounded-[10px] border border-[#e5e5e5] bg-white p-4 text-[14px] text-[#666]">
+              <section className="rounded-[10px] border border-[#e5e5e5] bg-white p-3 text-[14px] text-[#666]">
                 Generando respuestas...
               </section>
             ) : null}
@@ -394,7 +392,7 @@ export function WizardScaffold() {
                     <article
                       key={`${advisor?.id ?? index}-${index}`}
                       onClick={() => openAdvisorChat(index)}
-                      className="mb-3 cursor-pointer rounded-[10px] border border-[#e5e5e5] bg-white p-4 transition-all duration-150 ease-in-out hover:border-[#d4d4d4] hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)] last:mb-0"
+                      className="mb-[12px] cursor-pointer rounded-[10px] border border-[#e5e5e5] bg-white p-4 transition-all duration-150 ease-in-out hover:border-[#d4d4d4] hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)] last:mb-0"
                     >
                       <header className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
@@ -409,8 +407,8 @@ export function WizardScaffold() {
                         {responseText || "Sin respuesta disponible."}
                       </p>
                       <div className="mt-4 flex flex-wrap justify-end gap-2">
-                        <Button type="button" onClick={(event) => { event.stopPropagation(); openAdvisorChat(index); }} disabled={!responseText} variant="secondary" className="h-9 border-[#e5e5e5] bg-white px-3 text-[13px] text-[#111] hover:bg-[#fafafa]">Refinar</Button>
-                        <Button type="button" onClick={(event) => { event.stopPropagation(); void handleCopy(responseText, index); }} disabled={!responseText} variant="primary" className="h-9 bg-[#111] px-3 text-[13px] text-white hover:bg-[#222]">{copiedIndex === index ? "Copiada" : "Usar"}</Button>
+                        <Button type="button" onClick={(event) => { event.stopPropagation(); openAdvisorChat(index); }} disabled={!responseText} variant="secondary" className="h-9 border-[#ddd] bg-transparent px-3 text-[13px] text-[#111] hover:bg-[#fafafa]">Refinar</Button>
+                        <Button type="button" onClick={(event) => { event.stopPropagation(); void handleCopy(responseText, index); }} disabled={!responseText} variant="primary" className="h-9 rounded-[8px] bg-[#111] px-4 text-[13px] text-white hover:bg-[#222]">{copiedIndex === index ? "Copiada" : "Usar"}</Button>
                       </div>
                     </article>
                   );
@@ -426,6 +424,23 @@ export function WizardScaffold() {
       {hasResult && !advisorResult && !loadingAdvisor ? (
         <div className="text-[13px] text-[#666]">Las respuestas apareceran en la columna derecha.</div>
       ) : null}
+
+      <div className="sticky bottom-0 mt-auto border-t border-[#eee] bg-white px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="space-y-2">
+            <p className="text-[14px] font-semibold text-[#111]">Modo de respuesta</p>
+            <div className="flex flex-wrap gap-2">
+              {responseStyleOptions.map((item) => (
+                <button key={item.value} type="button" onClick={() => setResponseTone(item.value)} className={`rounded-[16px] border px-[10px] py-[6px] text-[13px] ${responseTone === item.value ? "border-[#bbb] bg-[#f3f4f6] text-[#111]" : "border-[#ddd] bg-white text-[#666] hover:bg-[#fafafa]"}`}>{item.label}</button>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {hasConversationInput ? <button type="button" onClick={handleStartNewConversation} className="h-9 rounded-[8px] border border-[#ddd] bg-transparent px-4 text-[13px] text-[#111] hover:bg-[#fafafa]">Limpiar</button> : null}
+            <Button type="button" onClick={() => void handleGenerateResponses()} disabled={(!messageText.trim() && conversationBlocks.length === 0) || loadingAnalysis || loadingAdvisor} variant="primary" className="h-9 rounded-[8px] bg-[#111] px-4 text-[13px] text-white hover:bg-[#222]">{loadingAnalysis ? "Analizando..." : loadingAdvisor ? "Generando..." : "Generar respuestas"}</Button>
+          </div>
+        </div>
+      </div>
 
       <AdvisorChatModal isOpen={advisorChatOpen} advisorName={advisorChatIndex !== null ? (ADVISOR_PROFILES[advisorChatIndex]?.name ?? "Adviser") : "Adviser"} messages={advisorChatMessages} draft={advisorChatInput} sending={advisorChatSending} onDraftChange={setAdvisorChatInput} onSend={() => void handleSendAdvisorRefinement()} onUseResponse={() => setAdvisorChatOpen(false)} onClose={() => setAdvisorChatOpen(false)} />
       <AdvisorProfileModal profile={selectedProfile} onClose={() => setSelectedProfile(null)} />
