@@ -219,6 +219,15 @@ function getLatestExPartnerMessage(blocks: ConversationBlock[]): string | null {
   return null;
 }
 
+function getConversationSubmissionText(
+  blocks: ConversationBlock[],
+  fallbackText: string,
+): string {
+  const structured = formatConversationBlocksForContext(blocks).trim();
+  if (structured) return structured;
+  return fallbackText.trim();
+}
+
 /**
  * Returns true when at least one medium/high severity signal is present.
  */
@@ -717,9 +726,7 @@ export function WizardScaffold() {
   }
 
   async function runAnalysis() {
-    const text =
-      getLatestExPartnerMessage(conversationBlocks) ??
-      messageText.trim();
+    const text = getConversationSubmissionText(conversationBlocks, messageText);
     if (!text || loadingAnalysis) return;
     const sourceType = ocrInfo ? "ocr" : "text";
 
@@ -748,9 +755,7 @@ export function WizardScaffold() {
   }
 
   async function requestAdvisor(params: { quickMode: boolean; analysisId?: string | null }) {
-    const text =
-      getLatestExPartnerMessage(conversationBlocks) ??
-      messageText.trim();
+    const text = getConversationSubmissionText(conversationBlocks, messageText);
     if (!text || loadingAdvisor) return;
     const sourceType = ocrInfo ? "ocr" : "text";
 
@@ -1086,13 +1091,13 @@ export function WizardScaffold() {
               {advisorError ? <p className="text-sm text-red-700">{advisorError}</p> : null}
             </section>
 
-            <section className="min-w-0 space-y-3 rounded-2xl border border-[#E2E8F0] bg-white p-4">
+            <section className="min-h-0 min-w-0 space-y-3 rounded-2xl border border-[#E2E8F0] bg-white p-4">
               <h4 className="text-sm font-semibold text-[#0F172A]">Conversacion interpretada</h4>
               <p className="text-xs text-[#64748B]">
                 Revisa quien dijo cada mensaje antes de generar la respuesta.
               </p>
 
-              <div className="max-h-[420px] space-y-2 overflow-y-auto rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-3">
+              <div className="h-[52vh] min-h-[380px] max-h-[620px] space-y-2 overflow-y-auto rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-3 pr-2">
                 {conversationBlocks.length === 0 ? (
                   <p className="text-xs text-[#64748B]">
                     Cuando detectemos una conversacion, aparecera aqui en bloques editables.
@@ -1101,7 +1106,7 @@ export function WizardScaffold() {
                 {conversationBlocks.map((item) => (
                   <div
                     key={item.id}
-                    className={`max-w-[90%] rounded-2xl px-3 py-2 text-sm leading-6 ${
+                    className={`max-w-[94%] break-words rounded-2xl px-3 py-2 text-sm leading-6 ${
                       item.speaker === "ex_partner"
                         ? "mr-auto bg-[#EEF2F7] text-[#0F172A]"
                         : "ml-auto bg-[#DBEAFE] text-[#1E3A8A]"
@@ -1134,8 +1139,8 @@ export function WizardScaffold() {
                     <Textarea
                       value={item.content}
                       onChange={(event) => updateConversationBlockText(item.id, event.target.value)}
-                      rows={2}
-                      className={`border-0 bg-transparent p-0 text-sm leading-6 focus-visible:ring-0 ${
+                      rows={Math.max(2, Math.ceil(item.content.length / 42))}
+                      className={`w-full resize-none overflow-hidden whitespace-pre-wrap break-words border-0 bg-transparent p-0 text-sm leading-6 focus-visible:ring-0 ${
                         item.speaker === "user" ? "text-[#1E3A8A]" : "text-[#0F172A]"
                       }`}
                     />

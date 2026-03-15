@@ -1,11 +1,54 @@
 import os
 from dataclasses import dataclass
 import logging
+from pathlib import Path
 
 from dotenv import load_dotenv
 
-load_dotenv()
 logger = logging.getLogger(__name__)
+_CONFIG_DIR = Path(__file__).resolve().parent
+_REPO_ROOT = _CONFIG_DIR.parent
+
+
+def _load_environment_files() -> None:
+    root_env = _REPO_ROOT / ".env"
+    api_env = _CONFIG_DIR / ".env"
+    loaded_paths: list[str] = []
+
+    if root_env.exists():
+        load_dotenv(dotenv_path=root_env, override=False)
+        loaded_paths.append(str(root_env))
+    if api_env.exists():
+        load_dotenv(dotenv_path=api_env, override=True)
+        loaded_paths.append(str(api_env))
+
+    if not loaded_paths:
+        load_dotenv()
+        loaded_paths.append(".env (auto-discovery)")
+
+    logger.info("Environment files loaded for backend config: %s", ", ".join(loaded_paths))
+
+
+def _normalize_bom_prefixed_env_keys() -> None:
+    normalized: list[str] = []
+    for key in list(os.environ.keys()):
+        if not key.startswith("\ufeff"):
+            continue
+        clean_key = key.lstrip("\ufeff")
+        if not clean_key:
+            continue
+        if clean_key not in os.environ:
+            os.environ[clean_key] = os.environ.get(key, "")
+            normalized.append(clean_key)
+    if normalized:
+        logger.warning(
+            "Normalized BOM-prefixed environment keys: %s",
+            ", ".join(normalized),
+        )
+
+
+_load_environment_files()
+_normalize_bom_prefixed_env_keys()
 
 
 def _parse_cors_origins(raw_value: str) -> list[str]:

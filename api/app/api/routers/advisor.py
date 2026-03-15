@@ -21,6 +21,15 @@ from providers.base import AIProvider
 
 router = APIRouter(prefix="/v1/advisor", tags=["advisor"])
 
+def _resolve_advisor_input_text(payload: AdvisorRequest) -> str:
+    context = payload.context or {}
+    structured = context.get("conversation_structured")
+    if isinstance(structured, str):
+        normalized = structured.strip()
+        if normalized:
+            return normalized[:8000]
+    return payload.message_text
+
 
 @router.post(
     "",
@@ -88,7 +97,12 @@ async def create_advisor_response(
         }
         for advisor in advisor_lineup
     ]
-    payload = payload.model_copy(update={"context": trusted_context})
+    payload = payload.model_copy(
+        update={
+            "context": trusted_context,
+            "message_text": _resolve_advisor_input_text(payload),
+        }
+    )
 
     orchestrator = AdvisorOrchestrator(provider=provider)
     try:
