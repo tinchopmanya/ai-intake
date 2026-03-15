@@ -5,7 +5,6 @@ import { type ChangeEvent, type ClipboardEvent, useEffect, useRef, useState } fr
 import { AdvisorChatModal } from "@/components/mvp/AdvisorChatModal";
 import { AdvisorProfileModal } from "@/components/mvp/AdvisorProfileModal";
 import { Button, Textarea } from "@/components/mvp/ui";
-import { AdvisorAvatarItem } from "@/components/ui/AdvisorAvatarItem";
 import { ADVISOR_PROFILES } from "@/data/advisors";
 import type { AdvisorProfile } from "@/data/advisors";
 import { getCases, postAdvisor, postAnalysis, postOcrInterpret, postWizardEvent } from "@/lib/api/client";
@@ -31,6 +30,7 @@ const responseStyleOptions: Array<{ value: ResponseTone; label: string }> = [
   { value: "firme_respetuoso", label: "Firme" },
   { value: "amigable", label: "Amigable" },
 ];
+const responseToneBadges = ["Cordial", "Firme", "Neutral"] as const;
 
 function createBlock(speaker: ConversationBlock["speaker"], content: string, source: ConversationBlock["source"]): ConversationBlock {
   return { id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, speaker, content: content.trim(), source };
@@ -306,96 +306,125 @@ export function WizardScaffold() {
 
   const showInterpretedPanel = autoParsing || ocrLoading || conversationBlocks.length > 0 || Boolean(autoParseError);
   const hasConversationInput = messageText.trim().length > 0;
+  const hasResult = !!analysisResult;
 
   return (
     <section className="mx-auto w-full min-w-0 space-y-6" onPaste={handleStepPaste}>
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-[20px] font-semibold text-[#111]">Sube, pega o escribe la conversacion.</h2>
-          <div>
-            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelection} disabled={ocrCapabilities?.available === false || ocrCapabilitiesLoading} className="hidden" />
-            <button type="button" onClick={() => fileInputRef.current?.click()} disabled={ocrCapabilities?.available === false || ocrCapabilitiesLoading} className="h-[34px] rounded-md border border-[#ddd] bg-white px-[10px] text-[13px] text-[#111] hover:bg-[#fafafa] disabled:cursor-not-allowed disabled:opacity-60">Seleccionar archivo</button>
+      <div className={hasResult ? "grid items-start gap-6 md:grid-cols-2" : "block"}>
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-[20px] font-semibold text-[#111]">Sube, pega o escribe la conversacion.</h2>
+            <div>
+              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelection} disabled={ocrCapabilities?.available === false || ocrCapabilitiesLoading} className="hidden" />
+              <button type="button" onClick={() => fileInputRef.current?.click()} disabled={ocrCapabilities?.available === false || ocrCapabilitiesLoading} className="h-[34px] rounded-md border border-[#ddd] bg-white px-[10px] text-[13px] text-[#111] hover:bg-[#fafafa] disabled:cursor-not-allowed disabled:opacity-60">Seleccionar archivo</button>
+            </div>
           </div>
-        </div>
-        {caseError ? <p className="text-[13px] text-[#b91c1c]">{caseError}</p> : null}
-        {ocrLoading || autoParsing ? <p className="text-[13px] text-[#666]">Interpretando conversacion...</p> : null}
-        {ocrStatusMessage ? <p className="text-[13px] text-[#666]">{ocrStatusMessage}</p> : null}
-        {ocrError ? <p className="text-[13px] text-[#b91c1c]">{ocrError}</p> : null}
-        {autoParseError ? <p className="text-[13px] text-[#92400e]">{autoParseError}</p> : null}
+          {caseError ? <p className="text-[13px] text-[#b91c1c]">{caseError}</p> : null}
+          {ocrLoading || autoParsing ? <p className="text-[13px] text-[#666]">Interpretando conversacion...</p> : null}
+          {ocrStatusMessage ? <p className="text-[13px] text-[#666]">{ocrStatusMessage}</p> : null}
+          {ocrError ? <p className="text-[13px] text-[#b91c1c]">{ocrError}</p> : null}
+          {autoParseError ? <p className="text-[13px] text-[#92400e]">{autoParseError}</p> : null}
 
-        <div className={`grid gap-6 ${showInterpretedPanel ? "md:grid-cols-2" : "grid-cols-1"}`}>
-          <div className="space-y-3">
-            {showInterpretedPanel ? <p className="text-[13px] font-semibold text-[#555]">Conversacion original</p> : null}
-            <Textarea value={messageText} onChange={(event) => handleMessageTextChange(event.target.value)} rows={8} placeholder="Pega aqui la conversacion de WhatsApp o el mensaje recibido..." className="min-h-[160px] rounded-[10px] border border-[#e5e5e5] p-[18px] text-[16px] leading-[1.5] text-[#111]" />
-          </div>
-          {showInterpretedPanel ? (
-            <section className="min-h-0 rounded-[10px] border border-[#eee] bg-[#fafafa] p-4">
-              <p className="text-[13px] font-semibold text-[#555]">Conversacion interpretada</p>
-              <p className="mt-1 text-[12px] text-[#666]">Revisa quien dijo cada mensaje antes de generar la respuesta.</p>
-              <div className="mt-3 max-h-[460px] space-y-3 overflow-y-auto pr-1">
-                {conversationBlocks.length === 0 ? <p className="text-[13px] text-[#666]">Aun no hay bloques interpretados.</p> : null}
-                {conversationBlocks.map((item) => (
-                  <div key={item.id} className="rounded-[10px] border border-[#eee] bg-white p-3">
-                    <div className="mb-2 inline-flex rounded-[16px] border border-[#ddd] bg-white p-0.5 text-[13px]">
-                      <button type="button" onClick={() => updateConversationBlockSpeaker(item.id, "ex_partner")} className={`rounded-[14px] px-2 py-1 ${item.speaker === "ex_partner" ? "bg-[#f3f4f6] text-[#111]" : "text-[#666]"}`}>Ex pareja</button>
-                      <button type="button" onClick={() => updateConversationBlockSpeaker(item.id, "user")} className={`rounded-[14px] px-2 py-1 ${item.speaker === "user" ? "bg-[#f3f4f6] text-[#111]" : "text-[#666]"}`}>Yo</button>
-                      <button type="button" onClick={() => updateConversationBlockSpeaker(item.id, "unknown")} className={`rounded-[14px] px-2 py-1 ${item.speaker === "unknown" ? "bg-[#f3f4f6] text-[#111]" : "text-[#666]"}`}>Sin identificar</button>
+          <div className={`grid gap-6 ${showInterpretedPanel ? "md:grid-cols-2" : "grid-cols-1"}`}>
+            <div className="space-y-3">
+              {showInterpretedPanel ? <p className="text-[13px] font-semibold text-[#555]">Conversacion original</p> : null}
+              <Textarea value={messageText} onChange={(event) => handleMessageTextChange(event.target.value)} rows={8} placeholder="Pega aqui la conversacion de WhatsApp o el mensaje recibido..." className="min-h-[160px] rounded-[10px] border border-[#e5e5e5] p-[18px] text-[16px] leading-[1.5] text-[#111]" />
+            </div>
+            {showInterpretedPanel ? (
+              <section className="min-h-0 rounded-[10px] border border-[#eee] bg-[#fafafa] p-4">
+                <p className="text-[13px] font-semibold text-[#555]">Conversacion interpretada</p>
+                <p className="mt-1 text-[12px] text-[#666]">Revisa quien dijo cada mensaje antes de generar la respuesta.</p>
+                <div className="mt-3 max-h-[460px] space-y-3 overflow-y-auto pr-1">
+                  {conversationBlocks.length === 0 ? <p className="text-[13px] text-[#666]">Aun no hay bloques interpretados.</p> : null}
+                  {conversationBlocks.map((item) => (
+                    <div key={item.id} className="rounded-[10px] border border-[#eee] bg-white p-3">
+                      <div className="mb-2 inline-flex rounded-[16px] border border-[#ddd] bg-white p-0.5 text-[13px]">
+                        <button type="button" onClick={() => updateConversationBlockSpeaker(item.id, "ex_partner")} className={`rounded-[14px] px-2 py-1 ${item.speaker === "ex_partner" ? "bg-[#f3f4f6] text-[#111]" : "text-[#666]"}`}>Ex pareja</button>
+                        <button type="button" onClick={() => updateConversationBlockSpeaker(item.id, "user")} className={`rounded-[14px] px-2 py-1 ${item.speaker === "user" ? "bg-[#f3f4f6] text-[#111]" : "text-[#666]"}`}>Yo</button>
+                        <button type="button" onClick={() => updateConversationBlockSpeaker(item.id, "unknown")} className={`rounded-[14px] px-2 py-1 ${item.speaker === "unknown" ? "bg-[#f3f4f6] text-[#111]" : "text-[#666]"}`}>Sin identificar</button>
+                      </div>
+                      <Textarea value={item.content} onChange={(event) => updateConversationBlockText(item.id, event.target.value)} rows={Math.max(2, Math.ceil(item.content.length / 52))} className="w-full resize-none whitespace-pre-wrap break-words border border-[#e5e5e5] bg-white p-3 text-[14px] leading-6 text-[#111]" />
                     </div>
-                    <Textarea value={item.content} onChange={(event) => updateConversationBlockText(item.id, event.target.value)} rows={Math.max(2, Math.ceil(item.content.length / 52))} className="w-full resize-none whitespace-pre-wrap break-words border border-[#e5e5e5] bg-white p-3 text-[14px] leading-6 text-[#111]" />
-                  </div>
-                ))}
-              </div>
-            </section>
-          ) : null}
-        </div>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+          </div>
 
-        <div>
-          <button type="button" onClick={() => setContextExpanded((prev) => !prev)} className="text-[13px] text-[#666] hover:text-[#111]">* Agregar contexto (opcional)</button>
-          {contextExpanded ? <Textarea value={contextOptional} onChange={(event) => setContextOptional(event.target.value)} rows={3} className="mt-2 rounded-[10px] border border-[#e5e5e5] bg-white text-[14px] text-[#111]" /> : null}
-        </div>
+          <div>
+            <button type="button" onClick={() => setContextExpanded((prev) => !prev)} className="text-[13px] text-[#666] hover:text-[#111]">* Agregar contexto (opcional)</button>
+            {contextExpanded ? <Textarea value={contextOptional} onChange={(event) => setContextOptional(event.target.value)} rows={3} className="mt-2 rounded-[10px] border border-[#e5e5e5] bg-white text-[14px] text-[#111]" /> : null}
+          </div>
 
-        <div className="space-y-2">
-          <p className="text-[14px] font-semibold text-[#111]">Modo de respuesta</p>
-          <div className="flex flex-wrap gap-2">
-            {responseStyleOptions.map((item) => (
-              <button key={item.value} type="button" onClick={() => setResponseTone(item.value)} className={`rounded-[16px] border px-[10px] py-[6px] text-[13px] ${responseTone === item.value ? "border-[#bbb] bg-[#f3f4f6] text-[#111]" : "border-[#ddd] bg-white text-[#666] hover:bg-[#fafafa]"}`}>{item.label}</button>
-            ))}
+          <div className="space-y-2">
+            <p className="text-[14px] font-semibold text-[#111]">Modo de respuesta</p>
+            <div className="flex flex-wrap gap-2">
+              {responseStyleOptions.map((item) => (
+                <button key={item.value} type="button" onClick={() => setResponseTone(item.value)} className={`rounded-[16px] border px-[10px] py-[6px] text-[13px] ${responseTone === item.value ? "border-[#bbb] bg-[#f3f4f6] text-[#111]" : "border-[#ddd] bg-white text-[#666] hover:bg-[#fafafa]"}`}>{item.label}</button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            {hasConversationInput ? <button type="button" onClick={handleStartNewConversation} className="h-9 rounded-[8px] border border-[#e5e5e5] bg-white px-4 text-[13px] text-[#111] hover:bg-[#fafafa]">Limpiar</button> : null}
+            <Button type="button" onClick={() => void handleGenerateResponses()} disabled={(!messageText.trim() && conversationBlocks.length === 0) || loadingAnalysis || loadingAdvisor} variant="primary" className="h-9 rounded-[8px] bg-[#111] px-4 text-[13px] text-white hover:bg-[#222]">{loadingAnalysis ? "Analizando..." : loadingAdvisor ? "Generando..." : "Generar respuestas"}</Button>
           </div>
         </div>
 
-        <div className="flex justify-end gap-2">
-          {hasConversationInput ? <button type="button" onClick={handleStartNewConversation} className="h-9 rounded-[8px] border border-[#e5e5e5] bg-white px-4 text-[13px] text-[#111] hover:bg-[#fafafa]">Limpiar</button> : null}
-          <Button type="button" onClick={() => void handleGenerateResponses()} disabled={(!messageText.trim() && conversationBlocks.length === 0) || loadingAnalysis || loadingAdvisor} variant="primary" className="h-9 rounded-[8px] bg-[#111] px-4 text-[13px] text-white hover:bg-[#222]">{loadingAnalysis ? "Analizando..." : loadingAdvisor ? "Generando..." : "Generar respuestas"}</Button>
-        </div>
+        {hasResult ? (
+          <aside className="space-y-4">
+            <section className="rounded-[10px] border border-[#e5e5e5] bg-[#fafafa] p-4">
+              <h3 className="text-[16px] font-semibold text-[#111]">Analisis</h3>
+              <p className="mt-2 whitespace-pre-wrap text-[14px] leading-[1.6] text-[#222]">{analysisResult.summary}</p>
+            </section>
+
+            {loadingAdvisor && !advisorResult ? (
+              <section className="rounded-[10px] border border-[#e5e5e5] bg-white p-4 text-[14px] text-[#666]">
+                Generando respuestas...
+              </section>
+            ) : null}
+
+            {advisorResult ? (
+              <section>
+                <h3 className="mb-3 text-[18px] font-semibold text-[#111]">Respuestas sugeridas</h3>
+                {Array.from({ length: 3 }).map((_, index) => {
+                  const advisor = ADVISOR_PROFILES[index];
+                  const responseText = advisorResult.responses[index]?.text ?? "";
+                  return (
+                    <article
+                      key={`${advisor?.id ?? index}-${index}`}
+                      onClick={() => openAdvisorChat(index)}
+                      className="mb-3 cursor-pointer rounded-[10px] border border-[#e5e5e5] bg-white p-4 transition-all duration-150 ease-in-out hover:border-[#d4d4d4] hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)] last:mb-0"
+                    >
+                      <header className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-[14px] font-semibold text-[#111]">{advisor?.name ?? "Advisor"}</p>
+                          <p className="mt-0.5 text-[12px] text-[#666]">{advisor?.role ?? "Perspectiva"}</p>
+                        </div>
+                        <span className="shrink-0 rounded-[6px] bg-[#f3f4f6] px-2 py-1 text-[12px] text-[#444]">
+                          {responseToneBadges[index] ?? "Neutral"}
+                        </span>
+                      </header>
+                      <p className="mt-3 whitespace-pre-wrap break-words text-[14px] leading-[1.6] text-[#222]">
+                        {responseText || "Sin respuesta disponible."}
+                      </p>
+                      <div className="mt-4 flex flex-wrap justify-end gap-2">
+                        <Button type="button" onClick={(event) => { event.stopPropagation(); openAdvisorChat(index); }} disabled={!responseText} variant="secondary" className="h-9 border-[#e5e5e5] bg-white px-3 text-[13px] text-[#111] hover:bg-[#fafafa]">Refinar</Button>
+                        <Button type="button" onClick={(event) => { event.stopPropagation(); void handleCopy(responseText, index); }} disabled={!responseText} variant="primary" className="h-9 bg-[#111] px-3 text-[13px] text-white hover:bg-[#222]">{copiedIndex === index ? "Copiada" : "Usar"}</Button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </section>
+            ) : null}
+          </aside>
+        ) : null}
       </div>
 
       {analysisError ? <p className="text-[13px] text-[#b91c1c]">{analysisError}</p> : null}
       {advisorError ? <p className="text-[13px] text-[#b91c1c]">{advisorError}</p> : null}
-
-      {analysisResult ? <div className="rounded-[10px] border border-[#e5e5e5] bg-[#fafafa] p-4 text-[14px] text-[#111] whitespace-pre-wrap">{analysisResult.summary}</div> : null}
-
-      {advisorResult ? (
-        <div className="space-y-3">
-          <h3 className="text-[18px] font-semibold text-[#111]">Respuestas sugeridas</h3>
-          <div className="grid gap-3 lg:grid-cols-3">
-            {Array.from({ length: 3 }).map((_, index) => {
-              const advisor = ADVISOR_PROFILES[index];
-              const responseText = advisorResult.responses[index]?.text ?? "";
-              return (
-                <article key={`${advisor?.id ?? index}-${index}`} onClick={() => openAdvisorChat(index)} className="flex min-w-0 cursor-pointer flex-col rounded-[10px] border border-[#e5e5e5] bg-white p-3">
-                  <header className="rounded-[8px] border border-[#e5e5e5] bg-[#fafafa] px-3 py-2">
-                    <AdvisorAvatarItem name={advisor?.name ?? "Advisor"} role={advisor?.role ?? "Perspectiva"} avatarSrc={advisor?.avatar64 ?? "/advisors/generic.svg"} size={56} tone="light" onClick={() => advisor && setSelectedProfile(advisor)} />
-                  </header>
-                  <p className="mt-3 flex-1 whitespace-pre-wrap break-words text-[14px] leading-6 text-[#111]">{responseText || "Sin respuesta disponible."}</p>
-                  <div className="mt-4 flex flex-wrap justify-end gap-2">
-                    <Button type="button" onClick={(event) => { event.stopPropagation(); openAdvisorChat(index); }} disabled={!responseText} variant="secondary" className="h-9 border-[#e5e5e5] bg-white px-3 text-[13px] text-[#111] hover:bg-[#fafafa]">Refinar</Button>
-                    <Button type="button" onClick={(event) => { event.stopPropagation(); void handleCopy(responseText, index); }} disabled={!responseText} variant="primary" className="h-9 bg-[#111] px-3 text-[13px] text-white hover:bg-[#222]">{copiedIndex === index ? "Copiada" : "Usar"}</Button>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        </div>
+      {hasResult && !advisorResult && !loadingAdvisor ? (
+        <div className="text-[13px] text-[#666]">Las respuestas apareceran en la columna derecha.</div>
       ) : null}
 
       <AdvisorChatModal isOpen={advisorChatOpen} advisorName={advisorChatIndex !== null ? (ADVISOR_PROFILES[advisorChatIndex]?.name ?? "Adviser") : "Adviser"} messages={advisorChatMessages} draft={advisorChatInput} sending={advisorChatSending} onDraftChange={setAdvisorChatInput} onSend={() => void handleSendAdvisorRefinement()} onUseResponse={() => setAdvisorChatOpen(false)} onClose={() => setAdvisorChatOpen(false)} />
