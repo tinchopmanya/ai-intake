@@ -33,18 +33,22 @@ export function VoiceMicButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-[13px] transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(15,23,42,0.18)] disabled:cursor-not-allowed disabled:opacity-60 ${
+      className={`group inline-flex h-9 items-center gap-2 rounded-full border px-3.5 text-[13px] font-medium transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(15,23,42,0.2)] disabled:cursor-not-allowed disabled:border-[#e7e7e7] disabled:bg-[#f8f8f8] disabled:text-[#9ca3af] ${
         listening
-          ? "border-[#fecaca] bg-[#fff5f5] text-[#7f1d1d]"
-          : "border-[#ddd] bg-white text-[#111] hover:bg-[#fafafa]"
+          ? "border-[#f2d2d8] bg-[#fff7f8] text-[#7f1d1d] shadow-[0_1px_2px_rgba(127,29,29,0.08)]"
+          : "border-[#e5e5e5] bg-white text-[#111] shadow-[0_1px_2px_rgba(15,23,42,0.04)] hover:border-[#d7d7d7] hover:bg-[#fafafa]"
       }`}
       aria-pressed={listening}
     >
       <span
-        className={`h-2 w-2 rounded-full ${
-          listening ? "bg-[#ef4444] animate-pulse" : "bg-[#cbd5e1]"
+        className={`relative h-2.5 w-2.5 rounded-full transition-colors ${
+          listening ? "bg-[#ef4444]" : "bg-[#c5ced9] group-hover:bg-[#a8b4c3]"
         }`}
-      />
+      >
+        {listening ? (
+          <span className="absolute inset-0 rounded-full bg-[#ef4444] opacity-70 animate-ping" />
+        ) : null}
+      </span>
       {listening ? listeningLabel : idleLabel}
     </button>
   );
@@ -56,8 +60,10 @@ export function VoiceListeningBadge({
 }: VoiceListeningBadgeProps) {
   if (!listening) return null;
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-[#fff5f5] px-2 py-1 text-[12px] text-[#b91c1c]">
-      <span className="h-2 w-2 rounded-full bg-[#ef4444] animate-pulse" />
+    <span className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[#f2d2d8] bg-[#fff7f8] px-2.5 text-[12px] font-medium text-[#b42318]">
+      <span className="relative h-2.5 w-2.5 rounded-full bg-[#ef4444]">
+        <span className="absolute inset-0 rounded-full bg-[#ef4444] opacity-70 animate-ping" />
+      </span>
       {label}
     </span>
   );

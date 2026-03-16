@@ -128,7 +128,7 @@ export function AdvisorChatModal({
                   }
                 }}
                 idleLabel="Hablar"
-                listeningLabel="Detener"
+                listeningLabel="Escuchando..."
               />
 
               <VoiceMicButton

@@ -1116,7 +1116,7 @@ export function WizardScaffold() {
                       }
                     }}
                     idleLabel="Hablar en vez de escribir"
-                    listeningLabel="Detener dictado"
+                    listeningLabel="Escuchando..."
                   />
                   <VoiceListeningBadge listening={contextVoice.listening} />
                 </div>
