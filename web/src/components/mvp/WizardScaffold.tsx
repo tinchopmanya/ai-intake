@@ -4,6 +4,7 @@ import { type ChangeEvent, type ClipboardEvent, useEffect, useRef, useState } fr
 
 import { AdvisorChatModal } from "@/components/mvp/AdvisorChatModal";
 import { AdvisorProfileModal } from "@/components/mvp/AdvisorProfileModal";
+import { VoiceListeningBadge, VoiceMicButton, VoicePlaybackButton } from "@/components/mvp/VoiceControls";
 import { Button, Panel, Select, Textarea } from "@/components/mvp/ui";
 import { AdvisorAvatarItem } from "@/components/ui/AdvisorAvatarItem";
 import { ADVISOR_PROFILES } from "@/data/advisors";
@@ -498,6 +499,20 @@ export function WizardScaffold() {
         ? `${previous.trim()}\n${contextVoice.transcript.trim()}`
         : contextVoice.transcript.trim(),
     );
+    const wrapper = document.getElementById("wizard-context-optional-wrap");
+    if (wrapper) {
+      wrapper.style.transition = "box-shadow 180ms ease, background-color 180ms ease";
+      wrapper.style.boxShadow = "0 0 0 2px rgba(191, 219, 254, 1)";
+      wrapper.style.backgroundColor = "#f8fafc";
+      window.setTimeout(() => {
+        wrapper.style.boxShadow = "";
+        wrapper.style.backgroundColor = "";
+      }, 850);
+    }
+    window.setTimeout(() => {
+      const input = document.getElementById("wizard-context-optional") as HTMLTextAreaElement | null;
+      input?.focus();
+    }, 30);
     contextVoice.resetTranscript();
   }, [contextVoice]);
 
@@ -1077,17 +1092,21 @@ export function WizardScaffold() {
 
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-[#1f2937]">Contexto adicional (opcional)</label>
-                <Textarea
-                  value={contextOptional}
-                  onChange={(event) => setContextOptional(event.target.value)}
-                  rows={3}
-                  placeholder="Escribe lo que creas necesario para entender mejor la conversacion"
-                  spellCheck={false}
-                  className="rounded-[10px] border border-[#ddd] bg-[#fafafa] p-3 text-[14px] text-[#1F2937]"
-                />
+                <div id="wizard-context-optional-wrap" className="rounded-xl transition-all duration-200">
+                  <Textarea
+                    id="wizard-context-optional"
+                    value={contextOptional}
+                    onChange={(event) => setContextOptional(event.target.value)}
+                    rows={3}
+                    placeholder="Escribe lo que creas necesario para entender mejor la conversacion"
+                    spellCheck={false}
+                    className="rounded-[10px] border border-[#ddd] bg-[#fafafa] p-3 text-[14px] text-[#1F2937]"
+                  />
+                </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
+                  <VoiceMicButton
+                    listening={contextVoice.listening}
+                    disabled={!contextVoice.supported}
                     onClick={() => {
                       if (!contextVoice.supported) return;
                       if (contextVoice.listening) {
@@ -1096,17 +1115,10 @@ export function WizardScaffold() {
                         contextVoice.startListening();
                       }
                     }}
-                    disabled={!contextVoice.supported}
-                    className="rounded-[6px] border border-[#ddd] bg-white px-3 py-1.5 text-[13px] text-[#111] hover:bg-[#fafafa] disabled:cursor-not-allowed disabled:text-[#999]"
-                  >
-                    {contextVoice.listening ? "Detener dictado" : "Hablar en vez de escribir"}
-                  </button>
-                  {contextVoice.listening ? (
-                    <span className="inline-flex items-center gap-1 text-[12px] text-[#b91c1c]">
-                      <span className="h-2 w-2 rounded-full bg-[#ef4444]" />
-                      Escuchando...
-                    </span>
-                  ) : null}
+                    idleLabel="Hablar en vez de escribir"
+                    listeningLabel="Detener dictado"
+                  />
+                  <VoiceListeningBadge listening={contextVoice.listening} />
                 </div>
                 {!contextVoice.supported ? (
                   <p className="text-[12px] text-[#666]">La entrada por voz no esta disponible en este navegador.</p>
@@ -1472,18 +1484,14 @@ export function WizardScaffold() {
 
                   <div className="mt-4 flex flex-wrap justify-end gap-2">
                     {speechSynthesis.supported ? (
-                      <Button
-                        type="button"
+                      <VoicePlaybackButton
                         onClick={(event) => {
                           event.stopPropagation();
                           handleToggleSpeakResponse(index, responseText);
                         }}
+                        speaking={speechSynthesis.speaking && speakingResponseIndex === index}
                         disabled={!responseText}
-                        variant="secondary"
-                        className="h-9 border-[#ddd] bg-transparent px-3 text-[13px] text-[#111] hover:bg-[#fafafa]"
-                      >
-                        {speechSynthesis.speaking && speakingResponseIndex === index ? "Detener" : "Escuchar"}
-                      </Button>
+                      />
                     ) : null}
                     <Button
                       type="button"

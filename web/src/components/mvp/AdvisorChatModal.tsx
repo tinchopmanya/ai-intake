@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 
 import { Button, Textarea } from "@/components/mvp/ui";
+import { VoiceListeningBadge, VoiceMicButton } from "@/components/mvp/VoiceControls";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
 
 export type AdvisorChatMessage = {
@@ -44,6 +45,20 @@ export function AdvisorChatModal({
     if (!isOpen || !voice.transcript.trim()) return;
     const merged = draft.trim() ? `${draft.trim()}\n${voice.transcript.trim()}` : voice.transcript.trim();
     onDraftChange(merged);
+    const wrapper = document.getElementById("advisor-chat-draft-wrap");
+    if (wrapper) {
+      wrapper.style.transition = "box-shadow 180ms ease, background-color 180ms ease";
+      wrapper.style.boxShadow = "0 0 0 2px rgba(191, 219, 254, 1)";
+      wrapper.style.backgroundColor = "#f8fafc";
+      window.setTimeout(() => {
+        wrapper.style.boxShadow = "";
+        wrapper.style.backgroundColor = "";
+      }, 850);
+    }
+    window.setTimeout(() => {
+      const input = document.getElementById("advisor-chat-draft") as HTMLTextAreaElement | null;
+      input?.focus();
+    }, 30);
     voice.resetTranscript();
   }, [draft, isOpen, onDraftChange, voice]);
 
@@ -87,19 +102,23 @@ export function AdvisorChatModal({
         </div>
 
         <footer className="space-y-3 border-t border-[#E2E8F0] bg-white px-4 py-3">
-          <Textarea
-            value={draft}
-            onChange={(event) => onDraftChange(event.target.value)}
-            rows={3}
-            spellCheck={false}
-            placeholder="Ej: manten el limite pero mas breve y neutral."
-            className="border-[#E2E8F0] bg-white text-[#0F172A]"
-          />
+          <div id="advisor-chat-draft-wrap" className="rounded-xl transition-all duration-200">
+            <Textarea
+              id="advisor-chat-draft"
+              value={draft}
+              onChange={(event) => onDraftChange(event.target.value)}
+              rows={3}
+              spellCheck={false}
+              placeholder="Ej: manten el limite pero mas breve y neutral."
+              className="border-[#E2E8F0] bg-white text-[#0F172A]"
+            />
+          </div>
 
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
+              <VoiceMicButton
+                listening={voice.listening}
+                disabled={!voice.supported}
                 onClick={() => {
                   if (!voice.supported) return;
                   if (voice.listening) {
@@ -108,30 +127,22 @@ export function AdvisorChatModal({
                     voice.startListening();
                   }
                 }}
-                disabled={!voice.supported}
-                className="rounded-md border border-[#ddd] bg-white px-3 py-1.5 text-[13px] text-[#111] hover:bg-[#fafafa] disabled:cursor-not-allowed disabled:text-[#999]"
-              >
-                {voice.listening ? "Detener" : "Hablar"}
-              </button>
+                idleLabel="Hablar"
+                listeningLabel="Detener"
+              />
 
-              <button
-                type="button"
+              <VoiceMicButton
+                listening={false}
+                disabled={!voice.supported || voice.listening}
                 onClick={() => {
                   if (!voice.supported) return;
                   voice.startListening();
                 }}
-                disabled={!voice.supported || voice.listening}
-                className="rounded-md border border-[#ddd] bg-white px-3 py-1.5 text-[13px] text-[#111] hover:bg-[#fafafa] disabled:cursor-not-allowed disabled:text-[#999]"
-              >
-                Desahogarte con este advisor
-              </button>
+                idleLabel="Desahogarte con este advisor"
+                listeningLabel="Desahogarte con este advisor"
+              />
 
-              {voice.listening ? (
-                <span className="inline-flex items-center gap-1 text-[12px] text-[#b91c1c]">
-                  <span className="h-2 w-2 rounded-full bg-[#ef4444]" />
-                  Escuchando...
-                </span>
-              ) : null}
+              <VoiceListeningBadge listening={voice.listening} />
             </div>
 
             {!voice.supported ? (
