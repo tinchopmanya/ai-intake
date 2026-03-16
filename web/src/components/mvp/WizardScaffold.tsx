@@ -21,6 +21,8 @@ import {
 import type { AdvisorProfile } from "@/data/advisors";
 import { API_URL } from "@/lib/config";
 import { resolveRuntimeLocale, tRuntime } from "@/lib/i18n/runtime";
+import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
+import { useSpeechToText } from "@/hooks/useSpeechToText";
 import type {
   AdvisorResponse,
   AnalysisResponse,
@@ -415,8 +417,15 @@ export function WizardScaffold() {
   const [advisorChatMessages, setAdvisorChatMessages] = useState<
     Array<{ id: string; role: "user" | "advisor"; text: string }>
   >([]);
+  const [speakingResponseIndex, setSpeakingResponseIndex] = useState<number | null>(null);
   const selectedCaseId = activeCase?.id ?? null;
   const manualInterpretTimerRef = useRef<number | null>(null);
+  const contextVoice = useSpeechToText({
+    lang: "es-ES",
+    continuous: false,
+    interimResults: false,
+  });
+  const speechSynthesis = useSpeechSynthesis({ lang: "es-ES" });
 
   useEffect(() => {
     let mounted = true;
@@ -481,6 +490,22 @@ export function WizardScaffold() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!contextVoice.transcript.trim()) return;
+    setContextOptional((previous) =>
+      previous.trim()
+        ? `${previous.trim()}\n${contextVoice.transcript.trim()}`
+        : contextVoice.transcript.trim(),
+    );
+    contextVoice.resetTranscript();
+  }, [contextVoice]);
+
+  useEffect(() => {
+    if (!speechSynthesis.speaking && speakingResponseIndex !== null) {
+      setSpeakingResponseIndex(null);
+    }
+  }, [speakingResponseIndex, speechSynthesis.speaking]);
 
   function openAdvisorProfileById(advisorId: string) {
     const profile = ADVISOR_PROFILES.find((advisor) => advisor.id === advisorId) ?? null;
@@ -963,6 +988,17 @@ export function WizardScaffold() {
     }
   }
 
+  function handleToggleSpeakResponse(index: number, text: string) {
+    if (!speechSynthesis.supported || !text.trim()) return;
+    if (speechSynthesis.speaking && speakingResponseIndex === index) {
+      speechSynthesis.stop();
+      setSpeakingResponseIndex(null);
+      return;
+    }
+    speechSynthesis.speak(text);
+    setSpeakingResponseIndex(index);
+  }
+
   const analysisStatus = analysisResult ? getAnalysisStatus(analysisResult) : null;
   const hasConversationInput = messageText.trim().length > 0 || conversationBlocks.length > 0;
 
@@ -1049,6 +1085,35 @@ export function WizardScaffold() {
                   spellCheck={false}
                   className="rounded-[10px] border border-[#ddd] bg-[#fafafa] p-3 text-[14px] text-[#1F2937]"
                 />
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!contextVoice.supported) return;
+                      if (contextVoice.listening) {
+                        contextVoice.stopListening();
+                      } else {
+                        contextVoice.startListening();
+                      }
+                    }}
+                    disabled={!contextVoice.supported}
+                    className="rounded-[6px] border border-[#ddd] bg-white px-3 py-1.5 text-[13px] text-[#111] hover:bg-[#fafafa] disabled:cursor-not-allowed disabled:text-[#999]"
+                  >
+                    {contextVoice.listening ? "Detener dictado" : "Hablar en vez de escribir"}
+                  </button>
+                  {contextVoice.listening ? (
+                    <span className="inline-flex items-center gap-1 text-[12px] text-[#b91c1c]">
+                      <span className="h-2 w-2 rounded-full bg-[#ef4444]" />
+                      Escuchando...
+                    </span>
+                  ) : null}
+                </div>
+                {!contextVoice.supported ? (
+                  <p className="text-[12px] text-[#666]">La entrada por voz no esta disponible en este navegador.</p>
+                ) : null}
+                {contextVoice.error ? (
+                  <p className="text-[12px] text-[#92400e]">No pudimos transcribir el audio. Intenta de nuevo.</p>
+                ) : null}
               </div>
             </section>
 
@@ -1406,6 +1471,20 @@ export function WizardScaffold() {
                   </p>
 
                   <div className="mt-4 flex flex-wrap justify-end gap-2">
+                    {speechSynthesis.supported ? (
+                      <Button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleToggleSpeakResponse(index, responseText);
+                        }}
+                        disabled={!responseText}
+                        variant="secondary"
+                        className="h-9 border-[#ddd] bg-transparent px-3 text-[13px] text-[#111] hover:bg-[#fafafa]"
+                      >
+                        {speechSynthesis.speaking && speakingResponseIndex === index ? "Detener" : "Escuchar"}
+                      </Button>
+                    ) : null}
                     <Button
                       type="button"
                       onClick={(event) => {
