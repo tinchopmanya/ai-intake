@@ -40,16 +40,65 @@ type UseSpeechToTextOptions = {
   interimResults?: boolean;
 };
 
+type SpeechToTextErrorCode =
+  | "voice_not_supported"
+  | "voice_not_allowed"
+  | "voice_no_microphone"
+  | "voice_network"
+  | "voice_no_speech"
+  | "voice_aborted"
+  | "voice_start_failed"
+  | "voice_unknown_error";
+
+function getSpeechRecognitionCtor(): SpeechRecognitionCtor | null {
+  if (typeof window === "undefined") return null;
+  const speechWindow = window as unknown as {
+    SpeechRecognition?: SpeechRecognitionCtor;
+    webkitSpeechRecognition?: SpeechRecognitionCtor;
+  };
+  return speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition ?? null;
+}
+
+function mapSpeechErrorCode(rawError?: string): SpeechToTextErrorCode {
+  switch (rawError) {
+    case "not-allowed":
+    case "service-not-allowed":
+      return "voice_not_allowed";
+    case "audio-capture":
+      return "voice_no_microphone";
+    case "network":
+      return "voice_network";
+    case "no-speech":
+      return "voice_no_speech";
+    case "aborted":
+      return "voice_aborted";
+    default:
+      return rawError ? "voice_unknown_error" : "voice_unknown_error";
+  }
+}
+
+export function getSpeechToTextErrorMessage(error: string | null): string | null {
+  if (!error) return null;
+  switch (error) {
+    case "voice_not_supported":
+      return "La entrada por voz no esta disponible en este navegador.";
+    case "voice_not_allowed":
+      return "No se pudo acceder al microfono. Revisa los permisos del navegador.";
+    case "voice_no_microphone":
+      return "No detectamos un microfono disponible.";
+    case "voice_network":
+      return "El reconocimiento de voz fallo por red. Intenta de nuevo.";
+    case "voice_no_speech":
+      return "No detectamos voz. Intenta hablar mas cerca del microfono.";
+    case "voice_start_failed":
+      return "No se pudo iniciar la entrada por voz. Intenta de nuevo.";
+    default:
+      return "No pudimos transcribir el audio. Intenta de nuevo.";
+  }
+}
+
 export function useSpeechToText(options?: UseSpeechToTextOptions) {
-  const [supported] = useState(() => {
-    const ctor = (
-      typeof window !== "undefined"
-        ? ((window as unknown as { SpeechRecognition?: SpeechRecognitionCtor; webkitSpeechRecognition?: SpeechRecognitionCtor }).SpeechRecognition ??
-          (window as unknown as { webkitSpeechRecognition?: SpeechRecognitionCtor }).webkitSpeechRecognition)
-        : undefined
-    ) as SpeechRecognitionCtor | undefined;
-    return Boolean(ctor);
-  });
+  const supported = Boolean(getSpeechRecognitionCtor());
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -60,12 +109,7 @@ export function useSpeechToText(options?: UseSpeechToTextOptions) {
   const interimResults = options?.interimResults ?? false;
 
   const ensureRecognition = useCallback(() => {
-    const ctor = (
-      typeof window !== "undefined"
-        ? ((window as unknown as { SpeechRecognition?: SpeechRecognitionCtor; webkitSpeechRecognition?: SpeechRecognitionCtor }).SpeechRecognition ??
-          (window as unknown as { webkitSpeechRecognition?: SpeechRecognitionCtor }).webkitSpeechRecognition)
-        : undefined
-    ) as SpeechRecognitionCtor | undefined;
+    const ctor = getSpeechRecognitionCtor();
     if (!ctor) return null;
     if (recognitionRef.current) return recognitionRef.current;
 
@@ -83,7 +127,7 @@ export function useSpeechToText(options?: UseSpeechToTextOptions) {
     };
     recognition.onerror = (event) => {
       setListening(false);
-      setError(event.error ? `voice_${event.error}` : "voice_unknown_error");
+      setError(mapSpeechErrorCode(event.error));
     };
     recognition.onresult = (event) => {
       let finalText = "";
@@ -104,14 +148,30 @@ export function useSpeechToText(options?: UseSpeechToTextOptions) {
 
   const startListening = useCallback(() => {
     const recognition = ensureRecognition();
-    if (!recognition) return;
+    if (!recognition) {
+      setError("voice_not_supported");
+      return;
+    }
+    if (listening) return;
     setError(null);
     try {
       recognition.start();
-    } catch {
-      // Some browsers throw when calling start twice. Ignore to keep UX calm.
+    } catch (exc) {
+      const message = exc instanceof Error ? exc.message.toLowerCase() : "";
+      if (message.includes("already started")) {
+        return;
+      }
+      if (message.includes("notallowed") || message.includes("permission")) {
+        setError("voice_not_allowed");
+        return;
+      }
+      if (message.includes("audio-capture")) {
+        setError("voice_no_microphone");
+        return;
+      }
+      setError("voice_start_failed");
     }
-  }, [ensureRecognition]);
+  }, [ensureRecognition, listening]);
 
   const stopListening = useCallback(() => {
     const recognition = recognitionRef.current;

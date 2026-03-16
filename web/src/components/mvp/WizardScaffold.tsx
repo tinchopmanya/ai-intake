@@ -23,7 +23,7 @@ import type { AdvisorProfile } from "@/data/advisors";
 import { API_URL } from "@/lib/config";
 import { resolveRuntimeLocale, tRuntime } from "@/lib/i18n/runtime";
 import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
-import { useSpeechToText } from "@/hooks/useSpeechToText";
+import { getSpeechToTextErrorMessage, useSpeechToText } from "@/hooks/useSpeechToText";
 import type {
   AdvisorResponse,
   AnalysisResponse,
@@ -1124,7 +1124,7 @@ export function WizardScaffold() {
                   <p className="text-[12px] text-[#666]">La entrada por voz no esta disponible en este navegador.</p>
                 ) : null}
                 {contextVoice.error ? (
-                  <p className="text-[12px] text-[#92400e]">No pudimos transcribir el audio. Intenta de nuevo.</p>
+                  <p className="text-[12px] text-[#92400e]">{getSpeechToTextErrorMessage(contextVoice.error)}</p>
                 ) : null}
               </div>
             </section>

@@ -4,7 +4,7 @@ import { useEffect } from "react";
 
 import { Button, Textarea } from "@/components/mvp/ui";
 import { VoiceListeningBadge, VoiceMicButton } from "@/components/mvp/VoiceControls";
-import { useSpeechToText } from "@/hooks/useSpeechToText";
+import { getSpeechToTextErrorMessage, useSpeechToText } from "@/hooks/useSpeechToText";
 
 export type AdvisorChatMessage = {
   id: string;
@@ -151,9 +151,7 @@ export function AdvisorChatModal({
               <p className="text-[12px] text-[#666]">Puedes hablar libremente y luego revisar el texto antes de enviarlo.</p>
             )}
 
-            {voice.error ? (
-              <p className="text-[12px] text-[#92400e]">No pudimos transcribir el audio. Intenta de nuevo.</p>
-            ) : null}
+            {voice.error ? <p className="text-[12px] text-[#92400e]">{getSpeechToTextErrorMessage(voice.error)}</p> : null}
           </div>
 
           <div className="flex flex-wrap justify-between gap-2">
