@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { AdvisorChatModal } from "@/components/mvp/AdvisorChatModal";
 import { ADVISOR_PROFILES } from "@/data/advisors";
 import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
-import { postAdvisor } from "@/lib/api/client";
+import { postAdvisorChat } from "@/lib/api/client";
 import { getCurrentUser, logoutSession } from "@/lib/auth/client";
 
 type AppShellProps = {
@@ -95,33 +95,28 @@ export function AppShell({ children }: AppShellProps) {
     if (advisorChatIndex === null || advisorChatSending || !advisorChatInput.trim()) return;
     const userInput = advisorChatInput.trim();
     const advisor = ADVISOR_PROFILES[advisorChatIndex];
-    const conversationPrompt = [
-      "Modo: advisor_conversation",
-      "Objetivo: responder al usuario en una conversacion con advisor.",
-      "No asumas que el texto del usuario es un mensaje para su ex.",
-      "Primero acompana, aclara y orienta. Solo sugiere texto para enviar si el usuario lo pide explicitamente.",
-      "",
-      "Mensaje del usuario:",
-      userInput,
-    ].join("\n");
-    const advisorPayload = {
-      message_text: conversationPrompt,
-      mode: "reactive" as const,
-      relationship_type: "otro" as const,
-      quick_mode: true,
-      save_session: false,
-      source_type: "text" as const,
-      context: {
-        user_style: "cordial",
-        entry_mode: "advisor_conversation",
-        selected_advisor_id: advisor?.id ?? null,
-        selected_advisor_name: advisor?.name ?? null,
-        selected_advisor_role: advisor?.role ?? null,
-        user_display_name: displayName,
+    const outboundMessages = [
+      ...advisorChatMessages.map((item) => ({
+        role: item.role,
+        content: item.text,
+      })),
+      {
+        role: "user" as const,
+        content: userInput,
       },
+    ];
+    const advisorPayload = {
+      advisor_id: advisor?.id ?? "laura",
+      entry_mode: "advisor_conversation" as const,
+      messages: outboundMessages,
+      conversation_context: {
+        user_name: displayName,
+      },
+      debug: process.env.NODE_ENV !== "production",
     };
     if (process.env.NODE_ENV !== "production") {
       const debugPayload = {
+        endpoint: "/v1/advisor/chat",
         entryMode: "advisor_conversation",
         advisor: advisor
           ? {
@@ -131,7 +126,6 @@ export function AppShell({ children }: AppShellProps) {
             }
           : null,
         userInput,
-        prompt: conversationPrompt,
         payload: advisorPayload,
       };
       setAdvisorChatDebugPayload(debugPayload);
@@ -139,11 +133,8 @@ export function AppShell({ children }: AppShellProps) {
     }
     setAdvisorChatSending(true);
     try {
-      const result = await postAdvisor(advisorPayload);
-      const reply =
-        result.responses[advisorChatIndex]?.text ??
-        result.responses[0]?.text ??
-        "No se pudo generar una respuesta en este momento.";
+      const result = await postAdvisorChat(advisorPayload);
+      const reply = result.message || "No se pudo generar una respuesta en este momento.";
       setAdvisorChatMessages((prev) => [
         ...prev,
         { id: `u-${Date.now()}`, role: "user", text: userInput },
@@ -156,6 +147,7 @@ export function AppShell({ children }: AppShellProps) {
       if (process.env.NODE_ENV !== "production") {
         setAdvisorChatDebugPayload((previous) => ({
           ...(previous ?? {}),
+          response: result,
           response_preview: reply.slice(0, 500),
         }));
       }

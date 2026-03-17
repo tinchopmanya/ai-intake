@@ -1,3 +1,6 @@
+import json
+import logging
+import re
 from typing import Annotated
 
 from fastapi import APIRouter
@@ -12,14 +15,18 @@ from app.api.deps import get_uow
 from app.repositories import UnitOfWork
 from app.schemas.advisor import AdvisorRequest
 from app.schemas.advisor import AdvisorResponse
+from app.schemas.advisor_chat import AdvisorChatRequest
+from app.schemas.advisor_chat import AdvisorChatResponse
 from app.services.advisor_catalog_service import AdvisorCatalogService
 from app.services.auth_service import AuthenticatedUser
 from app.services import AdvisorOrchestrator
 from app.services.advisor_orchestrator import AnalysisNotFoundError
 from app.services.analysis_registry import AnalysisOwnershipError
+from config import get_settings
 from providers.base import AIProvider
 
 router = APIRouter(prefix="/v1/advisor", tags=["advisor"])
+logger = logging.getLogger(__name__)
 
 def _resolve_advisor_input_text(payload: AdvisorRequest) -> str:
     context = payload.context or {}
@@ -32,6 +39,102 @@ def _resolve_advisor_input_text(payload: AdvisorRequest) -> str:
         if normalized:
             return normalized[:8000]
     return payload.message_text
+
+
+def _extract_json_object(raw_text: str) -> dict[str, object] | None:
+    text = raw_text.strip()
+    if not text:
+        return None
+    try:
+        data = json.loads(text)
+        return data if isinstance(data, dict) else None
+    except json.JSONDecodeError:
+        pass
+
+    fenced = text.replace("```json", "").replace("```", "").strip()
+    first = fenced.find("{")
+    last = fenced.rfind("}")
+    if first == -1 or last == -1 or last <= first:
+        return None
+    snippet = fenced[first : last + 1]
+    try:
+        data = json.loads(snippet)
+    except json.JSONDecodeError:
+        match = re.search(r"\{.*\}", snippet, flags=re.DOTALL)
+        if not match:
+            return None
+        try:
+            data = json.loads(match.group(0))
+        except json.JSONDecodeError:
+            return None
+    return data if isinstance(data, dict) else None
+
+
+def _build_chat_system_prompt(entry_mode: str, advisor_name: str, advisor_role: str) -> str:
+    if entry_mode == "advisor_refine_response":
+        return f"""
+Eres {advisor_name}, advisor de ExReply ({advisor_role}).
+Estas en modo advisor_refine_response.
+
+Objetivo:
+- Conversar brevemente con la persona usuaria y refinar una respuesta previa para su ex.
+- Escuchar el ajuste pedido y entregar una nueva version mas util.
+
+Reglas:
+- Responde en espanol claro y humano.
+- No des analisis tecnico.
+- Mantente breve y practico.
+- Entrega JSON estricto, sin texto extra.
+
+Salida obligatoria:
+{{
+  "message": "respuesta del advisor para la persona usuaria",
+  "suggested_reply": "nueva respuesta sugerida para enviar a la ex"
+}}
+""".strip()
+
+    return f"""
+Eres {advisor_name}, advisor de ExReply ({advisor_role}).
+Estas en modo advisor_conversation.
+
+Objetivo:
+- Conversar con la persona usuaria.
+- Escuchar, orientar, contener brevemente y ayudar a ordenar ideas.
+- NO asumir que el texto es un borrador para enviar a la ex.
+- Solo sugerir un mensaje para la ex si la persona lo pide explicitamente.
+
+Reglas:
+- Responde en espanol claro, cercano y breve (3 a 7 frases).
+- Puedes hacer 1 pregunta de aclaracion si ayuda.
+- No conviertas automaticamente el mensaje en propuesta para la ex.
+- Entrega JSON estricto, sin texto extra.
+
+Salida obligatoria:
+{{
+  "message": "respuesta del advisor para la persona usuaria",
+  "suggested_reply": null
+}}
+""".strip()
+
+
+def _build_chat_user_payload(payload: AdvisorChatRequest, *, user_id: str) -> str:
+    return json.dumps(
+        {
+            "entry_mode": payload.entry_mode,
+            "advisor_id": payload.advisor_id,
+            "messages": [item.model_dump() for item in payload.messages],
+            "base_reply": payload.base_reply,
+            "case_id": str(payload.case_id) if payload.case_id else None,
+            "conversation_context": (
+                payload.conversation_context.model_dump(exclude_none=True)
+                if payload.conversation_context is not None
+                else None
+            ),
+            "user_id": user_id,
+        },
+        ensure_ascii=True,
+        separators=(",", ":"),
+    )
 
 
 @router.post(
@@ -129,4 +232,87 @@ async def create_advisor_response(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="analysis_id_not_found_or_expired",
         ) from exc
+
+
+@router.post(
+    "/chat",
+    response_model=AdvisorChatResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def chat_with_advisor(
+    payload: AdvisorChatRequest,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    advisor_catalog: Annotated[AdvisorCatalogService, Depends(get_advisor_catalog_service)],
+    uow: Annotated[UnitOfWork | None, Depends(get_uow)],
+    provider: Annotated[AIProvider, Depends(get_ai_provider)],
+) -> AdvisorChatResponse:
+    if payload.case_id is not None:
+        if uow is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="case_memory_unavailable",
+            )
+        case_row = uow.cases.get_by_id(user_id=current_user.id, case_id=payload.case_id)
+        if case_row is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="case_not_found")
+
+    advisor_lineup = advisor_catalog.resolve(
+        country_code=current_user.country_code,
+        language_code=current_user.language_code,
+    )
+    advisor = next((item for item in advisor_lineup if item.id == payload.advisor_id), None)
+    if advisor is None:
+        advisor = advisor_lineup[0]
+
+    system_prompt = _build_chat_system_prompt(
+        payload.entry_mode,
+        advisor_name=advisor.name,
+        advisor_role=advisor.role or advisor.tone or "advisor",
+    )
+    user_payload = _build_chat_user_payload(payload, user_id=str(current_user.id))
+    model_input = f"SYSTEM:\n{system_prompt}\n\nUSER:\n{user_payload}"
+    raw_output = provider.generate_answer(model_input)
+    parsed = _extract_json_object(raw_output)
+
+    advisor_message = ""
+    suggested_reply: str | None = None
+    if parsed is not None:
+        advisor_message = str(parsed.get("message") or "").strip()
+        suggested_candidate = parsed.get("suggested_reply")
+        if isinstance(suggested_candidate, str):
+            normalized = suggested_candidate.strip()
+            if normalized and normalized.lower() != "null":
+                suggested_reply = normalized[:4000]
+
+    if not advisor_message:
+        advisor_message = (
+            "Te leo. Si quieres, cuentame un poco mas de lo que paso y que te gustaria lograr."
+            if payload.entry_mode == "advisor_conversation"
+            else "Gracias por el contexto. Te propongo este ajuste y, si quieres, lo afinamos una vez mas."
+        )
+        if payload.entry_mode == "advisor_refine_response" and not suggested_reply:
+            suggested_reply = payload.base_reply
+
+    debug_payload = None
+    if payload.debug and get_settings().is_local_env:
+        debug_payload = {
+            "endpoint": "/v1/advisor/chat",
+            "entry_mode": payload.entry_mode,
+            "advisor": {
+                "id": advisor.id,
+                "name": advisor.name,
+                "role": advisor.role,
+            },
+            "system_prompt": system_prompt,
+            "user_payload": user_payload,
+            "raw_output_preview": raw_output[:1600],
+        }
+        logger.info("advisor_chat_debug_enabled advisor=%s mode=%s", advisor.id, payload.entry_mode)
+
+    return AdvisorChatResponse(
+        message=advisor_message[:4000],
+        suggested_reply=suggested_reply,
+        mode_used=payload.entry_mode,
+        debug=debug_payload,
+    )
 

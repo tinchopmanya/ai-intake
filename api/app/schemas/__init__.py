@@ -1,5 +1,7 @@
 from .advisor import AdvisorRequest
 from .advisor import AdvisorResponse
+from .advisor_chat import AdvisorChatRequest
+from .advisor_chat import AdvisorChatResponse
 from .analysis import AnalysisRequest
 from .analysis import AnalysisResponse
 from .auth import CurrentSessionResponse
@@ -26,6 +28,8 @@ from .ocr import OcrInterpretResponse
 __all__ = [
     "AdvisorRequest",
     "AdvisorResponse",
+    "AdvisorChatRequest",
+    "AdvisorChatResponse",
     "AnalysisRequest",
     "AnalysisResponse",
     "CurrentSessionResponse",

@@ -1,6 +1,8 @@
 import { API_URL } from "@/lib/config";
 import { authFetch } from "@/lib/auth/client";
 import type { AdvisorRequest } from "@/lib/api/types";
+import type { AdvisorChatRequest } from "@/lib/api/types";
+import type { AdvisorChatResponse } from "@/lib/api/types";
 import type { AdvisorResponse } from "@/lib/api/types";
 import type { AnalysisRequest } from "@/lib/api/types";
 import type { AnalysisResponse } from "@/lib/api/types";
@@ -76,6 +78,10 @@ export function postAnalysis(payload: AnalysisRequest): Promise<AnalysisResponse
  */
 export function postAdvisor(payload: AdvisorRequest): Promise<AdvisorResponse> {
   return postJson<AdvisorResponse>("/v1/advisor", payload);
+}
+
+export function postAdvisorChat(payload: AdvisorChatRequest): Promise<AdvisorChatResponse> {
+  return postJson<AdvisorChatResponse>("/v1/advisor/chat", payload);
 }
 
 /**

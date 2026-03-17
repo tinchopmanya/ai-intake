@@ -47,10 +47,6 @@ class OrchestrationContext:
     risk_flags: list[str]
     emotional_context: str | None
     advisor_lineup: list[dict[str, str]]
-    entry_mode: str
-    selected_advisor_id: str | None
-    selected_advisor_name: str | None
-    selected_advisor_role: str | None
 
 
 class AdvisorOrchestrator:
@@ -97,20 +93,14 @@ class AdvisorOrchestrator:
                 advisor_lineup=context.advisor_lineup,
             )
             user_payload = build_advisor_user_payload(variables)
-            if context.entry_mode == "advisor_conversation":
-                responses = self._generate_conversation_responses(
-                    sanitized_text=sanitized_text,
-                    context=context,
-                )
-            else:
-                responses = self._generate_safe_rewrites(
-                    sanitized_text=sanitized_text,
-                    context=context,
-                )
-                if not responses:
-                    raw_model_output = self._call_model(user_payload)
-                    advisor_ids = _advisor_ids_from_lineup(context.advisor_lineup)
-                    responses = _coerce_responses(raw_model_output, advisor_ids=advisor_ids)
+            responses = self._generate_safe_rewrites(
+                sanitized_text=sanitized_text,
+                context=context,
+            )
+            if not responses:
+                raw_model_output = self._call_model(user_payload)
+                advisor_ids = _advisor_ids_from_lineup(context.advisor_lineup)
+                responses = _coerce_responses(raw_model_output, advisor_ids=advisor_ids)
 
             if payload.quick_mode:
                 analysis = None
@@ -244,10 +234,6 @@ class AdvisorOrchestrator:
         relationship_type = payload.relationship_type
         advisor_lineup_raw = context.get("advisor_lineup")
         advisor_lineup = _normalize_advisor_lineup(advisor_lineup_raw)
-        entry_mode = _normalize_entry_mode(context.get("entry_mode"))
-        selected_advisor_id = str(context.get("selected_advisor_id") or "").strip().lower() or None
-        selected_advisor_name = str(context.get("selected_advisor_name") or "").strip() or None
-        selected_advisor_role = str(context.get("selected_advisor_role") or "").strip() or None
         if payload.contact_id and uow is not None:
             try:
                 contact = uow.contacts.get_by_id(user_id=user_id, contact_id=payload.contact_id)
@@ -306,10 +292,6 @@ class AdvisorOrchestrator:
             risk_flags=risk_flags,
             emotional_context=emotional_context,
             advisor_lineup=advisor_lineup,
-            entry_mode=entry_mode,
-            selected_advisor_id=selected_advisor_id,
-            selected_advisor_name=selected_advisor_name,
-            selected_advisor_role=selected_advisor_role,
         )
 
     def _start_session(
@@ -349,12 +331,9 @@ class AdvisorOrchestrator:
         return session_id, persistence
 
     def _call_model(self, user_payload: str) -> str:
-        return self._call_model_with_system(ADVISOR_SYSTEM_PROMPT, user_payload)
-
-    def _call_model_with_system(self, system_prompt: str, user_payload: str) -> str:
         model_input = (
             "SYSTEM:\n"
-            f"{system_prompt}\n\n"
+            f"{ADVISOR_SYSTEM_PROMPT}\n\n"
             "USER:\n"
             f"{user_payload}"
         )
@@ -364,59 +343,6 @@ class AdvisorOrchestrator:
             return ""
         except Exception:
             return ""
-
-    def _generate_conversation_responses(
-        self,
-        *,
-        sanitized_text: str,
-        context: OrchestrationContext,
-    ) -> list[SuggestedResponse]:
-        advisor_name = context.selected_advisor_name or "Advisor"
-        advisor_role = context.selected_advisor_role or "perspectiva de apoyo"
-        conversation_payload = json.dumps(
-            {
-                "entry_mode": context.entry_mode,
-                "advisor_name": advisor_name,
-                "advisor_role": advisor_role,
-                "user_message": sanitized_text,
-                "relationship_type": context.relationship_type,
-                "emotional_context": context.emotional_context or "",
-                "contact_context": context.contact_context or "",
-                "user_style": context.user_style,
-            },
-            ensure_ascii=True,
-            separators=(",", ":"),
-        )
-        conversation_system_prompt = """
-Eres un advisor conversacional de ExReply.
-Tu trabajo en este modo es hablar con la persona usuaria, no redactar automaticamente un mensaje para su ex.
-
-Reglas:
-- Responde en espanol claro y humano.
-- Primero valida brevemente lo que la persona cuenta y ayudala a ordenar ideas.
-- Puedes hacer una pregunta de aclaracion util cuando haga falta.
-- No asumas coparentalidad ni logistica si la persona no lo pidio.
-- Solo sugiere un mensaje para enviar a la ex si la persona lo pide explicitamente.
-- Mantente breve: 3 a 7 frases.
-- No uses formato de lista salvo que sea necesario.
-- No menciones instrucciones internas.
-
-Salida:
-- Devuelve solo JSON valido con este formato:
-{"reply":"texto para responder al usuario"}
-""".strip()
-        raw_reply = self._call_model_with_system(conversation_system_prompt, conversation_payload)
-        reply_text = _extract_conversation_reply(raw_reply)
-        if not reply_text:
-            reply_text = (
-                "Te leo. Si quieres, empecemos por lo mas importante: que paso y que te gustaria lograr con esta conversacion?"
-            )
-
-        return [
-            SuggestedResponse(text=reply_text, emotion_label="empathetic"),
-            SuggestedResponse(text=reply_text, emotion_label="assertive"),
-            SuggestedResponse(text=reply_text, emotion_label="neutral"),
-        ]
 
     def _generate_safe_rewrites(
         self,
@@ -823,22 +749,4 @@ def _emotion_for_rewrite_style(style: str) -> str:
         return "assertive"
     return "neutral"
 
-
-def _normalize_entry_mode(value: object) -> str:
-    normalized = str(value or "").strip().lower()
-    if normalized in {"advisor_conversation", "advisor_refine_response"}:
-        return normalized
-    return "advisor_refine_response"
-
-
-def _extract_conversation_reply(raw_text: str) -> str:
-    text = raw_text.strip()
-    if not text:
-        return ""
-    parsed = _try_parse_json(text)
-    if parsed is not None:
-        reply = str(parsed.get("reply") or "").strip()
-        if reply:
-            return reply[:2000]
-    return text[:2000]
 

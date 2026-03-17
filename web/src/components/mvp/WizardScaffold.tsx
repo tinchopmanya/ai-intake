@@ -984,6 +984,7 @@ export function WizardScaffold() {
       };
       if (process.env.NODE_ENV !== "production") {
         const debugPayload = {
+          endpoint: "/v1/advisor",
           entryMode: "advisor_refine_response",
           advisor: {
             id: advisorVisual.id,

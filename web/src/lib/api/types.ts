@@ -65,6 +65,32 @@ export type AdvisorRequest = {
   context?: Record<string, unknown> | null;
 };
 
+export type AdvisorChatRequest = {
+  advisor_id: string;
+  entry_mode: "advisor_conversation" | "advisor_refine_response";
+  messages: Array<{
+    role: "user" | "advisor";
+    content: string;
+  }>;
+  case_id?: string | null;
+  conversation_context?: {
+    user_name?: string | null;
+    ex_name?: string | null;
+    has_children?: boolean | null;
+    relationship_type?: string | null;
+    extra?: Record<string, unknown> | null;
+  } | null;
+  base_reply?: string | null;
+  debug?: boolean;
+};
+
+export type AdvisorChatResponse = {
+  message: string;
+  suggested_reply: string | null;
+  mode_used: "advisor_conversation" | "advisor_refine_response";
+  debug?: Record<string, unknown> | null;
+};
+
 export type WizardEventRequest = {
   event_name: "reply_copied" | "case_exported";
   session_id?: string | null;
