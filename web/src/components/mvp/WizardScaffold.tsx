@@ -23,7 +23,11 @@ import type { AdvisorProfile } from "@/data/advisors";
 import { API_URL } from "@/lib/config";
 import { resolveRuntimeLocale, tRuntime } from "@/lib/i18n/runtime";
 import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
-import { getSpeechToTextErrorMessage, useSpeechToText } from "@/hooks/useSpeechToText";
+import {
+  getMicrophoneStatusMessage,
+  getSpeechToTextErrorMessage,
+  useSpeechToText,
+} from "@/hooks/useSpeechToText";
 import type {
   AdvisorResponse,
   AnalysisResponse,
@@ -376,6 +380,7 @@ function StepSection({
  * Client-side wizard that orchestrates analysis and advisor response calls.
  */
 export function WizardScaffold() {
+  const isDevelopment = process.env.NODE_ENV !== "production";
   const locale = resolveRuntimeLocale();
   const t = (key: string) => tRuntime(key, locale);
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
@@ -426,6 +431,10 @@ export function WizardScaffold() {
     continuous: false,
     interimResults: false,
   });
+  const contextMicrophoneStatusMessage = getMicrophoneStatusMessage(
+    contextVoice.microphoneStatus,
+    contextVoice.speechSupported,
+  );
   const speechSynthesis = useSpeechSynthesis({ lang: "es-ES" });
 
   useEffect(() => {
@@ -1106,9 +1115,8 @@ export function WizardScaffold() {
                 <div className="flex flex-wrap items-center gap-2">
                   <VoiceMicButton
                     listening={contextVoice.listening}
-                    disabled={!contextVoice.supported}
+                    disabled={contextVoice.microphoneStatus === "requesting"}
                     onClick={() => {
-                      if (!contextVoice.supported) return;
                       if (contextVoice.listening) {
                         contextVoice.stopListening();
                       } else {
@@ -1120,11 +1128,23 @@ export function WizardScaffold() {
                   />
                   <VoiceListeningBadge listening={contextVoice.listening} />
                 </div>
-                {!contextVoice.supported ? (
-                  <p className="text-[12px] text-[#666]">La entrada por voz no esta disponible en este navegador.</p>
+                {contextMicrophoneStatusMessage ? (
+                  <p className="text-[12px] text-[#666]">{contextMicrophoneStatusMessage}</p>
                 ) : null}
                 {contextVoice.error ? (
                   <p className="text-[12px] text-[#92400e]">{getSpeechToTextErrorMessage(contextVoice.error)}</p>
+                ) : null}
+                {isDevelopment ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void contextVoice.requestMicrophonePermission();
+                    }}
+                    disabled={contextVoice.microphoneStatus === "requesting"}
+                    className="inline-flex h-8 items-center rounded-full border border-[#d7d7d7] bg-white px-3 text-[12px] text-[#334155] hover:bg-[#fafafa] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Probar microfono
+                  </button>
                 ) : null}
               </div>
             </section>

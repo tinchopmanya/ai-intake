@@ -40,8 +40,16 @@ type UseSpeechToTextOptions = {
   interimResults?: boolean;
 };
 
+export type MicrophonePermissionStatus =
+  | "idle"
+  | "requesting"
+  | "granted"
+  | "denied"
+  | "unsupported";
+
 type SpeechToTextErrorCode =
   | "voice_not_supported"
+  | "voice_speech_not_supported"
   | "voice_not_allowed"
   | "voice_no_microphone"
   | "voice_network"
@@ -80,6 +88,8 @@ function mapSpeechErrorCode(rawError?: string): SpeechToTextErrorCode {
 export function getSpeechToTextErrorMessage(error: string | null): string | null {
   if (!error) return null;
   switch (error) {
+    case "voice_speech_not_supported":
+      return "El microfono esta disponible, pero el dictado por voz no es compatible en este navegador.";
     case "voice_not_supported":
       return "La entrada por voz no esta disponible en este navegador.";
     case "voice_not_allowed":
@@ -97,8 +107,51 @@ export function getSpeechToTextErrorMessage(error: string | null): string | null
   }
 }
 
+export function getMicrophoneStatusMessage(
+  status: MicrophonePermissionStatus,
+  speechSupported: boolean,
+): string | null {
+  switch (status) {
+    case "requesting":
+      return "Solicitando acceso al microfono...";
+    case "granted":
+      return speechSupported
+        ? "Puedes usar dictado por voz en este navegador."
+        : "El microfono esta disponible, pero el dictado por voz no es compatible en este navegador.";
+    case "denied":
+      return "No se pudo acceder al microfono. Revisa los permisos del navegador.";
+    case "unsupported":
+      return "Este navegador no permite acceso al microfono desde la app.";
+    case "idle":
+    default:
+      return null;
+  }
+}
+
+function hasMicrophonePermissionApi(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return Boolean(navigator.mediaDevices?.getUserMedia);
+}
+
+function mapGetUserMediaError(error: unknown): SpeechToTextErrorCode {
+  const maybeError = error as { name?: string };
+  switch (maybeError?.name) {
+    case "NotAllowedError":
+    case "PermissionDeniedError":
+      return "voice_not_allowed";
+    case "NotFoundError":
+    case "DevicesNotFoundError":
+    case "TrackStartError":
+    case "NotReadableError":
+      return "voice_no_microphone";
+    default:
+      return "voice_unknown_error";
+  }
+}
+
 export function useSpeechToText(options?: UseSpeechToTextOptions) {
-  const supported = Boolean(getSpeechRecognitionCtor());
+  const speechSupported = Boolean(getSpeechRecognitionCtor());
+  const [microphoneStatus, setMicrophoneStatus] = useState<MicrophonePermissionStatus>("idle");
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -107,6 +160,33 @@ export function useSpeechToText(options?: UseSpeechToTextOptions) {
   const lang = options?.lang ?? "es-ES";
   const continuous = options?.continuous ?? false;
   const interimResults = options?.interimResults ?? false;
+
+  const requestMicrophonePermission = useCallback(async () => {
+    if (typeof navigator === "undefined") {
+      setMicrophoneStatus("unsupported");
+      setError("voice_no_microphone");
+      return false;
+    }
+    if (!hasMicrophonePermissionApi()) {
+      setMicrophoneStatus("unsupported");
+      setError("voice_no_microphone");
+      return false;
+    }
+
+    setMicrophoneStatus("requesting");
+    setError(null);
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((track) => track.stop());
+      setMicrophoneStatus("granted");
+      return true;
+    } catch (exc) {
+      setMicrophoneStatus("denied");
+      setError(mapGetUserMediaError(exc));
+      return false;
+    }
+  }, []);
 
   const ensureRecognition = useCallback(() => {
     const ctor = getSpeechRecognitionCtor();
@@ -147,31 +227,41 @@ export function useSpeechToText(options?: UseSpeechToTextOptions) {
   }, [continuous, interimResults, lang]);
 
   const startListening = useCallback(() => {
-    const recognition = ensureRecognition();
-    if (!recognition) {
-      setError("voice_not_supported");
-      return;
-    }
-    if (listening) return;
-    setError(null);
-    try {
-      recognition.start();
-    } catch (exc) {
-      const message = exc instanceof Error ? exc.message.toLowerCase() : "";
-      if (message.includes("already started")) {
+    void (async () => {
+      const micGranted =
+        microphoneStatus === "granted" ? true : await requestMicrophonePermission();
+      if (!micGranted) return;
+      if (!speechSupported) {
+        setError("voice_speech_not_supported");
         return;
       }
-      if (message.includes("notallowed") || message.includes("permission")) {
-        setError("voice_not_allowed");
+
+      const recognition = ensureRecognition();
+      if (!recognition) {
+        setError("voice_not_supported");
         return;
       }
-      if (message.includes("audio-capture")) {
-        setError("voice_no_microphone");
-        return;
+      if (listening) return;
+      setError(null);
+      try {
+        recognition.start();
+      } catch (exc) {
+        const message = exc instanceof Error ? exc.message.toLowerCase() : "";
+        if (message.includes("already started")) {
+          return;
+        }
+        if (message.includes("notallowed") || message.includes("permission")) {
+          setError("voice_not_allowed");
+          return;
+        }
+        if (message.includes("audio-capture")) {
+          setError("voice_no_microphone");
+          return;
+        }
+        setError("voice_start_failed");
       }
-      setError("voice_start_failed");
-    }
-  }, [ensureRecognition, listening]);
+    })();
+  }, [ensureRecognition, listening, microphoneStatus, requestMicrophonePermission, speechSupported]);
 
   const stopListening = useCallback(() => {
     const recognition = recognitionRef.current;
@@ -192,10 +282,13 @@ export function useSpeechToText(options?: UseSpeechToTextOptions) {
   }, []);
 
   return {
-    supported,
+    supported: speechSupported,
+    speechSupported,
+    microphoneStatus,
     listening,
     transcript,
     error,
+    requestMicrophonePermission,
     startListening,
     stopListening,
     resetTranscript,

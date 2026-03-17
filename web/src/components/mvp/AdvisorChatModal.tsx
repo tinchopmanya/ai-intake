@@ -4,7 +4,11 @@ import { useEffect } from "react";
 
 import { Button, Textarea } from "@/components/mvp/ui";
 import { VoiceListeningBadge, VoiceMicButton } from "@/components/mvp/VoiceControls";
-import { getSpeechToTextErrorMessage, useSpeechToText } from "@/hooks/useSpeechToText";
+import {
+  getMicrophoneStatusMessage,
+  getSpeechToTextErrorMessage,
+  useSpeechToText,
+} from "@/hooks/useSpeechToText";
 
 export type AdvisorChatMessage = {
   id: string;
@@ -35,11 +39,16 @@ export function AdvisorChatModal({
   onUseResponse,
   onClose,
 }: AdvisorChatModalProps) {
+  const isDevelopment = process.env.NODE_ENV !== "production";
   const voice = useSpeechToText({
     lang: "es-ES",
     continuous: false,
     interimResults: false,
   });
+  const microphoneStatusMessage = getMicrophoneStatusMessage(
+    voice.microphoneStatus,
+    voice.speechSupported,
+  );
 
   useEffect(() => {
     if (!isOpen || !voice.transcript.trim()) return;
@@ -118,9 +127,8 @@ export function AdvisorChatModal({
             <div className="flex flex-wrap items-center gap-2">
               <VoiceMicButton
                 listening={voice.listening}
-                disabled={!voice.supported}
+                disabled={voice.microphoneStatus === "requesting"}
                 onClick={() => {
-                  if (!voice.supported) return;
                   if (voice.listening) {
                     voice.stopListening();
                   } else {
@@ -133,9 +141,8 @@ export function AdvisorChatModal({
 
               <VoiceMicButton
                 listening={false}
-                disabled={!voice.supported || voice.listening}
+                disabled={voice.listening || voice.microphoneStatus === "requesting"}
                 onClick={() => {
-                  if (!voice.supported) return;
                   voice.startListening();
                 }}
                 idleLabel="Desahogarte con este advisor"
@@ -145,13 +152,25 @@ export function AdvisorChatModal({
               <VoiceListeningBadge listening={voice.listening} />
             </div>
 
-            {!voice.supported ? (
-              <p className="text-[12px] text-[#666]">La entrada por voz no esta disponible en este navegador.</p>
-            ) : (
+            {microphoneStatusMessage ? <p className="text-[12px] text-[#666]">{microphoneStatusMessage}</p> : null}
+            {!microphoneStatusMessage && voice.speechSupported ? (
               <p className="text-[12px] text-[#666]">Puedes hablar libremente y luego revisar el texto antes de enviarlo.</p>
-            )}
+            ) : null}
 
             {voice.error ? <p className="text-[12px] text-[#92400e]">{getSpeechToTextErrorMessage(voice.error)}</p> : null}
+
+            {isDevelopment ? (
+              <button
+                type="button"
+                onClick={() => {
+                  void voice.requestMicrophonePermission();
+                }}
+                disabled={voice.microphoneStatus === "requesting"}
+                className="inline-flex h-8 items-center rounded-full border border-[#d7d7d7] bg-white px-3 text-[12px] text-[#334155] hover:bg-[#fafafa] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Probar microfono
+              </button>
+            ) : null}
           </div>
 
           <div className="flex flex-wrap justify-between gap-2">
