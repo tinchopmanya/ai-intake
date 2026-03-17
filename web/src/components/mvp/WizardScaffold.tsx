@@ -576,7 +576,6 @@ export function WizardScaffold() {
   async function interpretConversationText(
     rawText: string,
     source: "ocr" | "text",
-    options?: { forceGemini?: boolean },
   ) {
     const normalized = rawText.trim();
     if (!normalized) {
@@ -590,13 +589,6 @@ export function WizardScaffold() {
         normalized,
         source === "ocr" ? "ocr" : "manual",
       );
-      const shouldUseGemini = options?.forceGemini || source === "ocr" || localFallback.length < 2;
-      if (!shouldUseGemini) {
-        if (localFallback.length > 0) {
-          syncConversationBlocks(localFallback);
-        }
-        return;
-      }
       const interpreted = await postOcrInterpret({ text: normalized, source });
       const apiBlocks: ConversationBlock[] = interpreted.blocks
         .map((block) => ({
@@ -688,10 +680,10 @@ export function WizardScaffold() {
         if (blocksFromOcr.length > 0) {
           syncConversationBlocks(blocksFromOcr);
         } else {
-          await interpretConversationText(payload.extracted_text, "ocr", { forceGemini: true });
+          await interpretConversationText(payload.extracted_text, "ocr");
         }
       } else {
-        await interpretConversationText(payload.extracted_text, "ocr", { forceGemini: true });
+        await interpretConversationText(payload.extracted_text, "ocr");
       }
     } catch (exc) {
       setOcrError(

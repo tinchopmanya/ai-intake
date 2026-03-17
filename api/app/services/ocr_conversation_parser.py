@@ -64,7 +64,7 @@ class _GeminiBlock(BaseModel):
 
 
 class _GeminiResponse(BaseModel):
-    blocks: list[_GeminiBlock] = Field(default_factory=list)
+    blocks: list[_GeminiBlock]
 
 
 class OcrConversationParser:
@@ -83,7 +83,9 @@ class OcrConversationParser:
         if not normalized:
             return OcrParseResult(blocks=[], method="heuristic", warnings=["conversation_interpretation_empty"])
 
-        if source == "text" and _looks_like_whatsapp_structured(normalized):
+        is_whatsapp_structured = source == "text" and _looks_like_whatsapp_structured(normalized)
+
+        if is_whatsapp_structured:
             logger.info("parser_whatsapp_detected")
             whatsapp_blocks = _parse_whatsapp_structured(
                 normalized,
@@ -98,7 +100,7 @@ class OcrConversationParser:
                 return OcrParseResult(blocks=whatsapp_blocks, method="heuristic", warnings=[])
 
         fallback_blocks = _heuristic_segment(normalized)
-        should_use_gemini = source == "ocr" or not _looks_like_whatsapp_structured(normalized)
+        should_use_gemini = source == "ocr" or not is_whatsapp_structured
 
         if should_use_gemini:
             logger.info("parser_gemini_attempted")
@@ -110,9 +112,9 @@ class OcrConversationParser:
                     logger.info("parser_gemini_success blocks=%s", len(gemini_blocks))
                     return OcrParseResult(blocks=gemini_blocks, method="gemini", warnings=[])
                 logger.warning("parser_gemini_failed reason=empty_blocks")
-            except (ValueError, json.JSONDecodeError) as exc:
+            except (ValueError, json.JSONDecodeError, ValidationError) as exc:
                 logger.warning("parser_gemini_invalid_json error=%s", exc)
-            except (AIProviderError, ValidationError) as exc:
+            except AIProviderError as exc:
                 logger.warning("parser_gemini_failed error=%s", exc)
             except Exception as exc:
                 logger.warning("parser_gemini_failed error=%s", exc)
