@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 
 import { AdvisorChatModal } from "@/components/mvp/AdvisorChatModal";
 import { ADVISOR_PROFILES } from "@/data/advisors";
+import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
 import { postAdvisor } from "@/lib/api/client";
 import { getCurrentUser, logoutSession } from "@/lib/auth/client";
 
@@ -29,6 +30,7 @@ export function AppShell({ children }: AppShellProps) {
   const [advisorChatMessages, setAdvisorChatMessages] = useState<
     Array<{ id: string; role: "user" | "advisor"; text: string }>
   >([]);
+  const speechSynthesis = useSpeechSynthesis({ lang: "es-ES" });
 
   useEffect(() => {
     let mounted = true;
@@ -97,7 +99,7 @@ export function AppShell({ children }: AppShellProps) {
       "Modo: advisor_conversation",
       "Objetivo: responder al usuario en una conversacion con advisor.",
       "No asumas que el texto del usuario es un mensaje para su ex.",
-      "Primero acompana, aclara y orienta. Solo sugiere texto para enviar si el usuario lo pide.",
+      "Primero acompana, aclara y orienta. Solo sugiere texto para enviar si el usuario lo pide explicitamente.",
       "",
       "Mensaje del usuario:",
       userInput,
@@ -111,6 +113,11 @@ export function AppShell({ children }: AppShellProps) {
       source_type: "text" as const,
       context: {
         user_style: "cordial",
+        entry_mode: "advisor_conversation",
+        selected_advisor_id: advisor?.id ?? null,
+        selected_advisor_name: advisor?.name ?? null,
+        selected_advisor_role: advisor?.role ?? null,
+        user_display_name: displayName,
       },
     };
     if (process.env.NODE_ENV !== "production") {
@@ -142,7 +149,16 @@ export function AppShell({ children }: AppShellProps) {
         { id: `u-${Date.now()}`, role: "user", text: userInput },
         { id: `a-${Date.now() + 1}`, role: "advisor", text: reply },
       ]);
+      if (speechSynthesis.supported && reply.trim()) {
+        speechSynthesis.speak(reply);
+      }
       setAdvisorChatInput("");
+      if (process.env.NODE_ENV !== "production") {
+        setAdvisorChatDebugPayload((previous) => ({
+          ...(previous ?? {}),
+          response_preview: reply.slice(0, 500),
+        }));
+      }
     } catch {
       setAdvisorChatMessages((prev) => [
         ...prev,
@@ -253,6 +269,9 @@ export function AppShell({ children }: AppShellProps) {
       <AdvisorChatModal
         isOpen={advisorChatOpen}
         advisorName={advisorChatIndex !== null ? ADVISOR_PROFILES[advisorChatIndex]?.name ?? "Adviser" : "Adviser"}
+        advisorRole={advisorChatIndex !== null ? ADVISOR_PROFILES[advisorChatIndex]?.role ?? "" : ""}
+        advisorDescription={advisorChatIndex !== null ? ADVISOR_PROFILES[advisorChatIndex]?.description ?? "" : ""}
+        userName={displayName}
         advisorAvatarSrc={advisorChatIndex !== null ? ADVISOR_PROFILES[advisorChatIndex]?.avatar64 ?? null : null}
         messages={advisorChatMessages}
         draft={advisorChatInput}

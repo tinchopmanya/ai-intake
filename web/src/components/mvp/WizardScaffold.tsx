@@ -537,7 +537,7 @@ export function WizardScaffold() {
     setSelectedProfile(profile);
   }
 
-  function buildContextPayload() {
+  function buildContextPayload(additionalContext?: Record<string, unknown>) {
     const context: Record<string, unknown> = {};
     if (contextOptional.trim()) context.contact_context = contextOptional.trim();
     context.user_style = responseTone;
@@ -562,6 +562,12 @@ export function WizardScaffold() {
         sender: item.speaker === "user" ? "outgoing" : "incoming",
         text: item.content,
       }));
+    }
+    if (additionalContext) {
+      for (const [key, value] of Object.entries(additionalContext)) {
+        if (value === undefined || value === null || value === "") continue;
+        context[key] = value;
+      }
     }
     return Object.keys(context).length > 0 ? context : undefined;
   }
@@ -968,7 +974,13 @@ export function WizardScaffold() {
         source_type: "text" as const,
         quick_mode: true,
         save_session: false,
-        context: buildContextPayload(),
+        context: buildContextPayload({
+          entry_mode: "advisor_refine_response",
+          selected_advisor_id: advisorVisual.id,
+          selected_advisor_name: advisorVisual.name,
+          selected_advisor_role: advisorVisual.role,
+          refinement_base_text: baseText,
+        }),
       };
       if (process.env.NODE_ENV !== "production") {
         const debugPayload = {
@@ -1003,6 +1015,12 @@ export function WizardScaffold() {
         { id: `a-${Date.now() + 1}`, role: "advisor", text: refinedText },
       ]);
       setAdvisorChatInput("");
+      if (process.env.NODE_ENV !== "production") {
+        setAdvisorChatDebugPayload((previous) => ({
+          ...(previous ?? {}),
+          response_preview: refinedText.slice(0, 500),
+        }));
+      }
     } catch (exc) {
       setAdvisorError(toUiErrorMessage(exc, "No se pudo refinar la respuesta de este adviser."));
     } finally {
@@ -1662,6 +1680,10 @@ export function WizardScaffold() {
       <AdvisorChatModal
         isOpen={advisorChatOpen}
         advisorName={advisorChatIndex !== null ? getAdvisorVisualByIndex(advisorChatIndex).name : "Adviser"}
+        advisorRole={advisorChatIndex !== null ? getAdvisorVisualByIndex(advisorChatIndex).role : ""}
+        advisorDescription={
+          advisorChatIndex !== null ? ADVISOR_PROFILES[advisorChatIndex]?.description ?? "" : ""
+        }
         advisorAvatarSrc={advisorChatIndex !== null ? getAdvisorVisualByIndex(advisorChatIndex).avatar64 : null}
         messages={advisorChatMessages}
         draft={advisorChatInput}

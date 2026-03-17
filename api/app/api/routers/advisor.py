@@ -23,6 +23,9 @@ router = APIRouter(prefix="/v1/advisor", tags=["advisor"])
 
 def _resolve_advisor_input_text(payload: AdvisorRequest) -> str:
     context = payload.context or {}
+    entry_mode = str(context.get("entry_mode") or "").strip().lower()
+    if entry_mode in {"advisor_conversation", "advisor_refine_response"}:
+        return payload.message_text
     structured = context.get("conversation_structured")
     if isinstance(structured, str):
         normalized = structured.strip()
