@@ -420,6 +420,7 @@ export function WizardScaffold() {
   const [advisorChatIndex, setAdvisorChatIndex] = useState<number | null>(null);
   const [advisorChatInput, setAdvisorChatInput] = useState("");
   const [advisorChatSending, setAdvisorChatSending] = useState(false);
+  const [advisorChatDebugPayload, setAdvisorChatDebugPayload] = useState<Record<string, unknown> | null>(null);
   const [advisorChatMessages, setAdvisorChatMessages] = useState<
     Array<{ id: string; role: "user" | "advisor"; text: string }>
   >([]);
@@ -926,6 +927,7 @@ export function WizardScaffold() {
   function openAdvisorChat(index: number) {
     if (!advisorResult?.responses[index]?.text) return;
     setAdvisorChatIndex(index);
+    setAdvisorChatDebugPayload(null);
     setAdvisorChatMessages([
       {
         id: `advisor-initial-${index}`,
@@ -947,16 +949,31 @@ export function WizardScaffold() {
     setAdvisorChatSending(true);
     try {
       const refinementPrompt = `Mensaje base:\n${baseText}\n\nInstruccion del usuario:\n${instruction}`;
-      const result = await postAdvisor({
+      const advisorVisual = getAdvisorVisualByIndex(advisorChatIndex);
+      const advisorPayload = {
         message_text: refinementPrompt,
         mode,
-        relationship_type: "otro",
+        relationship_type: "otro" as const,
         case_id: selectedCaseId ?? undefined,
-        source_type: "text",
+        source_type: "text" as const,
         quick_mode: true,
         save_session: false,
         context: buildContextPayload(),
-      });
+      };
+      if (process.env.NODE_ENV !== "production") {
+        const debugPayload = {
+          entry_mode: "refine",
+          advisor: {
+            id: advisorVisual.id,
+            name: advisorVisual.name,
+            role: advisorVisual.role,
+          },
+          payload: advisorPayload,
+        };
+        setAdvisorChatDebugPayload(debugPayload);
+        console.debug("advisor_prompt_debug", debugPayload);
+      }
+      const result = await postAdvisor(advisorPayload);
       const refinedText = result.responses[advisorChatIndex]?.text ?? result.responses[0]?.text ?? baseText;
       setAdvisorResult((previous) => {
         if (!previous) return previous;
@@ -1633,10 +1650,13 @@ export function WizardScaffold() {
       <AdvisorChatModal
         isOpen={advisorChatOpen}
         advisorName={advisorChatIndex !== null ? getAdvisorVisualByIndex(advisorChatIndex).name : "Adviser"}
+        advisorAvatarSrc={advisorChatIndex !== null ? getAdvisorVisualByIndex(advisorChatIndex).avatar64 : null}
         messages={advisorChatMessages}
         draft={advisorChatInput}
         sending={advisorChatSending}
+        entryMode="refine"
         helperCopy="¿Que te parecio mi sugerencia? Puedes darme mas contexto y la ajustamos juntos."
+        debugPayload={advisorChatDebugPayload}
         onDraftChange={setAdvisorChatInput}
         onSend={() => void handleSendAdvisorRefinement()}
         onUseResponse={() => setAdvisorChatOpen(false)}

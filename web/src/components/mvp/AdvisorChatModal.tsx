@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect } from "react";
+import Image from "next/image";
 
 import { Button, Textarea } from "@/components/mvp/ui";
-import { VoiceListeningBadge, VoiceMicButton } from "@/components/mvp/VoiceControls";
+import { VoiceMicButton } from "@/components/mvp/VoiceControls";
 import {
   getMicrophoneStatusMessage,
   getSpeechToTextErrorMessage,
@@ -16,13 +17,18 @@ export type AdvisorChatMessage = {
   text: string;
 };
 
+export type AdvisorChatEntryMode = "header" | "refine";
+
 type AdvisorChatModalProps = {
   isOpen: boolean;
   advisorName: string;
+  advisorAvatarSrc?: string | null;
   messages: AdvisorChatMessage[];
   draft: string;
   sending: boolean;
+  entryMode: AdvisorChatEntryMode;
   helperCopy?: string;
+  debugPayload?: Record<string, unknown> | null;
   onDraftChange: (value: string) => void;
   onSend: () => void;
   onUseResponse: () => void;
@@ -32,10 +38,13 @@ type AdvisorChatModalProps = {
 export function AdvisorChatModal({
   isOpen,
   advisorName,
+  advisorAvatarSrc,
   messages,
   draft,
   sending,
+  entryMode,
   helperCopy,
+  debugPayload,
   onDraftChange,
   onSend,
   onUseResponse,
@@ -51,6 +60,11 @@ export function AdvisorChatModal({
     voice.microphoneStatus,
     voice.speechSupported,
   );
+  const defaultHelperCopy =
+    entryMode === "header"
+      ? "¿Como estas hoy? ¿En que te puedo ayudar?"
+      : "¿Que te parecio mi sugerencia? ¿Quieres darme mas contexto para ajustarla?";
+  const resolvedHelperCopy = helperCopy || defaultHelperCopy;
 
   useEffect(() => {
     if (!isOpen || !voice.transcript.trim()) return;
@@ -92,9 +106,7 @@ export function AdvisorChatModal({
 
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto bg-[#fafafa] p-4">
           {messages.length === 0 ? (
-            <p className="text-sm text-[#666]">
-              {helperCopy || "Escribe una instruccion para refinar la respuesta."}
-            </p>
+            <p className="text-sm text-[#666]">{resolvedHelperCopy}</p>
           ) : (
             messages.map((message) => {
               const isUser = message.role === "user";
@@ -115,7 +127,7 @@ export function AdvisorChatModal({
         </div>
 
         <footer className="space-y-3 border-t border-[#E2E8F0] bg-white px-4 py-3">
-          {helperCopy && messages.length > 0 ? <p className="text-[13px] text-[#666]">{helperCopy}</p> : null}
+          {messages.length > 0 ? <p className="text-[13px] text-[#666]">{resolvedHelperCopy}</p> : null}
           <div id="advisor-chat-draft-wrap" className="rounded-xl transition-all duration-200">
             <Textarea
               id="advisor-chat-draft"
@@ -128,41 +140,70 @@ export function AdvisorChatModal({
             />
           </div>
 
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <VoiceMicButton
-                listening={voice.listening}
-                disabled={voice.microphoneStatus === "requesting"}
-                onClick={() => {
-                  if (voice.listening) {
-                    voice.stopListening();
-                  } else {
-                    voice.startListening();
-                  }
-                }}
-                idleLabel="Hablar"
-                listeningLabel="Escuchando..."
-              />
-
-              <VoiceMicButton
-                listening={false}
-                disabled={voice.listening || voice.microphoneStatus === "requesting"}
-                onClick={() => {
-                  voice.startListening();
-                }}
-                idleLabel="Desahogarte con este advisor"
-                listeningLabel="Desahogarte con este advisor"
-              />
-
-              <VoiceListeningBadge listening={voice.listening} />
+          <div className="rounded-xl border border-[#e5e5e5] bg-[#fafafa] p-3">
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <VoiceMicButton
+                  listening={voice.listening}
+                  disabled={voice.microphoneStatus === "requesting"}
+                  onClick={() => {
+                    if (voice.listening) {
+                      voice.stopListening();
+                    } else {
+                      voice.startListening();
+                    }
+                  }}
+                  idleLabel="Hablar con el advisor"
+                  listeningLabel="Detener"
+                />
+              </div>
+              {voice.listening ? (
+                <div className="rounded-xl border border-[#f2d2d8] bg-[#fff7f8] p-3">
+                  <div className="flex items-center gap-2">
+                    {advisorAvatarSrc ? (
+                      <Image
+                        src={advisorAvatarSrc}
+                        alt={advisorName}
+                        width={32}
+                        height={32}
+                        className="h-8 w-8 rounded-full border border-[#e5e5e5] object-cover"
+                      />
+                    ) : (
+                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#111] text-[11px] font-semibold text-white">
+                        {advisorName.slice(0, 2).toUpperCase()}
+                      </span>
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-semibold text-[#7f1d1d]">{advisorName}</p>
+                      <p className="inline-flex items-center gap-1 text-[12px] text-[#b42318]">
+                        <span className="relative h-2 w-2 rounded-full bg-[#ef4444]">
+                          <span className="absolute inset-0 rounded-full bg-[#ef4444] opacity-70 animate-ping" />
+                        </span>
+                        Escuchando...
+                      </p>
+                    </div>
+                  </div>
+                  {voice.transcript.trim() ? (
+                    <p className="mt-2 whitespace-pre-wrap break-words text-[12px] text-[#7f1d1d]">
+                      {voice.transcript}
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-[12px] text-[#7f1d1d]">
+                      Puedes hablar libremente. Luego podras editar antes de enviar.
+                    </p>
+                  )}
+                </div>
+              ) : null}
             </div>
 
-            {microphoneStatusMessage ? <p className="text-[12px] text-[#666]">{microphoneStatusMessage}</p> : null}
+            {microphoneStatusMessage ? <p className="mt-2 text-[12px] text-[#666]">{microphoneStatusMessage}</p> : null}
             {!microphoneStatusMessage && voice.speechSupported ? (
-              <p className="text-[12px] text-[#666]">Puedes hablar libremente y luego revisar el texto antes de enviarlo.</p>
+              <p className="mt-2 text-[12px] text-[#666]">
+                Puedes desahogarte o pedir ayuda. El texto se inserta editable y no se envia automaticamente.
+              </p>
             ) : null}
 
-            {voice.error ? <p className="text-[12px] text-[#92400e]">{getSpeechToTextErrorMessage(voice.error)}</p> : null}
+            {voice.error ? <p className="mt-2 text-[12px] text-[#92400e]">{getSpeechToTextErrorMessage(voice.error)}</p> : null}
 
             {isDevelopment ? (
               <button
@@ -171,11 +212,30 @@ export function AdvisorChatModal({
                   void voice.requestMicrophonePermission();
                 }}
                 disabled={voice.microphoneStatus === "requesting"}
-                className="inline-flex h-8 items-center rounded-full border border-[#d7d7d7] bg-white px-3 text-[12px] text-[#334155] hover:bg-[#fafafa] disabled:cursor-not-allowed disabled:opacity-60"
+                className="mt-2 inline-flex h-8 items-center rounded-full border border-[#d7d7d7] bg-white px-3 text-[12px] text-[#334155] hover:bg-[#fafafa] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Probar microfono
               </button>
             ) : null}
+          </div>
+
+          {isDevelopment && debugPayload ? (
+            <details className="rounded-xl border border-[#e5e5e5] bg-[#fafafa] p-3">
+              <summary className="cursor-pointer text-[12px] font-medium text-[#334155]">
+                Debug prompt advisor (solo desarrollo)
+              </summary>
+              <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words text-[11px] text-[#334155]">
+                {JSON.stringify(debugPayload, null, 2)}
+              </pre>
+            </details>
+          ) : null}
+
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[12px] text-[#666]">
+                Revisa el transcript y luego envia manualmente.
+              </span>
+            </div>
           </div>
 
           <div className="flex flex-wrap justify-between gap-2">

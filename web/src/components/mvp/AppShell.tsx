@@ -25,6 +25,7 @@ export function AppShell({ children }: AppShellProps) {
   const [advisorChatIndex, setAdvisorChatIndex] = useState<number | null>(null);
   const [advisorChatInput, setAdvisorChatInput] = useState("");
   const [advisorChatSending, setAdvisorChatSending] = useState(false);
+  const [advisorChatDebugPayload, setAdvisorChatDebugPayload] = useState<Record<string, unknown> | null>(null);
   const [advisorChatMessages, setAdvisorChatMessages] = useState<
     Array<{ id: string; role: "user" | "advisor"; text: string }>
   >([]);
@@ -83,6 +84,7 @@ export function AppShell({ children }: AppShellProps) {
     setAdvisorMenuOpen(false);
     setAdvisorChatIndex(index);
     setAdvisorChatInput("");
+    setAdvisorChatDebugPayload(null);
     setAdvisorChatMessages([]);
     setAdvisorChatOpen(true);
   }
@@ -90,19 +92,36 @@ export function AppShell({ children }: AppShellProps) {
   async function handleSendAdvisorMessage() {
     if (advisorChatIndex === null || advisorChatSending || !advisorChatInput.trim()) return;
     const instruction = advisorChatInput.trim();
+    const advisor = ADVISOR_PROFILES[advisorChatIndex];
+    const advisorPayload = {
+      message_text: instruction,
+      mode: "reactive" as const,
+      relationship_type: "otro" as const,
+      quick_mode: true,
+      save_session: false,
+      source_type: "text" as const,
+      context: {
+        user_style: "cordial",
+      },
+    };
+    if (process.env.NODE_ENV !== "production") {
+      const debugPayload = {
+        entry_mode: "header",
+        advisor: advisor
+          ? {
+              id: advisor.id,
+              name: advisor.name,
+              role: advisor.role,
+            }
+          : null,
+        payload: advisorPayload,
+      };
+      setAdvisorChatDebugPayload(debugPayload);
+      console.debug("advisor_prompt_debug", debugPayload);
+    }
     setAdvisorChatSending(true);
     try {
-      const result = await postAdvisor({
-        message_text: instruction,
-        mode: "reactive",
-        relationship_type: "otro",
-        quick_mode: true,
-        save_session: false,
-        source_type: "text",
-        context: {
-          user_style: "cordial",
-        },
-      });
+      const result = await postAdvisor(advisorPayload);
       const reply =
         result.responses[advisorChatIndex]?.text ??
         result.responses[0]?.text ??
@@ -223,14 +242,17 @@ export function AppShell({ children }: AppShellProps) {
       <AdvisorChatModal
         isOpen={advisorChatOpen}
         advisorName={advisorChatIndex !== null ? ADVISOR_PROFILES[advisorChatIndex]?.name ?? "Adviser" : "Adviser"}
+        advisorAvatarSrc={advisorChatIndex !== null ? ADVISOR_PROFILES[advisorChatIndex]?.avatar64 ?? null : null}
         messages={advisorChatMessages}
         draft={advisorChatInput}
         sending={advisorChatSending}
+        entryMode="header"
         onDraftChange={setAdvisorChatInput}
         onSend={() => void handleSendAdvisorMessage()}
         onUseResponse={() => setAdvisorChatOpen(false)}
         onClose={() => setAdvisorChatOpen(false)}
         helperCopy={`¿Como estas hoy, ${displayName}? ¿En que te puedo ayudar?`}
+        debugPayload={advisorChatDebugPayload}
       />
     </main>
   );
