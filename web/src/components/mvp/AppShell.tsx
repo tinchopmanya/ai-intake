@@ -275,6 +275,7 @@ export function AppShell({ children }: AppShellProps) {
         onClose={() => setAdvisorChatOpen(false)}
         helperCopy={`Como estas hoy, ${displayName}? En que te puedo ayudar?`}
         debugPayload={advisorChatDebugPayload}
+        autoSendOnVoiceComplete
       />
     </main>
   );

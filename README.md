@@ -29,6 +29,7 @@ Aplicacion web fullstack para asistir respuestas en conversaciones sensibles.
 - `POST /v1/analysis`
 - `GET /v1/analysis/{analysis_id}`
 - `POST /v1/advisor`
+- `POST /v1/advisor/chat`
 - `POST /v1/events` (`reply_copied`)
 - `GET /v1/ocr/capabilities`
 - `POST /v1/ocr/extract`
@@ -36,6 +37,8 @@ Aplicacion web fullstack para asistir respuestas en conversaciones sensibles.
 Compatibilidad legacy (deprecado):
 - `POST /v1/chat`
 - `GET /v1/conversations/{conversation_id}`
+
+Nota: las rutas legacy estan desactivadas por defecto (`ENABLE_LEGACY_CHAT_ROUTES=false`).
 
 ## Requisitos
 - Python 3.11+

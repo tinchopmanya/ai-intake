@@ -125,7 +125,7 @@ def get_settings() -> Settings:
     )
     enable_legacy_chat_routes = _parse_bool(
         os.getenv("ENABLE_LEGACY_CHAT_ROUTES"),
-        True,
+        False,
     )
     database_url = os.getenv("DATABASE_URL")
     cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000")

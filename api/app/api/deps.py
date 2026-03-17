@@ -31,10 +31,11 @@ def _warn_once(key: str, message: str, *args) -> None:
 
 
 def _build_connection_factory(*, caller: str) -> ConnectionFactory | None:
+    allow_fallback = settings.is_local_env and settings.allow_inmemory_fallback and not settings.is_validation_env
     try:
         connection_factory = build_postgres_connection_factory()
     except RuntimeError as exc:
-        if settings.is_local_env and settings.allow_inmemory_fallback:
+        if allow_fallback:
             _warn_once(
                 f"{caller}:missing_database_url",
                 "%s: DATABASE_URL missing. Using explicit in-memory fallback.",
@@ -47,7 +48,7 @@ def _build_connection_factory(*, caller: str) -> ConnectionFactory | None:
     try:
         probe = connection_factory()
     except Exception as exc:
-        if settings.is_local_env and settings.allow_inmemory_fallback:
+        if allow_fallback:
             _warn_once(
                 f"{caller}:postgres_probe_failed",
                 "%s: PostgreSQL unavailable in local env. Using in-memory fallback. error=%s",

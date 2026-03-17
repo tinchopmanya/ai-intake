@@ -188,17 +188,6 @@ export type IncidentListResponse = {
   incidents: IncidentSummary[];
 };
 
-export type CaseTimelineEvent = {
-  id: string;
-  event_type: "analysis" | "advisor" | "incident";
-  title: string;
-  event_time: string;
-};
-
-export type CaseTimelineResponse = {
-  events: CaseTimelineEvent[];
-};
-
 export type AdvisorResponse = {
   session_id: string;
   mode: UsageMode;

@@ -24,6 +24,7 @@ Base URL local: `http://localhost:8000`
 | `POST` | `/v1/analysis` | Activo | Analisis emocional/riesgo |
 | `GET` | `/v1/analysis/{analysis_id}` | Activo | Lectura de analisis persistido por usuario |
 | `POST` | `/v1/advisor` | Activo | Respuestas de advisors |
+| `POST` | `/v1/advisor/chat` | Activo | Conversacion con advisor (separada de rewrite) |
 | `POST` | `/v1/events` | Activo | Tracking MVP (`reply_copied`) |
 | `GET` | `/v1/ocr/capabilities` | Activo | Probe de disponibilidad OCR |
 | `POST` | `/v1/ocr/extract` | Activo | OCR de imagen autenticado |
@@ -62,6 +63,10 @@ Base URL local: `http://localhost:8000`
 - `POST /v1/analysis` ahora persiste en `analysis_results` (cuando hay DB activa) y devuelve `analysis_id`.
 - `POST /v1/advisor` persiste sesion base en `advisor_sessions`:
   - `source_type`, `original_input_text`, `analysis_id`, `advisor_response_json`.
+- `POST /v1/advisor/chat` usa contrato conversacional:
+  - `messages[]` con historial.
+  - `entry_mode` (`advisor_conversation` o `advisor_refine_response`).
+  - `suggested_reply` solo cuando aplica (normalmente refine).
 - `case_id` puede viajar en `analysis/advisor` y se valida ownership.
 - Al usar `case_id`, el backend actualiza `cases.last_activity_at` y agrega una linea al `summary` acumulado.
 - `POST /v1/incidents` permite registrar hechos relevantes:

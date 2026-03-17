@@ -9,7 +9,6 @@ import type { AnalysisResponse } from "@/lib/api/types";
 import type { CaseCreateRequest } from "@/lib/api/types";
 import type { CaseListResponse } from "@/lib/api/types";
 import type { CaseSummary } from "@/lib/api/types";
-import type { CaseTimelineResponse } from "@/lib/api/types";
 import type { CaseUpdateRequest } from "@/lib/api/types";
 import type { IncidentCreateRequest } from "@/lib/api/types";
 import type { IncidentListResponse } from "@/lib/api/types";
@@ -105,44 +104,6 @@ export function getCaseById(caseId: string): Promise<CaseSummary> {
 
 export function patchCase(caseId: string, payload: CaseUpdateRequest): Promise<CaseSummary> {
   return patchJson<CaseSummary>(`/v1/cases/${caseId}`, payload);
-}
-
-export function getCaseTimeline(caseId: string): Promise<CaseTimelineResponse> {
-  return getJson<CaseTimelineResponse>(`/v1/cases/${caseId}/timeline`);
-}
-
-export async function downloadCaseExport(caseId: string): Promise<void> {
-  const response = await authFetch(`${API_URL}/v1/cases/${caseId}/export`, {
-    method: "GET",
-    cache: "no-store",
-  });
-  if (!response.ok) {
-    const errorPayload = (await response.json().catch(() => null)) as
-      | { error_code?: string; message?: string; detail?: string }
-      | null;
-    throw new Error(
-      errorPayload?.error_code ||
-        errorPayload?.message ||
-        errorPayload?.detail ||
-        `http_${response.status}`,
-    );
-  }
-  const content = await response.text();
-  const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
-  const url = window.URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = `case-${caseId}.md`;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  window.URL.revokeObjectURL(url);
-  void postJson<WizardEventResponse>("/v1/events", {
-    event_name: "case_exported",
-    case_id: caseId,
-  }).catch(() => {
-    // Keep export UX resilient even when tracking persistence fails.
-  });
 }
 
 export function postIncident(payload: IncidentCreateRequest): Promise<IncidentSummary> {

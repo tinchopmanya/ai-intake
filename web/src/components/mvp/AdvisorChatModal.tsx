@@ -32,6 +32,7 @@ type AdvisorChatModalProps = {
   entryMode: AdvisorChatEntryMode;
   helperCopy?: string;
   debugPayload?: Record<string, unknown> | null;
+  autoSendOnVoiceComplete?: boolean;
   onDraftChange: (value: string) => void;
   onSend: () => void;
   onUseResponse: () => void;
@@ -51,6 +52,7 @@ export function AdvisorChatModal({
   entryMode,
   helperCopy,
   debugPayload,
+  autoSendOnVoiceComplete = false,
   onDraftChange,
   onSend,
   onUseResponse,
@@ -74,8 +76,8 @@ export function AdvisorChatModal({
   const resolvedHelperCopy = helperCopy || defaultHelperCopy;
   const inputPlaceholder =
     entryMode === "advisor_conversation"
-      ? "Escribe aqui o habla para que te ayude."
-      : "Cuentame que cambiarias de la sugerencia y la refino contigo.";
+      ? "Escribe o habla para que te ayude."
+      : "Que quieres cambiar de mi sugerencia?";
 
   useEffect(() => {
     if (!isOpen || !voice.transcript.trim()) return;
@@ -95,8 +97,17 @@ export function AdvisorChatModal({
       const input = document.getElementById("advisor-chat-draft") as HTMLTextAreaElement | null;
       input?.focus();
     }, 30);
+    if (
+      autoSendOnVoiceComplete &&
+      entryMode === "advisor_conversation" &&
+      merged.trim().length >= 4
+    ) {
+      window.setTimeout(() => {
+        onSend();
+      }, 80);
+    }
     voice.resetTranscript();
-  }, [draft, isOpen, onDraftChange, voice]);
+  }, [autoSendOnVoiceComplete, draft, entryMode, isOpen, onDraftChange, onSend, voice]);
 
   if (!isOpen) return null;
 
