@@ -17,7 +17,7 @@ export type AdvisorChatMessage = {
   text: string;
 };
 
-export type AdvisorChatEntryMode = "header" | "refine";
+export type AdvisorChatEntryMode = "advisor_conversation" | "advisor_refine_response";
 
 type AdvisorChatModalProps = {
   isOpen: boolean;
@@ -53,17 +53,18 @@ export function AdvisorChatModal({
   const isDevelopment = process.env.NODE_ENV !== "production";
   const voice = useSpeechToText({
     lang: "es-ES",
-    continuous: false,
-    interimResults: false,
+    continuous: true,
+    interimResults: true,
+    silenceTimeoutMs: 3000,
   });
   const microphoneStatusMessage = getMicrophoneStatusMessage(
     voice.microphoneStatus,
     voice.speechSupported,
   );
   const defaultHelperCopy =
-    entryMode === "header"
-      ? "¿Como estas hoy? ¿En que te puedo ayudar?"
-      : "¿Que te parecio mi sugerencia? ¿Quieres darme mas contexto para ajustarla?";
+    entryMode === "advisor_conversation"
+      ? "Como estas hoy? En que te puedo ayudar?"
+      : "Que te parecio mi sugerencia? Quieres darme mas contexto para ajustarla?";
   const resolvedHelperCopy = helperCopy || defaultHelperCopy;
 
   useEffect(() => {
@@ -154,8 +155,18 @@ export function AdvisorChatModal({
                     }
                   }}
                   idleLabel="Hablar con el advisor"
-                  listeningLabel="Detener"
+                  listeningLabel="Escuchando..."
                 />
+                {voice.listening ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={voice.stopListening}
+                    className="h-9 rounded-full border-[#f2d2d8] bg-white px-4 text-[13px] text-[#7f1d1d] hover:bg-[#fff7f8]"
+                  >
+                    Terminar grabacion
+                  </Button>
+                ) : null}
               </div>
               {voice.listening ? (
                 <div className="rounded-xl border border-[#f2d2d8] bg-[#fff7f8] p-3">
@@ -189,7 +200,7 @@ export function AdvisorChatModal({
                     </p>
                   ) : (
                     <p className="mt-2 text-[12px] text-[#7f1d1d]">
-                      Puedes hablar libremente. Luego podras editar antes de enviar.
+                      Puedes hablar libremente. Luego puedes editar antes de enviar.
                     </p>
                   )}
                 </div>
@@ -204,6 +215,12 @@ export function AdvisorChatModal({
             ) : null}
 
             {voice.error ? <p className="mt-2 text-[12px] text-[#92400e]">{getSpeechToTextErrorMessage(voice.error)}</p> : null}
+            {voice.phase === "finishing" ? (
+              <p className="mt-2 text-[12px] text-[#666]">Finalizando grabacion...</p>
+            ) : null}
+            {voice.phase === "transcript_ready" ? (
+              <p className="mt-2 text-[12px] text-[#166534]">Transcript listo para editar.</p>
+            ) : null}
 
             {isDevelopment ? (
               <button
@@ -262,3 +279,4 @@ export function AdvisorChatModal({
     </div>
   );
 }
+

@@ -38,6 +38,7 @@ type UseSpeechToTextOptions = {
   lang?: string;
   continuous?: boolean;
   interimResults?: boolean;
+  silenceTimeoutMs?: number;
 };
 
 export type MicrophonePermissionStatus =
@@ -46,6 +47,13 @@ export type MicrophonePermissionStatus =
   | "granted"
   | "denied"
   | "unsupported";
+
+export type SpeechToTextPhase =
+  | "idle"
+  | "listening"
+  | "finishing"
+  | "transcript_ready"
+  | "error";
 
 type SpeechToTextErrorCode =
   | "voice_not_supported"
@@ -155,11 +163,34 @@ export function useSpeechToText(options?: UseSpeechToTextOptions) {
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [phase, setPhase] = useState<SpeechToTextPhase>("idle");
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const transcriptRef = useRef("");
+  const hadRecognitionErrorRef = useRef(false);
+  const silenceTimerRef = useRef<number | null>(null);
 
   const lang = options?.lang ?? "es-ES";
   const continuous = options?.continuous ?? false;
   const interimResults = options?.interimResults ?? false;
+  const silenceTimeoutMs = options?.silenceTimeoutMs ?? 0;
+
+  const clearSilenceTimer = useCallback(() => {
+    if (silenceTimerRef.current !== null) {
+      window.clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleSilenceStop = useCallback(() => {
+    if (silenceTimeoutMs <= 0) return;
+    clearSilenceTimer();
+    silenceTimerRef.current = window.setTimeout(() => {
+      const recognition = recognitionRef.current;
+      if (!recognition) return;
+      setPhase("finishing");
+      recognition.stop();
+    }, silenceTimeoutMs);
+  }, [clearSilenceTimer, silenceTimeoutMs]);
 
   const requestMicrophonePermission = useCallback(async () => {
     if (typeof navigator === "undefined") {
@@ -201,18 +232,31 @@ export function useSpeechToText(options?: UseSpeechToTextOptions) {
     recognition.onstart = () => {
       setListening(true);
       setError(null);
+      setPhase("listening");
+      hadRecognitionErrorRef.current = false;
+      scheduleSilenceStop();
     };
     recognition.onend = () => {
       setListening(false);
+      clearSilenceTimer();
+      if (!hadRecognitionErrorRef.current) {
+        setPhase(transcriptRef.current.trim() ? "transcript_ready" : "idle");
+      }
     };
     recognition.onerror = (event) => {
       setListening(false);
       setError(mapSpeechErrorCode(event.error));
+      clearSilenceTimer();
+      setPhase("error");
+      hadRecognitionErrorRef.current = true;
     };
     recognition.onresult = (event) => {
       let finalText = "";
       for (let index = event.resultIndex; index < event.results.length; index += 1) {
         const result = event.results[index];
+        if (result?.[0]?.transcript) {
+          scheduleSilenceStop();
+        }
         if (result?.isFinal && result[0]?.transcript) {
           finalText += result[0].transcript;
         }
@@ -224,7 +268,7 @@ export function useSpeechToText(options?: UseSpeechToTextOptions) {
 
     recognitionRef.current = recognition;
     return recognition;
-  }, [continuous, interimResults, lang]);
+  }, [clearSilenceTimer, continuous, interimResults, lang, scheduleSilenceStop]);
 
   const startListening = useCallback(() => {
     void (async () => {
@@ -243,6 +287,8 @@ export function useSpeechToText(options?: UseSpeechToTextOptions) {
       }
       if (listening) return;
       setError(null);
+      setPhase("listening");
+      hadRecognitionErrorRef.current = false;
       try {
         recognition.start();
       } catch (exc) {
@@ -256,9 +302,11 @@ export function useSpeechToText(options?: UseSpeechToTextOptions) {
         }
         if (message.includes("audio-capture")) {
           setError("voice_no_microphone");
+          setPhase("error");
           return;
         }
         setError("voice_start_failed");
+        setPhase("error");
       }
     })();
   }, [ensureRecognition, listening, microphoneStatus, requestMicrophonePermission, speechSupported]);
@@ -266,25 +314,36 @@ export function useSpeechToText(options?: UseSpeechToTextOptions) {
   const stopListening = useCallback(() => {
     const recognition = recognitionRef.current;
     if (!recognition) return;
+    setPhase("finishing");
+    clearSilenceTimer();
     recognition.stop();
-  }, []);
+  }, [clearSilenceTimer]);
 
   const resetTranscript = useCallback(() => {
     setTranscript("");
-  }, []);
+    if (!listening) {
+      setPhase("idle");
+    }
+  }, [listening]);
+
+  useEffect(() => {
+    transcriptRef.current = transcript;
+  }, [transcript]);
 
   useEffect(() => {
     return () => {
+      clearSilenceTimer();
       if (recognitionRef.current) {
         recognitionRef.current.abort();
       }
     };
-  }, []);
+  }, [clearSilenceTimer]);
 
   return {
     supported: speechSupported,
     speechSupported,
     microphoneStatus,
+    phase,
     listening,
     transcript,
     error,

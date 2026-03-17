@@ -948,7 +948,17 @@ export function WizardScaffold() {
 
     setAdvisorChatSending(true);
     try {
-      const refinementPrompt = `Mensaje base:\n${baseText}\n\nInstruccion del usuario:\n${instruction}`;
+      const refinementPrompt = [
+        "Modo: advisor_refine_response",
+        "Objetivo: refinar una sugerencia previa para responder mejor.",
+        "No ignores la sugerencia base. Ajustala con la nueva instruccion.",
+        "",
+        "Sugerencia base:",
+        baseText,
+        "",
+        "Nueva instruccion del usuario:",
+        instruction,
+      ].join("\n");
       const advisorVisual = getAdvisorVisualByIndex(advisorChatIndex);
       const advisorPayload = {
         message_text: refinementPrompt,
@@ -962,12 +972,14 @@ export function WizardScaffold() {
       };
       if (process.env.NODE_ENV !== "production") {
         const debugPayload = {
-          entry_mode: "refine",
+          entryMode: "advisor_refine_response",
           advisor: {
             id: advisorVisual.id,
             name: advisorVisual.name,
             role: advisorVisual.role,
           },
+          userInput: instruction,
+          prompt: refinementPrompt,
           payload: advisorPayload,
         };
         setAdvisorChatDebugPayload(debugPayload);
@@ -1654,8 +1666,8 @@ export function WizardScaffold() {
         messages={advisorChatMessages}
         draft={advisorChatInput}
         sending={advisorChatSending}
-        entryMode="refine"
-        helperCopy="¿Que te parecio mi sugerencia? Puedes darme mas contexto y la ajustamos juntos."
+        entryMode="advisor_refine_response"
+        helperCopy="Que te parecio mi sugerencia? Puedes darme mas contexto y la ajustamos juntos."
         debugPayload={advisorChatDebugPayload}
         onDraftChange={setAdvisorChatInput}
         onSend={() => void handleSendAdvisorRefinement()}
@@ -1666,3 +1678,4 @@ export function WizardScaffold() {
     </Panel>
   );
 }
+

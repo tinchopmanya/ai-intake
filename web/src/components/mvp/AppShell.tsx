@@ -91,10 +91,19 @@ export function AppShell({ children }: AppShellProps) {
 
   async function handleSendAdvisorMessage() {
     if (advisorChatIndex === null || advisorChatSending || !advisorChatInput.trim()) return;
-    const instruction = advisorChatInput.trim();
+    const userInput = advisorChatInput.trim();
     const advisor = ADVISOR_PROFILES[advisorChatIndex];
+    const conversationPrompt = [
+      "Modo: advisor_conversation",
+      "Objetivo: responder al usuario en una conversacion con advisor.",
+      "No asumas que el texto del usuario es un mensaje para su ex.",
+      "Primero acompana, aclara y orienta. Solo sugiere texto para enviar si el usuario lo pide.",
+      "",
+      "Mensaje del usuario:",
+      userInput,
+    ].join("\n");
     const advisorPayload = {
-      message_text: instruction,
+      message_text: conversationPrompt,
       mode: "reactive" as const,
       relationship_type: "otro" as const,
       quick_mode: true,
@@ -106,7 +115,7 @@ export function AppShell({ children }: AppShellProps) {
     };
     if (process.env.NODE_ENV !== "production") {
       const debugPayload = {
-        entry_mode: "header",
+        entryMode: "advisor_conversation",
         advisor: advisor
           ? {
               id: advisor.id,
@@ -114,6 +123,8 @@ export function AppShell({ children }: AppShellProps) {
               role: advisor.role,
             }
           : null,
+        userInput,
+        prompt: conversationPrompt,
         payload: advisorPayload,
       };
       setAdvisorChatDebugPayload(debugPayload);
@@ -128,7 +139,7 @@ export function AppShell({ children }: AppShellProps) {
         "No se pudo generar una respuesta en este momento.";
       setAdvisorChatMessages((prev) => [
         ...prev,
-        { id: `u-${Date.now()}`, role: "user", text: instruction },
+        { id: `u-${Date.now()}`, role: "user", text: userInput },
         { id: `a-${Date.now() + 1}`, role: "advisor", text: reply },
       ]);
       setAdvisorChatInput("");
@@ -246,14 +257,15 @@ export function AppShell({ children }: AppShellProps) {
         messages={advisorChatMessages}
         draft={advisorChatInput}
         sending={advisorChatSending}
-        entryMode="header"
+        entryMode="advisor_conversation"
         onDraftChange={setAdvisorChatInput}
         onSend={() => void handleSendAdvisorMessage()}
         onUseResponse={() => setAdvisorChatOpen(false)}
         onClose={() => setAdvisorChatOpen(false)}
-        helperCopy={`¿Como estas hoy, ${displayName}? ¿En que te puedo ayudar?`}
+        helperCopy={`Como estas hoy, ${displayName}? En que te puedo ayudar?`}
         debugPayload={advisorChatDebugPayload}
       />
     </main>
   );
 }
+
