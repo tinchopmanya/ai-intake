@@ -22,6 +22,7 @@ type AdvisorChatModalProps = {
   messages: AdvisorChatMessage[];
   draft: string;
   sending: boolean;
+  helperCopy?: string;
   onDraftChange: (value: string) => void;
   onSend: () => void;
   onUseResponse: () => void;
@@ -34,6 +35,7 @@ export function AdvisorChatModal({
   messages,
   draft,
   sending,
+  helperCopy,
   onDraftChange,
   onSend,
   onUseResponse,
@@ -75,7 +77,7 @@ export function AdvisorChatModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-3">
-      <div className="flex h-[min(88vh,740px)] w-full max-w-2xl flex-col rounded-2xl border border-[#E2E8F0] bg-white shadow-[0_24px_60px_rgba(15,23,42,0.28)]">
+      <div className="flex h-[min(88vh,740px)] w-full max-w-2xl flex-col rounded-2xl border border-[#e5e7eb] bg-white shadow-[0_20px_40px_rgba(15,23,42,0.2)]">
         <header className="flex items-center justify-between border-b border-[#E2E8F0] px-4 py-3">
           <h3 className="text-base font-semibold text-[#0F172A]">Chat con {advisorName}</h3>
           <Button
@@ -88,9 +90,11 @@ export function AdvisorChatModal({
           </Button>
         </header>
 
-        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto bg-[#F8FAFC] p-4">
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto bg-[#fafafa] p-4">
           {messages.length === 0 ? (
-            <p className="text-sm text-[#64748B]">Escribe una instruccion para refinar la respuesta.</p>
+            <p className="text-sm text-[#666]">
+              {helperCopy || "Escribe una instruccion para refinar la respuesta."}
+            </p>
           ) : (
             messages.map((message) => {
               const isUser = message.role === "user";
@@ -111,6 +115,7 @@ export function AdvisorChatModal({
         </div>
 
         <footer className="space-y-3 border-t border-[#E2E8F0] bg-white px-4 py-3">
+          {helperCopy && messages.length > 0 ? <p className="text-[13px] text-[#666]">{helperCopy}</p> : null}
           <div id="advisor-chat-draft-wrap" className="rounded-xl transition-all duration-200">
             <Textarea
               id="advisor-chat-draft"

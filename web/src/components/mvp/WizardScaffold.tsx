@@ -1019,7 +1019,7 @@ export function WizardScaffold() {
   const hasConversationInput = messageText.trim().length > 0 || conversationBlocks.length > 0;
 
   return (
-    <Panel className="mx-auto flex h-[calc(100vh-180px)] w-full min-w-0 flex-col space-y-4 overflow-hidden border-[#e5e7eb] bg-white p-4 shadow-sm sm:p-5">
+    <Panel className="mx-auto flex h-full min-h-0 w-full min-w-0 flex-col space-y-3 overflow-hidden border-[#e5e5e5] bg-white p-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:p-4">
       <Stepper
         currentStep={currentStep}
         labels={[
@@ -1030,29 +1030,29 @@ export function WizardScaffold() {
       />
 
       {currentStep === 1 ? (
-        <div className="flex min-h-0 flex-1 flex-col space-y-4">
+        <div className="flex min-h-0 flex-1 flex-col space-y-3">
           <div>
-            <h3 className="text-lg font-semibold text-[#1f2937]">Mensaje recibido</h3>
-            <p className="mt-1 text-sm text-[#334155]">
-              Sube, pega o escribe la conversacion. ExReply la interpreta automaticamente.
+            <h3 className="text-[19px] font-semibold text-[#111]">Sube, pega o escribe la conversacion.</h3>
+            <p className="mt-1 text-[13px] text-[#666]">
+              ExReply detecta participantes y prepara los bloques automaticamente.
             </p>
             {caseError ? <p className="mt-2 text-xs text-red-700">{caseError}</p> : null}
           </div>
 
           <div className="grid min-h-0 flex-1 items-start gap-6 xl:grid-cols-2">
             <section
-              className="min-h-0 min-w-0 space-y-3 overflow-y-auto rounded-2xl border border-[#E2E8F0] bg-white p-3 xl:max-h-[calc(100vh-360px)]"
+              className="min-h-0 min-w-0 space-y-3 overflow-y-auto rounded-xl border border-[#e5e5e5] bg-white p-3 xl:max-h-[calc(100vh-320px)]"
               onPaste={handleStepOnePaste}
             >
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-[#1f2937]">Conversacion</label>
+                <label className="block text-[14px] font-semibold text-[#111]">Conversacion</label>
                 <Textarea
                   value={messageText}
                   onChange={(event) => handleMessageTextChange(event.target.value)}
                   rows={6}
                   placeholder="Pega aqui el mensaje que recibiste o copia la conversacion de WhatsApp"
                   spellCheck={false}
-                  className="min-h-[170px] whitespace-pre-wrap break-words rounded-[10px] border border-[#ddd] bg-white p-4 text-[15px] leading-[1.5] text-[#1F2937]"
+                  className="min-h-[170px] whitespace-pre-wrap break-words rounded-[10px] border border-[#ddd] bg-white p-4 text-[15px] leading-[1.5] text-[#111]"
                 />
                 <input
                   type="file"
@@ -1079,7 +1079,7 @@ export function WizardScaffold() {
                   </p>
                 ) : null}
                 {ocrLoading || autoParsing ? (
-                  <p className="text-xs text-[#334155]">Procesando captura e interpretando mensajes...</p>
+                  <p className="text-xs text-[#666]">Detectando participantes e interpretando contexto...</p>
                 ) : null}
                 {ocrStatusMessage ? (
                   <p className="text-xs text-[#334155]">
@@ -1092,7 +1092,7 @@ export function WizardScaffold() {
               </div>
 
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-[#1f2937]">Contexto adicional (opcional)</label>
+                <label className="block text-[13px] font-medium text-[#666]">Contexto adicional (opcional)</label>
                 <div id="wizard-context-optional-wrap" className="rounded-xl transition-all duration-200">
                   <Textarea
                     id="wizard-context-optional"
@@ -1141,13 +1141,13 @@ export function WizardScaffold() {
               </div>
             </section>
 
-            <section className="min-h-0 min-w-0 space-y-3 overflow-y-auto rounded-2xl border border-[#E2E8F0] bg-white p-3 xl:max-h-[calc(100vh-360px)]">
-              <h4 className="text-sm font-semibold text-[#0F172A]">Conversacion interpretada</h4>
-              <p className="text-xs text-[#64748B]">
+            <section className="min-h-0 min-w-0 space-y-3 overflow-y-auto rounded-xl border border-[#e5e5e5] bg-[#fafafa] p-3 xl:max-h-[calc(100vh-320px)]">
+              <h4 className="text-[14px] font-semibold text-[#111]">Conversacion interpretada</h4>
+              <p className="text-[12px] text-[#666]">
                 Revisa quien dijo cada mensaje antes de generar la respuesta.
               </p>
 
-              <div className="max-h-[calc(100vh-400px)] min-h-[320px] space-y-2 overflow-y-auto rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-3 pr-2">
+              <div className="max-h-[calc(100vh-360px)] min-h-[320px] space-y-2 overflow-y-auto rounded-xl border border-[#e5e5e5] bg-white p-3 pr-2">
                 {conversationBlocks.length === 0 ? (
                   <p className="text-xs text-[#64748B]">
                     Cuando detectemos una conversacion, aparecera aqui en bloques editables.
@@ -1204,7 +1204,7 @@ export function WizardScaffold() {
                       onChange={(event) => updateConversationBlockText(item.id, event.target.value)}
                       rows={Math.max(2, Math.ceil(item.content.length / 42))}
                       spellCheck={false}
-                      className="w-full resize-none overflow-hidden whitespace-pre-wrap break-words border-0 bg-transparent p-0 text-sm leading-[1.6] focus-visible:ring-0"
+                      className="w-full resize-none overflow-hidden whitespace-pre-wrap break-words [overflow-wrap:anywhere] border-0 bg-transparent p-0 text-sm leading-[1.6] focus-visible:ring-0"
                     />
                   </div>
                 ))}
@@ -1212,7 +1212,7 @@ export function WizardScaffold() {
             </section>
           </div>
 
-          <div className="sticky bottom-0 z-10 mt-auto rounded-b-xl border-t border-[#eee] bg-white px-4 py-3">
+          <div className="sticky bottom-0 z-10 mt-auto rounded-b-xl border-t border-[#eee] bg-white px-4 py-3 shadow-[0_-2px_12px_rgba(15,23,42,0.04)]">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-[#1f2937]">Modo de respuesta</label>
@@ -1281,7 +1281,7 @@ export function WizardScaffold() {
 
           <div className="min-h-6">
             {loadingAnalysis ? (
-              <p className="text-sm text-[#334155]">Analizando conversacion...</p>
+              <p className="text-sm text-[#334155]">Interpretando contexto...</p>
             ) : null}
             {analysisError ? <p className="text-sm text-red-700">{analysisError}</p> : null}
             {advisorError ? <p className="text-sm text-red-700">{advisorError}</p> : null}
@@ -1570,7 +1570,7 @@ export function WizardScaffold() {
                 variant="secondary"
                 className="border-[#cbd5e1] bg-white text-[#334155] hover:bg-[#f8fafc]"
               >
-                Ninguna me sirve / Quiero explicar más contexto
+                Ninguna me sirve / quiero agregar mas contexto
               </Button>
           </div>
           {incidentVisible ? (
@@ -1636,6 +1636,7 @@ export function WizardScaffold() {
         messages={advisorChatMessages}
         draft={advisorChatInput}
         sending={advisorChatSending}
+        helperCopy="¿Que te parecio mi sugerencia? Puedes darme mas contexto y la ajustamos juntos."
         onDraftChange={setAdvisorChatInput}
         onSend={() => void handleSendAdvisorRefinement()}
         onUseResponse={() => setAdvisorChatOpen(false)}

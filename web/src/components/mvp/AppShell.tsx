@@ -6,7 +6,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { AdvisorChatModal } from "@/components/mvp/AdvisorChatModal";
-import { Panel } from "@/components/mvp/ui";
 import { ADVISOR_PROFILES } from "@/data/advisors";
 import { postAdvisor } from "@/lib/api/client";
 import { getCurrentUser, logoutSession } from "@/lib/auth/client";
@@ -129,8 +128,8 @@ export function AppShell({ children }: AppShellProps) {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-[980px] min-w-0 flex-col gap-4 overflow-x-hidden bg-white px-4 py-5 sm:px-6">
-      <Panel className="mx-auto flex w-full items-center justify-between border-[#e5e5e5] bg-white px-4 py-3">
+    <main className="mx-auto flex h-screen w-full max-w-[980px] min-w-0 flex-col overflow-x-hidden bg-white px-4 pb-4 pt-3 sm:px-6">
+      <header className="mx-auto flex w-full items-center justify-between border-b border-[#eee] py-3">
         <h1 className="text-[20px] font-semibold text-[#111]">Consejero de Conversaciones</h1>
         <div className="flex items-center gap-2">
           <div ref={advisorDropdownRef} className="relative">
@@ -139,14 +138,14 @@ export function AppShell({ children }: AppShellProps) {
               onClick={() => setAdvisorMenuOpen((prev) => !prev)}
               aria-haspopup="menu"
               aria-expanded={advisorMenuOpen}
-              className="h-9 rounded-md border border-[#ddd] bg-white px-3 text-[13px] font-medium text-[#111] transition-colors hover:bg-[#fafafa] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(17,17,17,0.2)]"
+              className="h-9 rounded-[10px] border border-[#e5e5e5] bg-white px-3 text-[13px] font-medium text-[#111] transition-colors hover:border-[#d8d8d8] hover:bg-[#fafafa] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(17,17,17,0.2)]"
             >
               Hablar con un advisor
             </button>
             {advisorMenuOpen ? (
               <div
                 role="menu"
-                className="absolute right-0 z-20 mt-2 w-[320px] rounded-xl border border-[#e5e5e5] bg-white p-2 shadow-[0_8px_20px_rgba(0,0,0,0.08)]"
+                className="absolute right-0 z-20 mt-2 w-[320px] rounded-xl border border-[#e5e5e5] bg-white p-2 shadow-[0_8px_18px_rgba(15,23,42,0.08)]"
               >
                 <ul className="space-y-1">
                   {ADVISOR_PROFILES.map((advisor, index) => (
@@ -191,7 +190,7 @@ export function AppShell({ children }: AppShellProps) {
             {menuOpen ? (
               <div
                 role="menu"
-                className="absolute right-0 z-20 mt-2 w-52 rounded-xl border border-[#e5e5e5] bg-white p-1 shadow-[0_8px_20px_rgba(0,0,0,0.08)]"
+                className="absolute right-0 z-20 mt-2 w-52 rounded-xl border border-[#e5e5e5] bg-white p-1 shadow-[0_8px_18px_rgba(15,23,42,0.08)]"
               >
                 <button
                   type="button"
@@ -219,8 +218,8 @@ export function AppShell({ children }: AppShellProps) {
             ) : null}
           </div>
         </div>
-      </Panel>
-      <section className="mx-auto w-full min-w-0">{children}</section>
+      </header>
+      <section className="mx-auto mt-3 flex min-h-0 w-full min-w-0 flex-1">{children}</section>
       <AdvisorChatModal
         isOpen={advisorChatOpen}
         advisorName={advisorChatIndex !== null ? ADVISOR_PROFILES[advisorChatIndex]?.name ?? "Adviser" : "Adviser"}
@@ -231,6 +230,7 @@ export function AppShell({ children }: AppShellProps) {
         onSend={() => void handleSendAdvisorMessage()}
         onUseResponse={() => setAdvisorChatOpen(false)}
         onClose={() => setAdvisorChatOpen(false)}
+        helperCopy={`¿Como estas hoy, ${displayName}? ¿En que te puedo ayudar?`}
       />
     </main>
   );
