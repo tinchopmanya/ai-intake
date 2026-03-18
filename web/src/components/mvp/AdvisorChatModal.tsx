@@ -484,6 +484,30 @@ export function AdvisorChatModal({
                   Cancelar
                 </Button>
               </div>
+
+              {isDevelopment ? (
+                <details className="mt-4 rounded-xl border border-[#e2e8f0] bg-white/70 p-3">
+                  <summary className="cursor-pointer text-[12px] font-medium text-[#334155]">
+                    Debug voz (solo desarrollo)
+                  </summary>
+                  <pre className="mt-2 whitespace-pre-wrap break-words text-[11px] text-[#334155]">
+                    {JSON.stringify(
+                      {
+                        speechSupported: voice.speechSupported,
+                        microphoneStatus: voice.microphoneStatus,
+                        phase: voice.phase,
+                        listening: voice.listening,
+                        transcriptSource: voice.transcriptSource,
+                        resultCount: voice.resultCount,
+                        transcriptPreview: voice.transcript.slice(0, 280),
+                        error: voice.error,
+                      },
+                      null,
+                      2,
+                    )}
+                  </pre>
+                </details>
+              ) : null}
             </div>
           </div>
         ) : null}

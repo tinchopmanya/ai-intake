@@ -162,10 +162,14 @@ export function useSpeechToText(options?: UseSpeechToTextOptions) {
   const [microphoneStatus, setMicrophoneStatus] = useState<MicrophonePermissionStatus>("idle");
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState("");
+  const [transcriptSource, setTranscriptSource] = useState<"none" | "interim" | "final">("none");
+  const [resultCount, setResultCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [phase, setPhase] = useState<SpeechToTextPhase>("idle");
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const transcriptRef = useRef("");
+  const finalTranscriptRef = useRef("");
+  const interimTranscriptRef = useRef("");
   const hadRecognitionErrorRef = useRef(false);
   const silenceTimerRef = useRef<number | null>(null);
 
@@ -233,6 +237,8 @@ export function useSpeechToText(options?: UseSpeechToTextOptions) {
       setListening(true);
       setError(null);
       setPhase("listening");
+      setResultCount(0);
+      setTranscriptSource("none");
       hadRecognitionErrorRef.current = false;
       scheduleSilenceStop();
     };
@@ -240,7 +246,12 @@ export function useSpeechToText(options?: UseSpeechToTextOptions) {
       setListening(false);
       clearSilenceTimer();
       if (!hadRecognitionErrorRef.current) {
-        setPhase(transcriptRef.current.trim() ? "transcript_ready" : "idle");
+        const resolved = finalTranscriptRef.current.trim() || transcriptRef.current.trim();
+        if (resolved && resolved !== transcriptRef.current.trim()) {
+          setTranscript(resolved);
+        }
+        setTranscriptSource(resolved ? (finalTranscriptRef.current.trim() ? "final" : "interim") : "none");
+        setPhase(resolved ? "transcript_ready" : "idle");
       }
     };
     recognition.onerror = (event) => {
@@ -252,6 +263,8 @@ export function useSpeechToText(options?: UseSpeechToTextOptions) {
     };
     recognition.onresult = (event) => {
       let finalText = "";
+      let interimText = "";
+      setResultCount((current) => current + 1);
       for (let index = event.resultIndex; index < event.results.length; index += 1) {
         const result = event.results[index];
         if (result?.[0]?.transcript) {
@@ -259,11 +272,18 @@ export function useSpeechToText(options?: UseSpeechToTextOptions) {
         }
         if (result?.isFinal && result[0]?.transcript) {
           finalText += result[0].transcript;
+        } else if (result?.[0]?.transcript) {
+          interimText += result[0].transcript;
         }
       }
       if (finalText.trim()) {
-        setTranscript((previous) => `${previous} ${finalText}`.trim());
+        finalTranscriptRef.current = `${finalTranscriptRef.current} ${finalText}`.trim();
       }
+      interimTranscriptRef.current = interimText.trim();
+      const merged = `${finalTranscriptRef.current} ${interimTranscriptRef.current}`.trim();
+      if (!merged) return;
+      setTranscript(merged);
+      setTranscriptSource(interimTranscriptRef.current ? "interim" : "final");
     };
 
     recognitionRef.current = recognition;
@@ -320,7 +340,11 @@ export function useSpeechToText(options?: UseSpeechToTextOptions) {
   }, [clearSilenceTimer]);
 
   const resetTranscript = useCallback(() => {
+    finalTranscriptRef.current = "";
+    interimTranscriptRef.current = "";
     setTranscript("");
+    setTranscriptSource("none");
+    setResultCount(0);
     if (!listening) {
       setPhase("idle");
     }
@@ -346,6 +370,8 @@ export function useSpeechToText(options?: UseSpeechToTextOptions) {
     phase,
     listening,
     transcript,
+    transcriptSource,
+    resultCount,
     error,
     requestMicrophonePermission,
     startListening,

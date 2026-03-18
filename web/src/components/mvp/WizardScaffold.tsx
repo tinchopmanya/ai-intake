@@ -14,6 +14,7 @@ import { toUiErrorMessage } from "@/lib/api/errors";
 import {
   getCases,
   postAdvisor,
+  postAdvisorChat,
   postAnalysis,
   postIncident,
   postOcrInterpret,
@@ -233,6 +234,14 @@ function getConversationSubmissionText(
   const structured = formatConversationBlocksForContext(blocks).trim();
   if (structured) return structured;
   return fallbackText.trim();
+}
+
+function mapConversationSpeakerToHistorySender(
+  speaker: ConversationBlock["speaker"],
+): "incoming" | "outgoing" | "unknown" {
+  if (speaker === "user") return "outgoing";
+  if (speaker === "ex_partner") return "incoming";
+  return "unknown";
 }
 
 /**
@@ -548,7 +557,7 @@ export function WizardScaffold() {
     }
     if (latestExPartnerMessage) {
       context.latest_ex_partner_message = latestExPartnerMessage;
-    } else if (messageText.trim()) {
+    } else if (conversationBlocks.length === 0 && messageText.trim()) {
       context.latest_ex_partner_message = messageText.trim();
     }
     if (conversationBlocks.length > 0) {
@@ -559,8 +568,9 @@ export function WizardScaffold() {
         source: item.source ?? "manual",
       }));
       context.conversation_history = conversationBlocks.map((item) => ({
-        sender: item.speaker === "user" ? "outgoing" : "incoming",
+        sender: mapConversationSpeakerToHistorySender(item.speaker),
         text: item.content,
+        speaker: item.speaker,
       }));
     }
     if (additionalContext) {
@@ -954,37 +964,38 @@ export function WizardScaffold() {
 
     setAdvisorChatSending(true);
     try {
-      const refinementPrompt = [
-        "Modo: advisor_refine_response",
-        "Objetivo: refinar una sugerencia previa para responder mejor.",
-        "No ignores la sugerencia base. Ajustala con la nueva instruccion.",
-        "",
-        "Sugerencia base:",
-        baseText,
-        "",
-        "Nueva instruccion del usuario:",
-        instruction,
-      ].join("\n");
       const advisorVisual = getAdvisorVisualByIndex(advisorChatIndex);
+      const contextualPayload = buildContextPayload({
+        entry_mode: "advisor_refine_response",
+        selected_advisor_id: advisorVisual.id,
+        selected_advisor_name: advisorVisual.name,
+        selected_advisor_role: advisorVisual.role,
+        refinement_base_text: baseText,
+      });
       const advisorPayload = {
-        message_text: refinementPrompt,
-        mode,
-        relationship_type: "otro" as const,
+        advisor_id: advisorVisual.id,
+        entry_mode: "advisor_refine_response" as const,
+        messages: [
+          ...advisorChatMessages.map((item) => ({
+            role: item.role,
+            content: item.text,
+          })),
+          {
+            role: "user" as const,
+            content: instruction,
+          },
+        ],
         case_id: selectedCaseId ?? undefined,
-        source_type: "text" as const,
-        quick_mode: true,
-        save_session: false,
-        context: buildContextPayload({
-          entry_mode: "advisor_refine_response",
-          selected_advisor_id: advisorVisual.id,
-          selected_advisor_name: advisorVisual.name,
-          selected_advisor_role: advisorVisual.role,
-          refinement_base_text: baseText,
-        }),
+        base_reply: baseText,
+        conversation_context: {
+          relationship_type: "otro",
+          extra: contextualPayload ?? null,
+        },
+        debug: process.env.NODE_ENV !== "production",
       };
       if (process.env.NODE_ENV !== "production") {
         const debugPayload = {
-          endpoint: "/v1/advisor",
+          endpoint: "/v1/advisor/chat",
           entryMode: "advisor_refine_response",
           advisor: {
             id: advisorVisual.id,
@@ -992,14 +1003,14 @@ export function WizardScaffold() {
             role: advisorVisual.role,
           },
           userInput: instruction,
-          prompt: refinementPrompt,
           payload: advisorPayload,
         };
         setAdvisorChatDebugPayload(debugPayload);
         console.debug("advisor_prompt_debug", debugPayload);
       }
-      const result = await postAdvisor(advisorPayload);
-      const refinedText = result.responses[advisorChatIndex]?.text ?? result.responses[0]?.text ?? baseText;
+      const result = await postAdvisorChat(advisorPayload);
+      const refinedText = result.suggested_reply?.trim() || baseText;
+      const advisorMessage = result.message.trim() || "Te propongo este ajuste.";
       setAdvisorResult((previous) => {
         if (!previous) return previous;
         const nextResponses = [...previous.responses];
@@ -1013,13 +1024,17 @@ export function WizardScaffold() {
       setAdvisorChatMessages((previous) => [
         ...previous,
         { id: `u-${Date.now()}`, role: "user", text: instruction },
-        { id: `a-${Date.now() + 1}`, role: "advisor", text: refinedText },
+        { id: `a-${Date.now() + 1}`, role: "advisor", text: advisorMessage },
       ]);
       setAdvisorChatInput("");
       if (process.env.NODE_ENV !== "production") {
         setAdvisorChatDebugPayload((previous) => ({
           ...(previous ?? {}),
+          prompt: result.debug?.system_prompt ?? null,
+          model_payload: result.debug?.user_payload ?? null,
           response_preview: refinedText.slice(0, 500),
+          advisor_message_preview: advisorMessage.slice(0, 500),
+          context_structured: contextualPayload ?? null,
         }));
       }
     } catch (exc) {
