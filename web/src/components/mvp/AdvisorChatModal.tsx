@@ -61,11 +61,21 @@ export function AdvisorChatModal({
   const [voiceUiDebugEvents, setVoiceUiDebugEvents] = useState<
     Array<{ at: string; event: string; details?: Record<string, unknown> }>
   >([]);
+  const preferredVoiceLang = useMemo(() => {
+    if (typeof navigator === "undefined") return "es-ES";
+    const browserLanguages = [navigator.language, ...(navigator.languages ?? [])]
+      .filter((item): item is string => Boolean(item))
+      .map((item) => item.toLowerCase());
+    return browserLanguages.some((item) => item.startsWith("es-uy")) ? "es-UY" : "es-ES";
+  }, []);
+
   const voice = useSpeechToText({
-    lang: "es-ES",
-    continuous: true,
+    lang: preferredVoiceLang,
+    continuous: false,
     interimResults: true,
-    silenceTimeoutMs: 3000,
+    silenceTimeoutMs: 0,
+    noSpeechIsRecoverable: true,
+    emitNoSpeechOnEnd: true,
   });
   const voiceListening = voice.listening;
   const stopVoiceListening = voice.stopListening;
@@ -125,6 +135,12 @@ export function AdvisorChatModal({
           description: "Revisalo antes de enviarlo al advisor.",
         };
       case "error":
+        if (voice.error === "voice_no_speech") {
+          return {
+            title: "No detecte tu voz",
+            description: "No detecte tu voz. Intenta de nuevo y habla apenas empiece a escuchar.",
+          };
+        }
         return {
           title: "No se pudo completar la grabacion",
           description: getSpeechToTextErrorMessage(voice.error) ?? "Intenta de nuevo.",
@@ -156,10 +172,8 @@ export function AdvisorChatModal({
       listening: voice.listening,
     });
     setVoiceModalOpen(true);
-    if (!voice.listening) {
-      voice.resetTranscript();
-      voice.startListening();
-    }
+    voice.resetTranscript();
+    void voice.requestMicrophonePermission();
   }
 
   function closeVoiceModal() {
@@ -176,8 +190,13 @@ export function AdvisorChatModal({
     onClose();
   }
 
-  function restartRecording() {
-    pushVoiceUiDebugEvent("restart recording clicked", { listening: voice.listening });
+  function startOrRestartRecording() {
+    pushVoiceUiDebugEvent("start/restart recording clicked", {
+      listening: voice.listening,
+      phase: voice.phase,
+      error: voice.error,
+      hasTranscript: Boolean(voice.transcript.trim()),
+    });
     if (voice.listening) {
       voice.stopListening();
     }
@@ -479,10 +498,10 @@ export function AdvisorChatModal({
                   <Button
                     type="button"
                     variant="secondary"
-                    onClick={restartRecording}
+                    onClick={startOrRestartRecording}
                     className="border-[#cbd5e1] bg-white text-[#334155]"
                   >
-                    Iniciar grabacion
+                    {voice.error === "voice_no_speech" ? "Reintentar" : "Iniciar grabacion"}
                   </Button>
                 ) : null}
 
@@ -491,7 +510,7 @@ export function AdvisorChatModal({
                     <Button
                       type="button"
                       variant="secondary"
-                      onClick={restartRecording}
+                      onClick={startOrRestartRecording}
                       className="border-[#cbd5e1] bg-white text-[#334155]"
                     >
                       Volver a grabar
@@ -531,6 +550,10 @@ export function AdvisorChatModal({
                         listening: voice.listening,
                         transcriptSource: voice.transcriptSource,
                         resultCount: voice.resultCount,
+                        recognitionConfig: voice.config,
+                        lastSessionDurationMs: voice.lastSessionDurationMs,
+                        lastSessionHadResult: voice.lastSessionHadResult,
+                        lastSessionHadTranscript: voice.lastSessionHadTranscript,
                         transcriptPreview: voice.transcript.slice(0, 280),
                         error: voice.error,
                         uiEvents: voiceUiDebugEvents,
