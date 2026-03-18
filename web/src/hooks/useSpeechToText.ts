@@ -55,6 +55,12 @@ export type SpeechToTextPhase =
   | "transcript_ready"
   | "error";
 
+export type SpeechToTextDebugEvent = {
+  at: string;
+  event: string;
+  details?: Record<string, unknown>;
+};
+
 type SpeechToTextErrorCode =
   | "voice_not_supported"
   | "voice_speech_not_supported"
@@ -158,6 +164,7 @@ function mapGetUserMediaError(error: unknown): SpeechToTextErrorCode {
 }
 
 export function useSpeechToText(options?: UseSpeechToTextOptions) {
+  const isDevelopment = process.env.NODE_ENV !== "production";
   const speechSupported = Boolean(getSpeechRecognitionCtor());
   const [microphoneStatus, setMicrophoneStatus] = useState<MicrophonePermissionStatus>("idle");
   const [listening, setListening] = useState(false);
@@ -166,17 +173,46 @@ export function useSpeechToText(options?: UseSpeechToTextOptions) {
   const [resultCount, setResultCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [phase, setPhase] = useState<SpeechToTextPhase>("idle");
+  const [debugEvents, setDebugEvents] = useState<SpeechToTextDebugEvent[]>([]);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const transcriptRef = useRef("");
   const finalTranscriptRef = useRef("");
   const interimTranscriptRef = useRef("");
   const hadRecognitionErrorRef = useRef(false);
   const silenceTimerRef = useRef<number | null>(null);
+  const startWatchdogTimerRef = useRef<number | null>(null);
+  const startPendingRef = useRef(false);
+  const onStartSeenRef = useRef(false);
 
   const lang = options?.lang ?? "es-ES";
   const continuous = options?.continuous ?? false;
   const interimResults = options?.interimResults ?? false;
   const silenceTimeoutMs = options?.silenceTimeoutMs ?? 0;
+
+  const pushDebugEvent = useCallback(
+    (event: string, details?: Record<string, unknown>) => {
+      if (!isDevelopment) return;
+      const entry: SpeechToTextDebugEvent = {
+        at: new Date().toISOString(),
+        event,
+        details,
+      };
+      setDebugEvents((current) => [...current.slice(-79), entry]);
+      if (details) {
+        console.debug("[voice][stt]", event, details);
+      } else {
+        console.debug("[voice][stt]", event);
+      }
+    },
+    [isDevelopment],
+  );
+
+  const clearStartWatchdogTimer = useCallback(() => {
+    if (startWatchdogTimerRef.current !== null) {
+      window.clearTimeout(startWatchdogTimerRef.current);
+      startWatchdogTimerRef.current = null;
+    }
+  }, []);
 
   const clearSilenceTimer = useCallback(() => {
     if (silenceTimerRef.current !== null) {
@@ -197,14 +233,17 @@ export function useSpeechToText(options?: UseSpeechToTextOptions) {
   }, [clearSilenceTimer, silenceTimeoutMs]);
 
   const requestMicrophonePermission = useCallback(async () => {
+    pushDebugEvent("requestMicrophonePermission called", { microphoneStatus });
     if (typeof navigator === "undefined") {
       setMicrophoneStatus("unsupported");
       setError("voice_no_microphone");
+      pushDebugEvent("requestMicrophonePermission unsupported navigator");
       return false;
     }
     if (!hasMicrophonePermissionApi()) {
       setMicrophoneStatus("unsupported");
       setError("voice_no_microphone");
+      pushDebugEvent("requestMicrophonePermission unsupported mediaDevices");
       return false;
     }
 
@@ -215,25 +254,45 @@ export function useSpeechToText(options?: UseSpeechToTextOptions) {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.getTracks().forEach((track) => track.stop());
       setMicrophoneStatus("granted");
+      pushDebugEvent("requestMicrophonePermission granted");
       return true;
     } catch (exc) {
       setMicrophoneStatus("denied");
-      setError(mapGetUserMediaError(exc));
+      const mappedError = mapGetUserMediaError(exc);
+      setError(mappedError);
+      pushDebugEvent("requestMicrophonePermission rejected", { mappedError });
       return false;
     }
-  }, []);
+  }, [microphoneStatus, pushDebugEvent]);
 
   const ensureRecognition = useCallback(() => {
     const ctor = getSpeechRecognitionCtor();
-    if (!ctor) return null;
+    if (!ctor) {
+      pushDebugEvent("recognition ctor missing");
+      return null;
+    }
     if (recognitionRef.current) return recognitionRef.current;
-
-    const recognition = new ctor();
+    let recognition: SpeechRecognitionLike;
+    try {
+      recognition = new ctor();
+      pushDebugEvent("recognition instance created");
+    } catch (exc) {
+      setError("voice_start_failed");
+      setPhase("error");
+      pushDebugEvent("recognition instance creation failed", {
+        message: exc instanceof Error ? exc.message : String(exc),
+      });
+      return null;
+    }
     recognition.lang = lang;
     recognition.continuous = continuous;
     recognition.interimResults = interimResults;
 
     recognition.onstart = () => {
+      onStartSeenRef.current = true;
+      startPendingRef.current = false;
+      clearStartWatchdogTimer();
+      pushDebugEvent("recognition.onstart fired");
       setListening(true);
       setError(null);
       setPhase("listening");
@@ -243,8 +302,21 @@ export function useSpeechToText(options?: UseSpeechToTextOptions) {
       scheduleSilenceStop();
     };
     recognition.onend = () => {
+      clearStartWatchdogTimer();
+      pushDebugEvent("recognition.onend fired", {
+        hadRecognitionError: hadRecognitionErrorRef.current,
+        onStartSeen: onStartSeenRef.current,
+      });
       setListening(false);
       clearSilenceTimer();
+      if (!onStartSeenRef.current && !hadRecognitionErrorRef.current && startPendingRef.current) {
+        setError("voice_start_failed");
+        setPhase("error");
+        hadRecognitionErrorRef.current = true;
+        startPendingRef.current = false;
+        pushDebugEvent("recognition.onend before onstart, marking start failure");
+        return;
+      }
       if (!hadRecognitionErrorRef.current) {
         const resolved = finalTranscriptRef.current.trim() || transcriptRef.current.trim();
         if (resolved && resolved !== transcriptRef.current.trim()) {
@@ -255,13 +327,20 @@ export function useSpeechToText(options?: UseSpeechToTextOptions) {
       }
     };
     recognition.onerror = (event) => {
+      clearStartWatchdogTimer();
+      pushDebugEvent("recognition.onerror fired", { error: event.error });
       setListening(false);
       setError(mapSpeechErrorCode(event.error));
       clearSilenceTimer();
       setPhase("error");
       hadRecognitionErrorRef.current = true;
+      startPendingRef.current = false;
     };
     recognition.onresult = (event) => {
+      pushDebugEvent("recognition.onresult fired", {
+        resultIndex: event.resultIndex,
+        totalResults: event.results.length,
+      });
       let finalText = "";
       let interimText = "";
       setResultCount((current) => current + 1);
@@ -288,58 +367,105 @@ export function useSpeechToText(options?: UseSpeechToTextOptions) {
 
     recognitionRef.current = recognition;
     return recognition;
-  }, [clearSilenceTimer, continuous, interimResults, lang, scheduleSilenceStop]);
+  }, [
+    clearSilenceTimer,
+    clearStartWatchdogTimer,
+    continuous,
+    interimResults,
+    lang,
+    pushDebugEvent,
+    scheduleSilenceStop,
+  ]);
 
   const startListening = useCallback(() => {
-    void (async () => {
-      const micGranted =
-        microphoneStatus === "granted" ? true : await requestMicrophonePermission();
-      if (!micGranted) return;
-      if (!speechSupported) {
-        setError("voice_speech_not_supported");
-        return;
-      }
+    pushDebugEvent("startListening called", {
+      microphoneStatus,
+      speechSupported,
+      listening,
+    });
+    if (!speechSupported) {
+      setError("voice_speech_not_supported");
+      setPhase("error");
+      pushDebugEvent("startListening blocked: speech not supported");
+      return;
+    }
 
-      const recognition = ensureRecognition();
-      if (!recognition) {
-        setError("voice_not_supported");
+    const recognition = ensureRecognition();
+    if (!recognition) {
+      setError("voice_not_supported");
+      setPhase("error");
+      pushDebugEvent("startListening blocked: recognition unavailable");
+      return;
+    }
+    if (listening) {
+      pushDebugEvent("startListening ignored because already listening");
+      return;
+    }
+    setError(null);
+    setPhase("listening");
+    hadRecognitionErrorRef.current = false;
+    onStartSeenRef.current = false;
+    startPendingRef.current = true;
+    clearStartWatchdogTimer();
+    startWatchdogTimerRef.current = window.setTimeout(() => {
+      if (onStartSeenRef.current || hadRecognitionErrorRef.current) return;
+      startPendingRef.current = false;
+      setError("voice_start_failed");
+      setPhase("error");
+      pushDebugEvent("recognition start watchdog timeout");
+    }, 1800);
+    try {
+      pushDebugEvent("recognition.start invoked");
+      recognition.start();
+      if (microphoneStatus !== "granted") {
+        void requestMicrophonePermission();
+      }
+    } catch (exc) {
+      clearStartWatchdogTimer();
+      startPendingRef.current = false;
+      const message = exc instanceof Error ? exc.message.toLowerCase() : "";
+      pushDebugEvent("recognition.start threw", {
+        message: exc instanceof Error ? exc.message : String(exc),
+      });
+      if (message.includes("already started")) {
         return;
       }
-      if (listening) return;
-      setError(null);
-      setPhase("listening");
-      hadRecognitionErrorRef.current = false;
-      try {
-        recognition.start();
-      } catch (exc) {
-        const message = exc instanceof Error ? exc.message.toLowerCase() : "";
-        if (message.includes("already started")) {
-          return;
-        }
-        if (message.includes("notallowed") || message.includes("permission")) {
-          setError("voice_not_allowed");
-          return;
-        }
-        if (message.includes("audio-capture")) {
-          setError("voice_no_microphone");
-          setPhase("error");
-          return;
-        }
-        setError("voice_start_failed");
+      if (message.includes("notallowed") || message.includes("permission")) {
+        setError("voice_not_allowed");
         setPhase("error");
+        return;
       }
-    })();
-  }, [ensureRecognition, listening, microphoneStatus, requestMicrophonePermission, speechSupported]);
+      if (message.includes("audio-capture")) {
+        setError("voice_no_microphone");
+        setPhase("error");
+        return;
+      }
+      setError("voice_start_failed");
+      setPhase("error");
+    }
+  }, [
+    clearStartWatchdogTimer,
+    ensureRecognition,
+    listening,
+    microphoneStatus,
+    pushDebugEvent,
+    requestMicrophonePermission,
+    speechSupported,
+  ]);
 
   const stopListening = useCallback(() => {
+    pushDebugEvent("stopListening called");
     const recognition = recognitionRef.current;
     if (!recognition) return;
     setPhase("finishing");
     clearSilenceTimer();
+    clearStartWatchdogTimer();
+    startPendingRef.current = false;
     recognition.stop();
-  }, [clearSilenceTimer]);
+  }, [clearSilenceTimer, clearStartWatchdogTimer, pushDebugEvent]);
 
   const resetTranscript = useCallback(() => {
+    pushDebugEvent("resetTranscript called");
     finalTranscriptRef.current = "";
     interimTranscriptRef.current = "";
     setTranscript("");
@@ -348,7 +474,11 @@ export function useSpeechToText(options?: UseSpeechToTextOptions) {
     if (!listening) {
       setPhase("idle");
     }
-  }, [listening]);
+  }, [listening, pushDebugEvent]);
+
+  const clearDebugEvents = useCallback(() => {
+    setDebugEvents([]);
+  }, []);
 
   useEffect(() => {
     transcriptRef.current = transcript;
@@ -357,11 +487,12 @@ export function useSpeechToText(options?: UseSpeechToTextOptions) {
   useEffect(() => {
     return () => {
       clearSilenceTimer();
+      clearStartWatchdogTimer();
       if (recognitionRef.current) {
         recognitionRef.current.abort();
       }
     };
-  }, [clearSilenceTimer]);
+  }, [clearSilenceTimer, clearStartWatchdogTimer]);
 
   return {
     supported: speechSupported,
@@ -377,5 +508,7 @@ export function useSpeechToText(options?: UseSpeechToTextOptions) {
     startListening,
     stopListening,
     resetTranscript,
+    debugEvents,
+    clearDebugEvents,
   };
 }

@@ -58,6 +58,9 @@ export function AdvisorChatModal({
   onClose,
 }: AdvisorChatModalProps) {
   const isDevelopment = process.env.NODE_ENV !== "production";
+  const [voiceUiDebugEvents, setVoiceUiDebugEvents] = useState<
+    Array<{ at: string; event: string; details?: Record<string, unknown> }>
+  >([]);
   const voice = useSpeechToText({
     lang: "es-ES",
     continuous: true,
@@ -80,6 +83,21 @@ export function AdvisorChatModal({
       ? "Escribe o habla para que te ayude."
       : "Que quieres cambiar de mi sugerencia?";
   const [voiceModalOpen, setVoiceModalOpen] = useState(false);
+
+  function pushVoiceUiDebugEvent(event: string, details?: Record<string, unknown>) {
+    if (!isDevelopment) return;
+    const entry = {
+      at: new Date().toISOString(),
+      event,
+      details,
+    };
+    setVoiceUiDebugEvents((current) => [...current.slice(-39), entry]);
+    if (details) {
+      console.debug("[voice][advisor-modal]", event, details);
+    } else {
+      console.debug("[voice][advisor-modal]", event);
+    }
+  }
 
   const voiceUiState = useMemo(() => {
     if (voice.error) return "error" as const;
@@ -128,6 +146,15 @@ export function AdvisorChatModal({
   }
 
   function openVoiceModal() {
+    if (voice.clearDebugEvents) {
+      voice.clearDebugEvents();
+    }
+    setVoiceUiDebugEvents([]);
+    pushVoiceUiDebugEvent("talk button clicked", {
+      voiceModalOpen,
+      phase: voice.phase,
+      listening: voice.listening,
+    });
     setVoiceModalOpen(true);
     if (!voice.listening) {
       voice.resetTranscript();
@@ -136,6 +163,7 @@ export function AdvisorChatModal({
   }
 
   function closeVoiceModal() {
+    pushVoiceUiDebugEvent("voice modal closed", { listening: voice.listening });
     if (voice.listening) {
       voice.stopListening();
     }
@@ -149,6 +177,7 @@ export function AdvisorChatModal({
   }
 
   function restartRecording() {
+    pushVoiceUiDebugEvent("restart recording clicked", { listening: voice.listening });
     if (voice.listening) {
       voice.stopListening();
     }
@@ -157,6 +186,9 @@ export function AdvisorChatModal({
   }
 
   function applyTranscriptToDraft() {
+    pushVoiceUiDebugEvent("apply transcript clicked", {
+      transcriptLength: voice.transcript.trim().length,
+    });
     const transcript = voice.transcript.trim();
     if (!transcript) return;
     const merged = draft.trim() ? `${draft.trim()}\n${transcript}` : transcript;
@@ -501,6 +533,8 @@ export function AdvisorChatModal({
                         resultCount: voice.resultCount,
                         transcriptPreview: voice.transcript.slice(0, 280),
                         error: voice.error,
+                        uiEvents: voiceUiDebugEvents,
+                        hookEvents: voice.debugEvents ?? [],
                       },
                       null,
                       2,
