@@ -39,6 +39,8 @@ type UseSpeechToTextOptions = {
   continuous?: boolean;
   interimResults?: boolean;
   silenceTimeoutMs?: number;
+  noSpeechIsRecoverable?: boolean;
+  emitNoSpeechOnEnd?: boolean;
 };
 
 export type MicrophonePermissionStatus =
@@ -113,7 +115,7 @@ export function getSpeechToTextErrorMessage(error: string | null): string | null
     case "voice_network":
       return "El reconocimiento de voz fallo por red. Intenta de nuevo.";
     case "voice_no_speech":
-      return "No detectamos voz. Intenta hablar mas cerca del microfono.";
+      return "No detecte tu voz. Intenta de nuevo y habla apenas empiece a escuchar.";
     case "voice_start_failed":
       return "No se pudo iniciar la entrada por voz. Intenta de nuevo.";
     default:
@@ -183,11 +185,18 @@ export function useSpeechToText(options?: UseSpeechToTextOptions) {
   const startWatchdogTimerRef = useRef<number | null>(null);
   const startPendingRef = useRef(false);
   const onStartSeenRef = useRef(false);
+  const sessionStartedAtRef = useRef<number | null>(null);
+  const hadResultInCurrentSessionRef = useRef(false);
+  const [lastSessionDurationMs, setLastSessionDurationMs] = useState<number | null>(null);
+  const [lastSessionHadResult, setLastSessionHadResult] = useState(false);
+  const [lastSessionHadTranscript, setLastSessionHadTranscript] = useState(false);
 
   const lang = options?.lang ?? "es-ES";
   const continuous = options?.continuous ?? false;
   const interimResults = options?.interimResults ?? false;
   const silenceTimeoutMs = options?.silenceTimeoutMs ?? 0;
+  const noSpeechIsRecoverable = options?.noSpeechIsRecoverable ?? false;
+  const emitNoSpeechOnEnd = options?.emitNoSpeechOnEnd ?? false;
 
   const pushDebugEvent = useCallback(
     (event: string, details?: Record<string, unknown>) => {
@@ -287,12 +296,28 @@ export function useSpeechToText(options?: UseSpeechToTextOptions) {
     recognition.lang = lang;
     recognition.continuous = continuous;
     recognition.interimResults = interimResults;
+    pushDebugEvent("recognition configured", {
+      lang,
+      continuous,
+      interimResults,
+      silenceTimeoutMs,
+      noSpeechIsRecoverable,
+      emitNoSpeechOnEnd,
+      micActivityObservable: false,
+    });
 
     recognition.onstart = () => {
       onStartSeenRef.current = true;
       startPendingRef.current = false;
       clearStartWatchdogTimer();
-      pushDebugEvent("recognition.onstart fired");
+      sessionStartedAtRef.current = Date.now();
+      hadResultInCurrentSessionRef.current = false;
+      pushDebugEvent("recognition.onstart fired", {
+        lang,
+        continuous,
+        interimResults,
+        micActivityObservable: false,
+      });
       setListening(true);
       setError(null);
       setPhase("listening");
@@ -303,9 +328,17 @@ export function useSpeechToText(options?: UseSpeechToTextOptions) {
     };
     recognition.onend = () => {
       clearStartWatchdogTimer();
+      const sessionDurationMs = sessionStartedAtRef.current
+        ? Date.now() - sessionStartedAtRef.current
+        : null;
+      const hadResultInSession = hadResultInCurrentSessionRef.current;
+      setLastSessionDurationMs(sessionDurationMs);
+      setLastSessionHadResult(hadResultInSession);
       pushDebugEvent("recognition.onend fired", {
         hadRecognitionError: hadRecognitionErrorRef.current,
         onStartSeen: onStartSeenRef.current,
+        sessionDurationMs,
+        hadResultInSession,
       });
       setListening(false);
       clearSilenceTimer();
@@ -319,24 +352,33 @@ export function useSpeechToText(options?: UseSpeechToTextOptions) {
       }
       if (!hadRecognitionErrorRef.current) {
         const resolved = finalTranscriptRef.current.trim() || transcriptRef.current.trim();
+        const hasTranscript = Boolean(resolved);
+        setLastSessionHadTranscript(hasTranscript);
         if (resolved && resolved !== transcriptRef.current.trim()) {
           setTranscript(resolved);
         }
         setTranscriptSource(resolved ? (finalTranscriptRef.current.trim() ? "final" : "interim") : "none");
+        if (!hasTranscript && emitNoSpeechOnEnd) {
+          setError("voice_no_speech");
+        }
         setPhase(resolved ? "transcript_ready" : "idle");
       }
+      sessionStartedAtRef.current = null;
     };
     recognition.onerror = (event) => {
       clearStartWatchdogTimer();
       pushDebugEvent("recognition.onerror fired", { error: event.error });
       setListening(false);
-      setError(mapSpeechErrorCode(event.error));
+      const mappedError = mapSpeechErrorCode(event.error);
+      const noSpeechRecoverable = mappedError === "voice_no_speech" && noSpeechIsRecoverable;
+      setError(mappedError);
       clearSilenceTimer();
-      setPhase("error");
-      hadRecognitionErrorRef.current = true;
+      setPhase(noSpeechRecoverable ? "idle" : "error");
+      hadRecognitionErrorRef.current = !noSpeechRecoverable;
       startPendingRef.current = false;
     };
     recognition.onresult = (event) => {
+      hadResultInCurrentSessionRef.current = true;
       pushDebugEvent("recognition.onresult fired", {
         resultIndex: event.resultIndex,
         totalResults: event.results.length,
@@ -363,6 +405,7 @@ export function useSpeechToText(options?: UseSpeechToTextOptions) {
       if (!merged) return;
       setTranscript(merged);
       setTranscriptSource(interimTranscriptRef.current ? "interim" : "final");
+      setLastSessionHadTranscript(true);
     };
 
     recognitionRef.current = recognition;
@@ -371,10 +414,13 @@ export function useSpeechToText(options?: UseSpeechToTextOptions) {
     clearSilenceTimer,
     clearStartWatchdogTimer,
     continuous,
+    emitNoSpeechOnEnd,
     interimResults,
     lang,
+    noSpeechIsRecoverable,
     pushDebugEvent,
     scheduleSilenceStop,
+    silenceTimeoutMs,
   ]);
 
   const startListening = useCallback(() => {
@@ -402,6 +448,9 @@ export function useSpeechToText(options?: UseSpeechToTextOptions) {
       return;
     }
     setError(null);
+    setLastSessionDurationMs(null);
+    setLastSessionHadResult(false);
+    setLastSessionHadTranscript(false);
     setPhase("listening");
     hadRecognitionErrorRef.current = false;
     onStartSeenRef.current = false;
@@ -510,5 +559,16 @@ export function useSpeechToText(options?: UseSpeechToTextOptions) {
     resetTranscript,
     debugEvents,
     clearDebugEvents,
+    config: {
+      lang,
+      continuous,
+      interimResults,
+      silenceTimeoutMs,
+      noSpeechIsRecoverable,
+      emitNoSpeechOnEnd,
+    },
+    lastSessionDurationMs,
+    lastSessionHadResult,
+    lastSessionHadTranscript,
   };
 }
