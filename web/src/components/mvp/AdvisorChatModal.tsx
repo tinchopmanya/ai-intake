@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 
 import { Button, Textarea } from "@/components/mvp/ui";
@@ -52,7 +52,6 @@ export function AdvisorChatModal({
   entryMode,
   helperCopy,
   debugPayload,
-  autoSendOnVoiceComplete = false,
   onDraftChange,
   onSend,
   onUseResponse,
@@ -65,6 +64,8 @@ export function AdvisorChatModal({
     interimResults: true,
     silenceTimeoutMs: 3000,
   });
+  const voiceListening = voice.listening;
+  const stopVoiceListening = voice.stopListening;
   const microphoneStatusMessage = getMicrophoneStatusMessage(
     voice.microphoneStatus,
     voice.speechSupported,
@@ -78,10 +79,87 @@ export function AdvisorChatModal({
     entryMode === "advisor_conversation"
       ? "Escribe o habla para que te ayude."
       : "Que quieres cambiar de mi sugerencia?";
+  const [voiceModalOpen, setVoiceModalOpen] = useState(false);
 
-  useEffect(() => {
-    if (!isOpen || !voice.transcript.trim()) return;
-    const merged = draft.trim() ? `${draft.trim()}\n${voice.transcript.trim()}` : voice.transcript.trim();
+  const voiceUiState = useMemo(() => {
+    if (voice.error) return "error" as const;
+    if (voice.phase === "listening") return "listening" as const;
+    if (voice.phase === "finishing") return "processing" as const;
+    if (voice.transcript.trim()) return "transcript_ready" as const;
+    return "idle" as const;
+  }, [voice.error, voice.phase, voice.transcript]);
+
+  const stateCopy = useMemo(() => {
+    switch (voiceUiState) {
+      case "listening":
+        return {
+          title: "Escuchando...",
+          description: "Habla con naturalidad. Puedes terminar cuando quieras.",
+        };
+      case "processing":
+        return {
+          title: "Procesando lo que dijiste...",
+          description: "Estamos finalizando la transcripcion.",
+        };
+      case "transcript_ready":
+        return {
+          title: "Esto es lo que entendi",
+          description: "Revisalo antes de enviarlo al advisor.",
+        };
+      case "error":
+        return {
+          title: "No se pudo completar la grabacion",
+          description: getSpeechToTextErrorMessage(voice.error) ?? "Intenta de nuevo.",
+        };
+      case "idle":
+      default:
+        return {
+          title: "Listo para escucharte",
+          description: "Pulsa iniciar cuando quieras grabar tu mensaje.",
+        };
+    }
+  }, [voice.error, voiceUiState]);
+
+  function focusDraftInput() {
+    window.setTimeout(() => {
+      const input = document.getElementById("advisor-chat-draft") as HTMLTextAreaElement | null;
+      input?.focus();
+    }, 30);
+  }
+
+  function openVoiceModal() {
+    setVoiceModalOpen(true);
+    if (!voice.listening) {
+      voice.resetTranscript();
+      voice.startListening();
+    }
+  }
+
+  function closeVoiceModal() {
+    if (voice.listening) {
+      voice.stopListening();
+    }
+    setVoiceModalOpen(false);
+    voice.resetTranscript();
+  }
+
+  function handleCloseAdvisorModal() {
+    closeVoiceModal();
+    onClose();
+  }
+
+  function restartRecording() {
+    if (voice.listening) {
+      voice.stopListening();
+    }
+    voice.resetTranscript();
+    voice.startListening();
+  }
+
+  function applyTranscriptToDraft() {
+    const transcript = voice.transcript.trim();
+    if (!transcript) return;
+    const merged = draft.trim() ? `${draft.trim()}\n${transcript}` : transcript;
     onDraftChange(merged);
     const wrapper = document.getElementById("advisor-chat-draft-wrap");
     if (wrapper) {
@@ -93,21 +171,15 @@ export function AdvisorChatModal({
         wrapper.style.backgroundColor = "";
       }, 850);
     }
-    window.setTimeout(() => {
-      const input = document.getElementById("advisor-chat-draft") as HTMLTextAreaElement | null;
-      input?.focus();
-    }, 30);
-    if (
-      autoSendOnVoiceComplete &&
-      entryMode === "advisor_conversation" &&
-      merged.trim().length >= 4
-    ) {
-      window.setTimeout(() => {
-        onSend();
-      }, 80);
+    closeVoiceModal();
+    focusDraftInput();
+  }
+
+  useEffect(() => {
+    if (!isOpen && voiceListening) {
+      stopVoiceListening();
     }
-    voice.resetTranscript();
-  }, [autoSendOnVoiceComplete, draft, entryMode, isOpen, onDraftChange, onSend, voice]);
+  }, [isOpen, stopVoiceListening, voiceListening]);
 
   if (!isOpen) return null;
 
@@ -140,7 +212,7 @@ export function AdvisorChatModal({
           <Button
             type="button"
             variant="secondary"
-            onClick={onClose}
+            onClick={handleCloseAdvisorModal}
             className="border-[#CBD5E1] bg-white px-3 py-1.5 text-sm text-[#334155]"
           >
             Cerrar
@@ -196,19 +268,13 @@ export function AdvisorChatModal({
               <VoiceMicButton
                 listening={voice.listening}
                 disabled={voice.microphoneStatus === "requesting"}
-                onClick={() => {
-                  if (voice.listening) {
-                    voice.stopListening();
-                  } else {
-                    voice.startListening();
-                  }
-                }}
+                onClick={openVoiceModal}
                 idleLabel="Hablar con el advisor"
                 listeningLabel="Escuchando..."
               />
-              {voice.phase === "transcript_ready" ? (
+              {voice.transcript.trim() ? (
                 <span className="inline-flex h-8 items-center rounded-full border border-[#bbf7d0] bg-[#f0fdf4] px-3 text-[12px] text-[#166534]">
-                  Transcript listo para editar
+                  Transcript listo para revisar
                 </span>
               ) : null}
             </div>
@@ -271,44 +337,153 @@ export function AdvisorChatModal({
           </div>
         </footer>
 
-        {voice.listening ? (
-          <div className="pointer-events-none absolute inset-0 z-20 flex items-end justify-center bg-slate-900/10 p-6">
-            <div className="pointer-events-auto w-full max-w-md rounded-2xl border border-[#f2d2d8] bg-white p-4 shadow-[0_16px_30px_rgba(15,23,42,0.16)]">
-              <div className="flex items-center gap-3">
-                {advisorAvatarSrc ? (
-                  <Image
-                    src={advisorAvatarSrc}
-                    alt={advisorName}
-                    width={36}
-                    height={36}
-                    className="h-9 w-9 rounded-full border border-[#e5e5e5] object-cover"
-                  />
-                ) : (
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#111] text-[11px] font-semibold text-white">
-                    {advisorName.slice(0, 2).toUpperCase()}
-                  </span>
-                )}
-                <div className="min-w-0 flex-1">
-                  <p className="text-[13px] font-semibold text-[#7f1d1d]">{advisorName}</p>
-                  <p className="inline-flex items-center gap-1 text-[12px] text-[#b42318]">
-                    <span className="relative h-2 w-2 rounded-full bg-[#ef4444]">
-                      <span className="absolute inset-0 rounded-full bg-[#ef4444] opacity-70 animate-ping" />
-                    </span>
-                    Escuchando...
-                  </p>
+        {voiceModalOpen ? (
+          <div className="absolute inset-0 z-30 flex items-center justify-center bg-slate-900/55 p-4">
+            <div className="w-full max-w-3xl rounded-3xl border border-[#dbe3ec] bg-gradient-to-b from-[#ffffff] to-[#f8fbff] p-6 shadow-[0_24px_60px_rgba(15,23,42,0.35)]">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="relative">
+                    <span
+                      className={`voice-avatar-ring ${voiceUiState === "listening" ? "is-active" : ""}`}
+                      aria-hidden
+                    />
+                    {advisorAvatarSrc ? (
+                      <Image
+                        src={advisorAvatarSrc}
+                        alt={advisorName}
+                        width={64}
+                        height={64}
+                        className="relative z-10 h-16 w-16 rounded-full border border-[#dbe3ec] object-cover"
+                      />
+                    ) : (
+                      <span className="relative z-10 flex h-16 w-16 items-center justify-center rounded-full bg-[#111827] text-sm font-semibold text-white">
+                        {advisorName.slice(0, 2).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-[18px] font-semibold text-[#0f172a]">{advisorName}</p>
+                    {advisorRole ? (
+                      <p className="text-[13px] font-medium text-[#475569]">{advisorRole}</p>
+                    ) : null}
+                    <p className="mt-1 text-[13px] text-[#334155]">{stateCopy.title}</p>
+                    <p className="text-[12px] text-[#64748b]">{stateCopy.description}</p>
+                  </div>
                 </div>
                 <Button
                   type="button"
                   variant="secondary"
-                  onClick={voice.stopListening}
-                  className="h-8 rounded-full border-[#f2d2d8] bg-white px-3 text-[12px] text-[#7f1d1d] hover:bg-[#fff7f8]"
+                  onClick={closeVoiceModal}
+                  className="border-[#cbd5e1] bg-white px-3 py-1.5 text-sm text-[#334155]"
                 >
-                  Terminar
+                  Cerrar
                 </Button>
               </div>
-              <p className="mt-3 min-h-10 whitespace-pre-wrap break-words rounded-xl border border-[#f8d7dd] bg-[#fff7f8] px-3 py-2 text-[12px] text-[#7f1d1d]">
-                {voice.transcript.trim() || "Estoy escuchando. Habla cuando quieras."}
-              </p>
+
+              <div className="mt-5 rounded-2xl border border-[#e2e8f0] bg-white/80 p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <span className="text-[12px] font-medium uppercase tracking-wide text-[#64748b]">
+                    Estado
+                  </span>
+                  <span
+                    className={`inline-flex h-7 items-center rounded-full border px-3 text-[12px] ${
+                      voiceUiState === "listening"
+                        ? "border-[#fecaca] bg-[#fff1f2] text-[#b42318]"
+                        : voiceUiState === "processing"
+                          ? "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]"
+                          : voiceUiState === "transcript_ready"
+                            ? "border-[#bbf7d0] bg-[#f0fdf4] text-[#166534]"
+                            : voiceUiState === "error"
+                              ? "border-[#fcd34d] bg-[#fffbeb] text-[#92400e]"
+                              : "border-[#e2e8f0] bg-[#f8fafc] text-[#334155]"
+                    }`}
+                  >
+                    {voiceUiState === "listening"
+                      ? "Escuchando"
+                      : voiceUiState === "processing"
+                        ? "Procesando"
+                        : voiceUiState === "transcript_ready"
+                          ? "Transcript listo"
+                          : voiceUiState === "error"
+                            ? "Error"
+                            : "En espera"}
+                  </span>
+                </div>
+
+                <div className="mb-4 flex h-14 items-end justify-center gap-1.5 rounded-xl border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2">
+                  {Array.from({ length: 14 }).map((_, index) => (
+                    <span
+                      key={`voice-bar-${index}`}
+                      className={`voice-level-bar ${voiceUiState === "listening" ? "is-active" : ""}`}
+                      style={{ animationDelay: `${index * 70}ms` }}
+                      aria-hidden
+                    />
+                  ))}
+                </div>
+
+                <p className="mb-2 text-[12px] font-medium text-[#334155]">Transcript</p>
+                <p className="min-h-24 whitespace-pre-wrap break-words rounded-xl border border-[#dbe3ec] bg-[#f8fafc] px-3 py-2 text-[14px] text-[#0f172a]">
+                  {voice.transcript.trim()
+                    ? voice.transcript.trim()
+                    : voiceUiState === "listening"
+                      ? "Estoy escuchando. Habla cuando quieras."
+                      : "Aun no hay transcript."}
+                </p>
+              </div>
+
+              <div className="mt-5 flex flex-wrap justify-end gap-2">
+                {voiceUiState === "listening" ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={voice.stopListening}
+                    className="border-[#fecdd3] bg-white text-[#9f1239] hover:bg-[#fff1f2]"
+                  >
+                    Terminar grabacion
+                  </Button>
+                ) : null}
+
+                {voiceUiState === "idle" || voiceUiState === "error" ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={restartRecording}
+                    className="border-[#cbd5e1] bg-white text-[#334155]"
+                  >
+                    Iniciar grabacion
+                  </Button>
+                ) : null}
+
+                {voiceUiState === "transcript_ready" ? (
+                  <>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={restartRecording}
+                      className="border-[#cbd5e1] bg-white text-[#334155]"
+                    >
+                      Volver a grabar
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="primary"
+                      onClick={applyTranscriptToDraft}
+                      className="bg-[#1d4ed8] text-white hover:bg-[#1e40af]"
+                    >
+                      Enviar transcript
+                    </Button>
+                  </>
+                ) : null}
+
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={closeVoiceModal}
+                  className="border-[#cbd5e1] bg-white text-[#334155]"
+                >
+                  Cancelar
+                </Button>
+              </div>
             </div>
           </div>
         ) : null}

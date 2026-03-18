@@ -46,3 +46,52 @@ body {
 .login-card-in {
   animation: login-card-in 320ms ease-out both;
 }
+
+@keyframes voice-avatar-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.45;
+  }
+  100% {
+    transform: scale(1.25);
+    opacity: 0;
+  }
+}
+
+@keyframes voice-level-bar {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+.voice-avatar-ring {
+  position: absolute;
+  inset: -8px;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.22), rgba(59, 130, 246, 0));
+  opacity: 0;
+}
+
+.voice-avatar-ring.is-active {
+  animation: voice-avatar-ring 1.5s ease-out infinite;
+}
+
+.voice-level-bar {
+  width: 4px;
+  height: 100%;
+  max-height: 28px;
+  transform-origin: bottom;
+  border-radius: 9999px;
+  background: linear-gradient(180deg, #60a5fa 0%, #2563eb 100%);
+  opacity: 0.28;
+}
+
+.voice-level-bar.is-active {
+  animation: voice-level-bar 1s ease-in-out infinite;
+}
