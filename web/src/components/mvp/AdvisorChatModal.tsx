@@ -235,121 +235,149 @@ export function AdvisorChatModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-3">
-      <div className="relative flex h-[min(90vh,760px)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-[#e5e7eb] bg-white shadow-[0_20px_40px_rgba(15,23,42,0.2)]">
-        <header className="flex items-start justify-between gap-3 border-b border-[#E2E8F0] bg-white px-4 py-3">
-          <div className="flex min-w-0 items-start gap-3">
-            {advisorAvatarSrc ? (
-              <Image
-                src={advisorAvatarSrc}
-                alt={advisorName}
-                width={44}
-                height={44}
-                className="h-11 w-11 rounded-full border border-[#e5e5e5] object-cover"
-              />
-            ) : (
-              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#111] text-[12px] font-semibold text-white">
-                {advisorName.slice(0, 2).toUpperCase()}
-              </span>
-            )}
-            <div className="min-w-0">
-              <p className="truncate text-[16px] font-semibold text-[#0F172A]">{advisorName}</p>
-              {advisorRole ? <p className="text-[12px] font-medium text-[#475569]">{advisorRole}</p> : null}
-              {advisorDescription ? (
-                <p className="mt-0.5 line-clamp-2 text-[12px] text-[#64748b]">{advisorDescription}</p>
-              ) : null}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-[2px]">
+      <div className="relative flex h-[min(92vh,860px)] w-full max-w-3xl flex-col overflow-hidden rounded-[28px] border border-[#dbe4ee] bg-[#f8fafc] shadow-[0_32px_90px_rgba(15,23,42,0.28)]">
+        <header className="relative overflow-hidden border-b border-white/10 bg-[linear-gradient(135deg,#44556b_0%,#334155_48%,#243244_100%)] px-5 py-4 md:px-6 md:py-5">
+          <div
+            className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(148,163,184,0.26),transparent_42%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.14),transparent_36%)]"
+            aria-hidden
+          />
+          <div className="relative flex items-start justify-between gap-4">
+            <div className="flex min-w-0 items-start gap-4">
+              {advisorAvatarSrc ? (
+                <Image
+                  src={advisorAvatarSrc}
+                  alt={advisorName}
+                  width={56}
+                  height={56}
+                  className="h-14 w-14 rounded-2xl border border-white/20 object-cover shadow-[0_12px_24px_rgba(15,23,42,0.24)]"
+                />
+              ) : (
+                <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/20 bg-white/12 text-[13px] font-semibold text-white shadow-[0_12px_24px_rgba(15,23,42,0.2)]">
+                  {advisorName.slice(0, 2).toUpperCase()}
+                </span>
+              )}
+              <div className="min-w-0 pt-0.5">
+                <p className="truncate text-[18px] font-semibold tracking-[-0.01em] text-white">{advisorName}</p>
+                {advisorRole ? (
+                  <p className="mt-1 text-[13px] font-medium text-slate-200/95">{advisorRole}</p>
+                ) : null}
+                {advisorDescription ? (
+                  <p className="mt-2 max-w-2xl text-[13px] leading-6 text-slate-200/85">{advisorDescription}</p>
+                ) : null}
+              </div>
             </div>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleCloseAdvisorModal}
+              className="shrink-0 border-white/18 bg-white/12 px-3.5 py-2 text-sm font-medium text-white backdrop-blur-sm hover:bg-white/18"
+            >
+              Cerrar
+            </Button>
           </div>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={handleCloseAdvisorModal}
-            className="border-[#CBD5E1] bg-white px-3 py-1.5 text-sm text-[#334155]"
-          >
-            Cerrar
-          </Button>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto bg-[#fafafa] px-4 py-4">
-          {messages.length === 0 ? (
-            <div className="rounded-xl border border-[#e5e7eb] bg-white px-3 py-3 text-[14px] text-[#475569]">
-              {resolvedHelperCopy}
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {messages.map((message) => {
-                const isUser = message.role === "user";
-                return (
-                  <div
-                    key={message.id}
-                    className={`max-w-[88%] whitespace-pre-wrap break-words rounded-2xl border px-3 py-2 text-sm leading-6 ${
-                      isUser
-                        ? "ml-auto border-[#bcd4ff] bg-[#eaf3ff] text-[#1e3a8a]"
-                        : "mr-auto border-[#e2e8f0] bg-white text-[#0f172a]"
-                    }`}
-                  >
-                    <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[#64748b]">
-                      {isUser ? "Tu" : advisorName}
-                    </p>
-                    <p>{message.text}</p>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+        <div className="min-h-0 flex-1 bg-[linear-gradient(180deg,#f3f6fa_0%,#eef3f8_100%)] px-4 py-4 md:px-6 md:py-5">
+          <div className="h-full overflow-y-auto pr-1">
+            {messages.length === 0 ? (
+              <div className="rounded-2xl border border-white/80 bg-white/90 px-4 py-4 text-[14px] leading-7 text-[#475569] shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
+                {resolvedHelperCopy}
+              </div>
+            ) : (
+              <div className="space-y-4 pb-1">
+                {messages.map((message) => {
+                  const isUser = message.role === "user";
+                  return (
+                    <div key={message.id} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+                      <div
+                        className={`max-w-[90%] whitespace-pre-wrap break-words rounded-[24px] border px-4 py-3 text-[14px] leading-7 shadow-[0_12px_24px_rgba(15,23,42,0.05)] ${
+                          isUser
+                            ? "border-[#b7e4c7] bg-[#ecfdf3] text-[#166534]"
+                            : "border-[#c9d9ff] bg-[#ebf2ff] text-[#1e40af]"
+                        }`}
+                      >
+                        <p
+                          className={`mb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] ${
+                            isUser ? "text-[#15803d]" : "text-[#3156b7]"
+                          }`}
+                        >
+                          {isUser ? "Tu" : advisorName}
+                        </p>
+                        <p>{message.text}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
-        <footer className="space-y-3 border-t border-[#E2E8F0] bg-white px-4 py-3">
-          <p className="text-[13px] text-[#666]">{resolvedHelperCopy}</p>
+        <footer className="space-y-4 border-t border-[#dbe4ee] bg-white/95 px-4 py-4 md:px-6 md:py-5">
+          <p className="text-[13px] leading-6 text-[#526173]">{resolvedHelperCopy}</p>
 
-          <div id="advisor-chat-draft-wrap" className="rounded-xl transition-all duration-200">
+          <div
+            id="advisor-chat-draft-wrap"
+            className="rounded-2xl border border-[#dbe4ee] bg-white p-1 shadow-[0_8px_24px_rgba(15,23,42,0.05)] transition-all duration-200"
+          >
             <Textarea
               id="advisor-chat-draft"
               value={draft}
               onChange={(event) => onDraftChange(event.target.value)}
-              rows={3}
+              rows={4}
               spellCheck={false}
               placeholder={inputPlaceholder}
-              className="border-[#E2E8F0] bg-white text-[#0F172A]"
+              className="border-0 bg-transparent px-3 py-3 text-[#0F172A] placeholder:text-[#7c8b9d] focus:ring-0"
             />
           </div>
 
-          <div className="rounded-xl border border-[#e5e5e5] bg-[#fafafa] p-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <VoiceMicButton
-                listening={voice.listening}
-                disabled={voice.microphoneStatus === "requesting"}
-                onClick={openVoiceModal}
-                idleLabel="Hablar con el advisor"
-                listeningLabel="Escuchando..."
-              />
+          <div className="rounded-2xl border border-[#dbe4ee] bg-[#f6f9fc] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                {microphoneStatusMessage ? (
+                  <p className="text-[12px] leading-5 text-[#526173]">{microphoneStatusMessage}</p>
+                ) : null}
+                {voice.error ? (
+                  <p className="text-[12px] leading-5 text-[#92400e]">
+                    {getSpeechToTextErrorMessage(voice.error)}
+                  </p>
+                ) : null}
+                {!microphoneStatusMessage && voice.speechSupported ? (
+                  <p className="text-[12px] leading-5 text-[#526173]">
+                    Habla con naturalidad. El texto se inserta en el campo y puedes editarlo antes de enviar.
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <VoiceMicButton
+                  listening={voice.listening}
+                  disabled={voice.microphoneStatus === "requesting"}
+                  onClick={openVoiceModal}
+                  idleLabel="Hablar con el advisor"
+                  listeningLabel="Escuchando..."
+                />
+                {isDevelopment ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void voice.requestMicrophonePermission();
+                    }}
+                    disabled={voice.microphoneStatus === "requesting"}
+                    className="inline-flex h-9 items-center rounded-full border border-[#cad5e2] bg-white px-3.5 text-[12px] font-medium text-[#334155] shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition hover:bg-[#f8fafc] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Probar microfono
+                  </button>
+                ) : null}
+              </div>
+
               {voice.transcript.trim() ? (
-                <span className="inline-flex h-8 items-center rounded-full border border-[#bbf7d0] bg-[#f0fdf4] px-3 text-[12px] text-[#166534]">
+                <span className="inline-flex h-8 items-center rounded-full border border-[#b7e4c7] bg-[#ecfdf3] px-3 text-[12px] font-medium text-[#166534]">
                   Transcript listo para revisar
                 </span>
               ) : null}
             </div>
-
-            {microphoneStatusMessage ? <p className="mt-2 text-[12px] text-[#666]">{microphoneStatusMessage}</p> : null}
-            {voice.error ? <p className="mt-2 text-[12px] text-[#92400e]">{getSpeechToTextErrorMessage(voice.error)}</p> : null}
-            {!microphoneStatusMessage && voice.speechSupported ? (
-              <p className="mt-2 text-[12px] text-[#666]">
-                Habla con naturalidad. El texto se inserta en el campo y puedes editarlo antes de enviar.
-              </p>
-            ) : null}
-
-            {isDevelopment ? (
-              <button
-                type="button"
-                onClick={() => {
-                  void voice.requestMicrophonePermission();
-                }}
-                disabled={voice.microphoneStatus === "requesting"}
-                className="mt-2 inline-flex h-8 items-center rounded-full border border-[#d7d7d7] bg-white px-3 text-[12px] text-[#334155] hover:bg-[#fafafa] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Probar microfono
-              </button>
-            ) : null}
           </div>
 
           {isDevelopment && debugPayload ? (
@@ -363,12 +391,12 @@ export function AdvisorChatModal({
             </details>
           ) : null}
 
-          <div className="flex flex-wrap justify-between gap-2">
+          <div className="flex flex-wrap justify-between gap-2 pt-1">
             <Button
               type="button"
               variant="secondary"
               onClick={onUseResponse}
-              className="border-[#CBD5E1] bg-white text-[#334155]"
+              className="border-[#CBD5E1] bg-white px-4 py-2.5 font-medium text-[#334155]"
             >
               Usar esta respuesta
             </Button>
@@ -377,7 +405,7 @@ export function AdvisorChatModal({
               variant="primary"
               disabled={sending || !draft.trim()}
               onClick={onSend}
-              className="bg-[#1D4ED8] hover:bg-[#1E40AF]"
+              className="bg-[#1D4ED8] px-4 py-2.5 font-medium shadow-[0_8px_20px_rgba(29,78,216,0.24)] hover:bg-[#1E40AF]"
             >
               {sending
                 ? "Enviando..."
