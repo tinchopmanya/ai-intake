@@ -202,7 +202,7 @@ function heuristicSegmentConversation(
     const marker = cleaned.match(
       /^(yo|me|mi|tu|vos|ex|expareja|ex pareja|ella|el)\s*[:\-]\s*(.+)$/i,
     );
-    let speaker = currentSpeaker;
+    let speaker: ConversationBlock["speaker"] = currentSpeaker;
     let content = cleaned;
 
     if (marker) {
@@ -619,13 +619,14 @@ export function WizardScaffold() {
         source === "ocr" ? "ocr" : "manual",
       );
       const interpreted = await postOcrInterpret({ text: normalized, source });
+      const normalizedSource: ConversationBlock["source"] = source === "ocr" ? "ocr" : "manual";
       const apiBlocks: ConversationBlock[] = interpreted.blocks
         .map((block) => ({
           id: block.id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           speaker: block.speaker,
           content: block.content.trim(),
           confidence: typeof block.confidence === "number" ? block.confidence : undefined,
-          source: source === "ocr" ? "ocr" : "manual",
+          source: normalizedSource,
         }))
         .filter((block) => block.content.length > 0);
       const legacyBlocks: ConversationBlock[] = !apiBlocks.length
@@ -1053,6 +1054,39 @@ export function WizardScaffold() {
       setAdvisorError(toUiErrorMessage(exc, "No se pudo refinar la respuesta de este adviser."));
     } finally {
       setAdvisorChatSending(false);
+    }
+  }
+
+  function handleVoiceRefinementSessionSync(payload: {
+    turns: Array<{ role: "user" | "advisor"; text: string }>;
+    lastSuggestedReply: string | null;
+    debug?: Record<string, unknown> | null;
+  }) {
+    if (advisorChatIndex === null || payload.turns.length === 0) return;
+    const newTurns = payload.turns.map((turn, index) => ({
+      id: `v-sync-${Date.now()}-${index}`,
+      role: turn.role,
+      text: turn.text,
+    }));
+    setAdvisorChatMessages((previous) => [...previous, ...newTurns]);
+    if (payload.lastSuggestedReply?.trim()) {
+      setAdvisorResult((previous) => {
+        if (!previous) return previous;
+        const nextResponses = [...previous.responses];
+        if (!nextResponses[advisorChatIndex]) return previous;
+        nextResponses[advisorChatIndex] = {
+          ...nextResponses[advisorChatIndex],
+          text: payload.lastSuggestedReply!.trim(),
+        };
+        return { ...previous, responses: nextResponses };
+      });
+    }
+    if (process.env.NODE_ENV !== "production") {
+      setAdvisorChatDebugPayload((previous) => ({
+        ...(previous ?? {}),
+        voice_response: payload,
+        endpoint: "/v1/advisor/voice",
+      }));
     }
   }
 
@@ -1740,6 +1774,7 @@ export function WizardScaffold() {
 
       <AdvisorChatModal
         isOpen={advisorChatOpen}
+        advisorId={advisorChatIndex !== null ? getAdvisorVisualByIndex(advisorChatIndex).id : undefined}
         advisorName={advisorChatIndex !== null ? getAdvisorVisualByIndex(advisorChatIndex).name : "Adviser"}
         advisorRole={advisorChatIndex !== null ? getAdvisorVisualByIndex(advisorChatIndex).role : ""}
         advisorDescription={
@@ -1750,6 +1785,7 @@ export function WizardScaffold() {
             ? getAdvisorAvatar(getAdvisorVisualByIndex(advisorChatIndex), "128")
             : null
         }
+        caseId={selectedCaseId}
         messages={advisorChatMessages}
         draft={advisorChatInput}
         sending={advisorChatSending}
@@ -1758,6 +1794,7 @@ export function WizardScaffold() {
         debugPayload={advisorChatDebugPayload}
         onDraftChange={setAdvisorChatInput}
         onSend={() => void handleSendAdvisorRefinement()}
+        onVoiceSessionSync={handleVoiceRefinementSessionSync}
         onUseResponse={() => setAdvisorChatOpen(false)}
         onClose={() => setAdvisorChatOpen(false)}
       />
@@ -1765,4 +1802,5 @@ export function WizardScaffold() {
     </Panel>
   );
 }
+
 

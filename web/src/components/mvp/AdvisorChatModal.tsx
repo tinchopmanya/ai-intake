@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import Image from "next/image";
 
 import {
@@ -19,6 +19,8 @@ export type AdvisorChatMessage = {
 };
 
 export type AdvisorChatEntryMode = "advisor_conversation" | "advisor_refine_response";
+
+type VoiceSessionTurn = { role: "user" | "advisor"; text: string };
 
 type AdvisorChatModalProps = {
   isOpen: boolean;
@@ -44,6 +46,11 @@ type AdvisorChatModalProps = {
     userText: string;
     advisorText: string;
     suggestedReply: string | null;
+    debug?: Record<string, unknown> | null;
+  }) => void;
+  onVoiceSessionSync?: (payload: {
+    turns: VoiceSessionTurn[];
+    lastSuggestedReply: string | null;
     debug?: Record<string, unknown> | null;
   }) => void;
 };
@@ -92,12 +99,17 @@ export function AdvisorChatModal({
   onUseResponse,
   onClose,
   onVoiceExchangeComplete,
+  onVoiceSessionSync,
 }: AdvisorChatModalProps) {
   const isDevelopment = process.env.NODE_ENV !== "production";
   const [voiceModalOpen, setVoiceModalOpen] = useState(false);
   const [voiceTranscriptOpen, setVoiceTranscriptOpen] = useState(false);
   const [voiceSendError, setVoiceSendError] = useState<string | null>(null);
+  const [voiceSessionTurns, setVoiceSessionTurns] = useState<VoiceSessionTurn[]>([]);
+  const [voiceSessionLastSuggestedReply, setVoiceSessionLastSuggestedReply] = useState<string | null>(null);
+  const [voiceSessionLastDebug, setVoiceSessionLastDebug] = useState<Record<string, unknown> | null>(null);
   const voiceAutoStartGuardRef = useRef(false);
+  const voiceSendAfterStopRef = useRef(false);
 
   const headerAvatarSrc = useMemo(() => resolveAvatarVariant(advisorAvatarSrc, "128"), [advisorAvatarSrc]);
   const voiceHeroAvatarSrc = useMemo(() => resolveAvatarVariant(advisorAvatarSrc, "256"), [advisorAvatarSrc]);
@@ -113,14 +125,16 @@ export function AdvisorChatModal({
   const recorder = useVoiceRecorder({
     lang: preferredVoiceLang,
     countdownSeconds: 3,
-    autoStopMs: 18000,
   });
+  const recorderStatusRef = useRef(recorder.status);
+  const recorderAudioBlobRef = useRef(recorder.audioBlob);
+
   const startVoiceFlowRef = useRef(recorder.startFlow);
   useEffect(() => {
     startVoiceFlowRef.current = recorder.startFlow;
   }, [recorder.startFlow]);
 
-  const voiceUserText = recorder.transcript || "Mensaje de voz";
+  const voiceUserText = recorder.transcript.trim() || "Mensaje de voz";
 
   const statusText = useMemo(() => {
     if (recorder.status === "countdown") {
@@ -143,17 +157,62 @@ export function AdvisorChatModal({
     return "Preparando...";
   }, [recorder.audioBlob, recorder.status]);
 
-  function closeVoiceModal() {
-    voiceAutoStartGuardRef.current = false;
-    recorder.resetRecording();
-    setVoiceTranscriptOpen(false);
-    setVoiceSendError(null);
-    setVoiceModalOpen(false);
-  }
+  const commitVoiceSession = useCallback(() => {
+    if (voiceSessionTurns.length === 0) return;
+    if (onVoiceSessionSync) {
+      onVoiceSessionSync({
+        turns: voiceSessionTurns,
+        lastSuggestedReply: voiceSessionLastSuggestedReply,
+        debug: voiceSessionLastDebug,
+      });
+      return;
+    }
+    if (onVoiceExchangeComplete) {
+      for (let index = 0; index < voiceSessionTurns.length - 1; index += 2) {
+        const userTurn = voiceSessionTurns[index];
+        const advisorTurn = voiceSessionTurns[index + 1];
+        if (!userTurn || !advisorTurn || userTurn.role !== "user" || advisorTurn.role !== "advisor") continue;
+        onVoiceExchangeComplete({
+          userText: userTurn.text,
+          advisorText: advisorTurn.text,
+          suggestedReply: null,
+          debug: null,
+        });
+      }
+    }
+  }, [
+    onVoiceExchangeComplete,
+    onVoiceSessionSync,
+    voiceSessionLastDebug,
+    voiceSessionLastSuggestedReply,
+    voiceSessionTurns,
+  ]);
+
+  const closeVoiceModal = useCallback(
+    ({ commitSession = true }: { commitSession?: boolean } = {}) => {
+      if (commitSession) {
+        commitVoiceSession();
+      }
+      voiceAutoStartGuardRef.current = false;
+      recorder.resetRecording();
+      setVoiceTranscriptOpen(false);
+      setVoiceSendError(null);
+      voiceSendAfterStopRef.current = false;
+      setVoiceSessionTurns([]);
+      setVoiceSessionLastSuggestedReply(null);
+      setVoiceSessionLastDebug(null);
+      setVoiceModalOpen(false);
+    },
+    [commitVoiceSession, recorder],
+  );
 
   function openVoiceModal() {
     setVoiceTranscriptOpen(false);
     setVoiceSendError(null);
+    voiceSendAfterStopRef.current = false;
+    setVoiceSessionTurns([]);
+    setVoiceSessionLastSuggestedReply(null);
+    setVoiceSessionLastDebug(null);
     setVoiceModalOpen(true);
   }
 
@@ -167,20 +226,16 @@ export function AdvisorChatModal({
     startVoiceFlowRef.current();
   }, [voiceModalOpen]);
 
-  async function handleSendVoice() {
+  const handleSendVoice = useCallback(async () => {
     if (!advisorId || !recorder.audioBlob || recorder.status === "sending") return;
     setVoiceSendError(null);
     recorder.setStatus("sending");
-
     try {
-      const baseMessages = messages.map((item) => ({
-        role: item.role,
-        content: item.text,
-      }));
-      const userVoiceMessage = {
-        role: "user" as const,
-        content: voiceUserText,
-      };
+      const baseMessages = [
+        ...messages.map((item) => ({ role: item.role, content: item.text })),
+        ...voiceSessionTurns.map((item) => ({ role: item.role, content: item.text })),
+      ];
+      const userVoiceMessage = { role: "user" as const, content: voiceUserText };
       const payloadMessages =
         baseMessages.length > 0 &&
         baseMessages[baseMessages.length - 1]?.role === "user" &&
@@ -202,35 +257,91 @@ export function AdvisorChatModal({
           extra: {
             voice_flow: true,
             transcript_supported: recorder.speechSupported,
+            voice_session_turns: voiceSessionTurns.length,
           },
         },
         debug: isDevelopment,
       });
 
       const advisorText = result.message.trim() || "No pude responder ahora. Intenta nuevamente.";
-      if (onVoiceExchangeComplete) {
+      setVoiceSessionTurns((current) => [
+        ...current,
+        { role: "user", text: voiceUserText },
+        { role: "advisor", text: advisorText },
+      ]);
+      setVoiceSessionLastSuggestedReply(result.suggested_reply);
+      setVoiceSessionLastDebug(result.debug ?? null);
+      recorder.resetRecording();
+      recorder.setStatus("idle");
+
+      if (!onVoiceSessionSync && onVoiceExchangeComplete) {
         onVoiceExchangeComplete({
           userText: voiceUserText,
           advisorText,
           suggestedReply: result.suggested_reply,
           debug: result.debug ?? null,
         });
-      } else {
+      }
+      if (!onVoiceSessionSync && !onVoiceExchangeComplete) {
         onDraftChange(voiceUserText);
         if (autoSendOnVoiceComplete) {
           window.setTimeout(() => onSend(), 0);
         }
       }
-      closeVoiceModal();
     } catch {
       recorder.setStatus("error");
       setVoiceSendError("No pudimos enviar la grabacion. Intenta de nuevo.");
     }
+  }, [
+    advisorId,
+    autoSendOnVoiceComplete,
+    caseId,
+    entryMode,
+    isDevelopment,
+    messages,
+    onDraftChange,
+    onSend,
+    onVoiceExchangeComplete,
+    onVoiceSessionSync,
+    recorder,
+    userName,
+    voiceSessionTurns,
+    voiceUserText,
+  ]);
+  const handleSendVoiceRef = useRef(handleSendVoice);
+  useEffect(() => {
+    handleSendVoiceRef.current = handleSendVoice;
+  }, [handleSendVoice]);
+  useEffect(() => {
+    recorderStatusRef.current = recorder.status;
+    recorderAudioBlobRef.current = recorder.audioBlob;
+  }, [recorder.audioBlob, recorder.status]);
+
+  function handleFinishRecording() {
+    if (recorder.status !== "recording") return;
+    voiceSendAfterStopRef.current = true;
+    recorder.stopRecording();
+    const waitForBlobAndSend = () => {
+      if (!voiceSendAfterStopRef.current || !voiceModalOpen) return;
+      if (recorderStatusRef.current === "stopped" && recorderAudioBlobRef.current) {
+        voiceSendAfterStopRef.current = false;
+        void handleSendVoiceRef.current();
+        return;
+      }
+      window.setTimeout(waitForBlobAndSend, 120);
+    };
+    window.setTimeout(waitForBlobAndSend, 120);
+  }
+
+  function handleCloseAdvisorModal() {
+    if (voiceModalOpen) {
+      closeVoiceModal();
+    }
+    onClose();
   }
 
   const inputPlaceholder =
     entryMode === "advisor_conversation" ? "Escribi tu mensaje..." : "Escribi como queres ajustarlo...";
-
   const helperFallback =
     entryMode === "advisor_conversation"
       ? `Como estas hoy${userName ? `, ${userName}` : ""}? En que te puedo ayudar?`
@@ -253,13 +364,7 @@ export function AdvisorChatModal({
       <div className={`relative flex h-[min(92vh,760px)] w-full max-w-[560px] flex-col overflow-hidden ${advisorPanelShellClass}`}>
         <header className="flex items-center gap-3 bg-[#1e2a3a] px-5 py-4">
           {headerAvatarSrc ? (
-            <Image
-              src={headerAvatarSrc}
-              alt={advisorName}
-              width={48}
-              height={48}
-              className="h-12 w-12 rounded-full border-2 border-white/20 object-cover"
-            />
+            <Image src={headerAvatarSrc} alt={advisorName} width={48} height={48} className="h-12 w-12 rounded-full border-2 border-white/20 object-cover" />
           ) : (
             <span className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-white/20 bg-[#4a9eff] text-[18px] font-bold text-white">
               {(getInitials(advisorName) || "A").slice(0, 1)}
@@ -270,12 +375,7 @@ export function AdvisorChatModal({
             {advisorRole ? <p className="mt-0.5 text-[12px] text-white/55">{advisorRole}</p> : null}
             {advisorDescription ? <p className="mt-1 line-clamp-2 text-[11px] text-white/70">{advisorDescription}</p> : null}
           </div>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={onClose}
-            className="shrink-0 rounded-[10px] border-0 bg-white/10 px-4 py-[7px] text-[13px] text-white hover:bg-white/20"
-          >
+          <Button type="button" variant="secondary" onClick={handleCloseAdvisorModal} className="shrink-0 rounded-[10px] border-0 bg-white/10 px-4 py-[7px] text-[13px] text-white hover:bg-white/20">
             Cerrar
           </Button>
         </header>
@@ -285,9 +385,7 @@ export function AdvisorChatModal({
             {messages.length === 0 ? (
               <div className="max-w-[80%]">
                 <p className="mb-1 text-[10px] font-bold tracking-[0.08em] text-[#2d6be4]">{advisorName.toUpperCase()}</p>
-                <div className="rounded-[4px_16px_16px_16px] border border-[#e8ecf2] bg-white px-4 py-3 text-[14px] leading-[1.55] text-[#2c3e50]">
-                  {resolvedHelperCopy}
-                </div>
+                <div className="rounded-[4px_16px_16px_16px] border border-[#e8ecf2] bg-white px-4 py-3 text-[14px] leading-[1.55] text-[#2c3e50]">{resolvedHelperCopy}</div>
               </div>
             ) : (
               <div className="flex flex-col gap-3">
@@ -296,20 +394,10 @@ export function AdvisorChatModal({
                   return (
                     <div key={message.id} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
                       <div className={isUser ? "max-w-[70%]" : "max-w-[80%]"}>
-                        <p
-                          className={`mb-1 text-[10px] font-bold tracking-[0.08em] ${
-                            isUser ? "text-right text-[#2d8a50]" : "text-[#2d6be4]"
-                          }`}
-                        >
+                        <p className={`mb-1 text-[10px] font-bold tracking-[0.08em] ${isUser ? "text-right text-[#2d8a50]" : "text-[#2d6be4]"}`}>
                           {isUser ? "TU" : advisorName.toUpperCase()}
                         </p>
-                        <div
-                          className={`whitespace-pre-wrap break-words px-[14px] py-[10px] text-[14px] leading-[1.55] ${
-                            isUser
-                              ? "rounded-[16px_16px_4px_16px] bg-[#d4edda] text-[#1a4a2a]"
-                              : "rounded-[4px_16px_16px_16px] border border-[#e8ecf2] bg-white text-[#2c3e50]"
-                          }`}
-                        >
+                        <div className={`whitespace-pre-wrap break-words px-[14px] py-[10px] text-[14px] leading-[1.55] ${isUser ? "rounded-[16px_16px_4px_16px] bg-[#d4edda] text-[#1a4a2a]" : "rounded-[4px_16px_16px_16px] border border-[#e8ecf2] bg-white text-[#2c3e50]"}`}>
                           {message.text}
                         </div>
                       </div>
@@ -322,63 +410,27 @@ export function AdvisorChatModal({
 
           <footer className="border-t border-[#e8ecf2] bg-white px-4 py-3">
             <div className="mb-2 flex items-end gap-2">
-              <Textarea
-                id="advisor-chat-draft"
-                value={draft}
-                onChange={(event) => onDraftChange(event.target.value)}
-                rows={1}
-                spellCheck={false}
-                placeholder={inputPlaceholder}
-                onKeyDown={handleKeyDown}
-                className="min-h-[42px] max-h-[120px] flex-1 rounded-xl border-[1.5px] border-[#dde3ef] px-[14px] py-[10px] text-[14px] text-[#2c3e50] placeholder:text-[#aab3c5] focus:border-[#4a9eff] focus:ring-0"
-              />
-              <button
-                type="button"
-                onClick={openVoiceModal}
-                className="inline-flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full border-[1.5px] border-[#dde3ef] bg-[#f4f6fa] text-[#6b7a99] transition-all hover:border-[#4a9eff] hover:bg-[#e8ecf2]"
-                aria-label="Hablar con el advisor"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-[18px] w-[18px]"
-                >
+              <Textarea id="advisor-chat-draft" value={draft} onChange={(event) => onDraftChange(event.target.value)} rows={1} spellCheck={false} placeholder={inputPlaceholder} onKeyDown={handleKeyDown} className="min-h-[42px] max-h-[120px] flex-1 rounded-xl border-[1.5px] border-[#dde3ef] px-[14px] py-[10px] text-[14px] text-[#2c3e50] placeholder:text-[#aab3c5] focus:border-[#4a9eff] focus:ring-0" />
+              <button type="button" onClick={openVoiceModal} className="inline-flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full border-[1.5px] border-[#dde3ef] bg-[#f4f6fa] text-[#6b7a99] transition-all hover:border-[#4a9eff] hover:bg-[#e8ecf2]" aria-label="Hablar con el advisor">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]">
                   <rect x="9" y="2" width="6" height="12" rx="3" />
                   <path d="M5 10a7 7 0 0 0 14 0" />
                   <path d="M12 19v3" />
                   <path d="M8 22h8" />
                 </svg>
               </button>
-              <Button
-                type="button"
-                variant="primary"
-                disabled={sending || !draft.trim()}
-                onClick={onSend}
-                className="h-[42px] rounded-xl border-0 bg-[#2d6be4] px-[18px] text-[14px] font-semibold text-white hover:bg-[#1d5bcd]"
-              >
+              <Button type="button" variant="primary" disabled={sending || !draft.trim()} onClick={onSend} className="h-[42px] rounded-xl border-0 bg-[#2d6be4] px-[18px] text-[14px] font-semibold text-white hover:bg-[#1d5bcd]">
                 {sending ? "Enviando..." : "Enviar"}
               </Button>
             </div>
-
             <div className="flex items-center justify-between gap-2">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={onUseResponse}
-                className="rounded-[10px] border-[1.5px] border-[#dde3ef] bg-transparent px-[14px] py-[7px] text-[13px] text-[#6b7a99] hover:border-[#4a9eff] hover:text-[#2d6be4]"
-              >
+              <Button type="button" variant="secondary" onClick={onUseResponse} className="rounded-[10px] border-[1.5px] border-[#dde3ef] bg-transparent px-[14px] py-[7px] text-[13px] text-[#6b7a99] hover:border-[#4a9eff] hover:text-[#2d6be4]">
                 Usar esta respuesta
               </Button>
               {isDevelopment && debugPayload ? (
                 <details className="text-right">
                   <summary className="cursor-pointer text-[11px] text-[#aab3c5]">Debug prompt (solo desarrollo)</summary>
-                  <pre className="mt-2 max-h-40 overflow-auto rounded-lg border border-[#e8ecf2] bg-[#f8fafc] p-2 text-left text-[11px] text-[#334155]">
-                    {JSON.stringify(debugPayload, null, 2)}
-                  </pre>
+                  <pre className="mt-2 max-h-40 overflow-auto rounded-lg border border-[#e8ecf2] bg-[#f8fafc] p-2 text-left text-[11px] text-[#334155]">{JSON.stringify(debugPayload, null, 2)}</pre>
                 </details>
               ) : null}
             </div>
@@ -390,14 +442,7 @@ export function AdvisorChatModal({
             <div className={`w-full max-w-[560px] overflow-hidden ${advisorPanelShellClass}`}>
               <header className={`${advisorVoiceHeaderClass} flex items-center gap-3 px-5 py-3.5`}>
                 {headerAvatarSrc ? (
-                  <Image
-                    src={headerAvatarSrc}
-                    alt={advisorName}
-                    width={48}
-                    height={48}
-                    priority={voiceModalOpen}
-                    className="h-12 w-12 rounded-full border-2 border-white/18 object-cover"
-                  />
+                  <Image src={headerAvatarSrc} alt={advisorName} width={48} height={48} priority={voiceModalOpen} className="h-12 w-12 rounded-full border-2 border-white/18 object-cover" />
                 ) : (
                   <span className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-white/18 bg-[#4a9eff] text-[18px] font-bold text-white">
                     {(getInitials(advisorName) || "A").slice(0, 1)}
@@ -411,12 +456,7 @@ export function AdvisorChatModal({
                     {headerStatusText}
                   </p>
                 </div>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={closeVoiceModal}
-                  className="rounded-[10px] border-0 bg-white/10 px-4 py-[7px] text-[13px] text-white hover:bg-white/20"
-                >
+                <Button type="button" variant="secondary" onClick={() => closeVoiceModal()} className="rounded-[10px] border-0 bg-white/10 px-4 py-[7px] text-[13px] text-white hover:bg-white/20">
                   Cerrar
                 </Button>
               </header>
@@ -427,108 +467,68 @@ export function AdvisorChatModal({
                   <span className={`voice-pulse-ring voice-pulse-ring-2 ${recorder.status === "recording" ? "is-listening" : ""}`} aria-hidden />
                   <span className={`voice-pulse-ring voice-pulse-ring-3 ${recorder.status === "recording" ? "is-listening" : ""}`} aria-hidden />
                   {voiceHeroAvatarSrc ? (
-                    <Image
-                      src={voiceHeroAvatarSrc}
-                      alt={advisorName}
-                      width={168}
-                      height={168}
-                      priority={voiceModalOpen}
-                      className="relative z-[2] h-[168px] w-[168px] rounded-full border-[3px] border-white/12 object-cover"
-                    />
+                    <Image src={voiceHeroAvatarSrc} alt={advisorName} width={168} height={168} priority={voiceModalOpen} className="relative z-[2] h-[168px] w-[168px] rounded-full border-[3px] border-white/12 object-cover" />
                   ) : (
                     <span className="relative z-[2] flex h-[168px] w-[168px] items-center justify-center rounded-full border-[3px] border-white/15 bg-[#4a9eff] text-[52px] font-bold text-white">
                       {(getInitials(advisorName) || "A").slice(0, 1)}
                     </span>
                   )}
                   {recorder.status === "countdown" ? (
-                    <span className="absolute bottom-2 right-2 z-[4] flex h-11 w-11 items-center justify-center rounded-full border-[3px] border-[#0d1520] bg-[#2d6be4] text-[22px] font-bold text-white">
-                      {recorder.countdown}
-                    </span>
+                    <span className="absolute bottom-2 right-2 z-[4] flex h-11 w-11 items-center justify-center rounded-full border-[3px] border-[#0d1520] bg-[#2d6be4] text-[22px] font-bold text-white">{recorder.countdown}</span>
                   ) : null}
                 </div>
 
-                <p
-                  className={`mb-5 text-center text-[15px] font-medium ${
-                    recorder.status === "recording"
-                      ? "text-[#ff6b6b]"
-                      : recorder.status === "sending"
-                        ? "text-[#4a9eff]"
-                        : recorder.status === "error"
-                          ? "text-[#fca5a5]"
-                          : "text-white/70"
-                  }`}
-                >
+                <p className={`mb-4 text-center text-[15px] font-medium ${recorder.status === "recording" ? "text-[#ff6b6b]" : recorder.status === "sending" ? "text-[#4a9eff]" : recorder.status === "error" ? "text-[#fca5a5]" : "text-white/70"}`}>
                   {statusText}
                 </p>
 
-                <div className="mb-5 flex h-9 items-center gap-[3px]">
+                <div className="mb-4 flex h-9 items-center gap-[3px]">
                   {Array.from({ length: 12 }).map((_, index) => (
-                    <span
-                      key={`voice-wave-${index}`}
-                      className={`voice-wave-bar ${recorder.status === "recording" ? "is-active" : "is-paused"}`}
-                      style={{ animationDelay: `${index * 0.1}s` }}
-                    />
+                    <span key={`voice-wave-${index}`} className={`voice-wave-bar ${recorder.status === "recording" ? "is-active" : "is-paused"}`} style={{ animationDelay: `${index * 0.1}s` }} />
                   ))}
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setVoiceTranscriptOpen((current) => !current)}
-                  className={`mb-1 flex items-center gap-2 bg-transparent text-[12px] text-white/35 transition-colors hover:text-white/60 ${
-                    voiceTranscriptOpen ? "is-open" : ""
-                  }`}
-                >
-                  <svg
-                    viewBox="0 0 12 12"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    className={`h-3 w-3 transition-transform ${voiceTranscriptOpen ? "rotate-90" : ""}`}
-                  >
+                <button type="button" onClick={() => setVoiceTranscriptOpen((current) => !current)} className="mb-1 flex items-center gap-2 bg-transparent text-[12px] text-white/35 transition-colors hover:text-white/60">
+                  <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" className={`h-3 w-3 transition-transform ${voiceTranscriptOpen ? "rotate-90" : ""}`}>
                     <path d="M4 2l4 4-4 4" />
                   </svg>
                   lo que se escucho
                 </button>
-
-                <div
-                  className={`w-full overflow-hidden rounded-[10px] bg-white/5 px-3.5 text-[12px] leading-6 text-white/55 transition-all duration-300 ${
-                    voiceTranscriptOpen ? "mb-3 max-h-[120px] py-2.5" : "mb-0 max-h-0 py-0"
-                  }`}
-                >
+                <div className={`w-full overflow-hidden rounded-[10px] bg-white/5 px-3.5 text-[12px] leading-6 text-white/55 transition-all duration-300 ${voiceTranscriptOpen ? "mb-3 max-h-[120px] py-2.5" : "mb-0 max-h-0 py-0"}`}>
                   {recorder.transcript || "Aun no hay texto transcripto."}
                 </div>
 
+                <div className="mb-3 max-h-[164px] w-full space-y-2 overflow-y-auto rounded-xl border border-white/10 bg-white/[0.03] p-2.5">
+                  {voiceSessionTurns.length === 0 ? (
+                    <p className="text-[12px] text-white/45">Aun no hay respuestas en esta sesion de voz.</p>
+                  ) : (
+                    voiceSessionTurns.map((turn, index) => (
+                      <div key={`voice-session-${index}-${turn.role}`} className={`rounded-xl px-3 py-2 text-[12px] leading-5 ${turn.role === "user" ? "ml-10 border border-[#1f4f37] bg-[#123126] text-[#d4f5df]" : "mr-10 border border-white/14 bg-[#111d2e] text-white/90"}`}>
+                        <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-white/60">{turn.role === "user" ? "Tu voz" : advisorName}</p>
+                        <p>{turn.text}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+
                 {recorder.errorMessage || voiceSendError ? (
-                  <p className="mb-2 w-full text-center text-[12px] text-[#fca5a5]">
-                    {voiceSendError ?? recorder.errorMessage}
-                  </p>
+                  <p className="mb-2 w-full text-center text-[12px] text-[#fca5a5]">{voiceSendError ?? recorder.errorMessage}</p>
                 ) : null}
 
                 <div className="mt-1 flex w-full flex-wrap gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void recorder.requestMicProbe().then((ok) => {
-                        if (ok) recorder.startFlow();
-                      });
-                    }}
-                    className="min-w-[110px] flex-1 rounded-xl border border-white/12 bg-white/[0.07] px-3 py-[11px] text-[13px] text-white/65 transition-all hover:bg-white/12 hover:text-white"
-                  >
+                  <button type="button" onClick={() => void recorder.requestMicProbe().then((ok) => { if (ok) { voiceSendAfterStopRef.current = false; recorder.startFlow(); } })} className="min-w-[110px] flex-1 rounded-xl border border-white/12 bg-white/[0.07] px-3 py-[11px] text-[13px] text-white/65 transition-all hover:bg-white/12 hover:text-white">
                     Probar mic
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => void handleSendVoice()}
-                    disabled={!recorder.canSend || recorder.status === "sending"}
-                    className="min-w-[180px] flex-[2] rounded-xl border-0 bg-[#2d6be4] px-5 py-[11px] text-[14px] font-semibold text-white transition-all hover:bg-[#1d5bcd] disabled:cursor-not-allowed disabled:opacity-40"
-                  >
+                  <button type="button" onClick={handleFinishRecording} disabled={recorder.status !== "recording"} className="min-w-[150px] flex-1 rounded-xl border border-[#fca5a5]/40 bg-[#3a1720] px-3 py-[11px] text-[13px] font-medium text-[#fecdd3] transition-all hover:bg-[#4a1c28] disabled:cursor-not-allowed disabled:opacity-45">
+                    Finalizar grabacion
+                  </button>
+                  <button type="button" onClick={() => void handleSendVoice()} disabled={!recorder.canSend || recorder.status === "sending" || recorder.status === "recording"} className="min-w-[180px] flex-[2] rounded-xl border-0 bg-[#2d6be4] px-5 py-[11px] text-[14px] font-semibold text-white transition-all hover:bg-[#1d5bcd] disabled:cursor-not-allowed disabled:opacity-40">
                     Enviar grabacion
                   </button>
-                  <button
-                    type="button"
-                    onClick={closeVoiceModal}
-                    className="min-w-[110px] flex-1 rounded-xl border border-white/8 bg-white/[0.04] px-3 py-[11px] text-[13px] text-white/35 transition-all hover:bg-white/8 hover:text-white/65"
-                  >
+                  <button type="button" onClick={() => { voiceSendAfterStopRef.current = false; recorder.startFlow(); }} disabled={recorder.status === "countdown" || recorder.status === "recording" || recorder.status === "sending"} className="min-w-[130px] flex-1 rounded-xl border border-white/12 bg-transparent px-3 py-[11px] text-[13px] text-white/70 transition-all hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-45">
+                    Hablar otra vez
+                  </button>
+                  <button type="button" onClick={() => closeVoiceModal()} className="min-w-[110px] flex-1 rounded-xl border border-white/8 bg-white/[0.04] px-3 py-[11px] text-[13px] text-white/35 transition-all hover:bg-white/8 hover:text-white/65">
                     Cancelar
                   </button>
                 </div>
@@ -547,6 +547,7 @@ export function AdvisorChatModal({
                           speechSupported: recorder.speechSupported,
                           microphoneStatus: recorder.microphoneStatus,
                           micSupported: recorder.micSupported,
+                          voiceTurns: voiceSessionTurns.length,
                         },
                         null,
                         2,

@@ -175,6 +175,32 @@ export function AppShell({ children }: AppShellProps) {
     }
   }
 
+  function handleVoiceAdvisorSessionSync(payload: {
+    turns: Array<{ role: "user" | "advisor"; text: string }>;
+    lastSuggestedReply: string | null;
+    debug?: Record<string, unknown> | null;
+  }) {
+    if (payload.turns.length === 0) return;
+    const newTurns = payload.turns.map((turn, index) => ({
+      id: `v-sync-${Date.now()}-${index}`,
+      role: turn.role,
+      text: turn.text,
+    }));
+    setAdvisorChatMessages((prev) => [...prev, ...newTurns]);
+    const latestAdvisorText =
+      [...payload.turns].reverse().find((turn) => turn.role === "advisor")?.text ?? "";
+    if (speechSynthesis.supported && latestAdvisorText.trim()) {
+      speechSynthesis.speak(latestAdvisorText);
+    }
+    if (process.env.NODE_ENV !== "production") {
+      setAdvisorChatDebugPayload((previous) => ({
+        ...(previous ?? {}),
+        voice_response: payload,
+        endpoint: "/v1/advisor/voice",
+      }));
+    }
+  }
+
   return (
     <main className="mx-auto flex h-screen w-full max-w-[980px] min-w-0 flex-col overflow-x-hidden bg-white px-4 pb-4 pt-3 sm:px-6">
       <header className="mx-auto flex w-full items-center justify-between border-b border-[#eee] py-3">
@@ -284,6 +310,7 @@ export function AppShell({ children }: AppShellProps) {
       <section className="mx-auto mt-3 flex min-h-0 w-full min-w-0 flex-1">{children}</section>
       <AdvisorChatModal
         isOpen={advisorChatOpen}
+        advisorId={advisorChatIndex !== null ? ADVISOR_PROFILES[advisorChatIndex]?.id : undefined}
         advisorName={advisorChatIndex !== null ? ADVISOR_PROFILES[advisorChatIndex]?.name ?? "Adviser" : "Adviser"}
         advisorRole={advisorChatIndex !== null ? ADVISOR_PROFILES[advisorChatIndex]?.role ?? "" : ""}
         advisorDescription={advisorChatIndex !== null ? ADVISOR_PROFILES[advisorChatIndex]?.description ?? "" : ""}
@@ -304,6 +331,7 @@ export function AppShell({ children }: AppShellProps) {
         helperCopy={`Como estas hoy, ${displayName}? En que te puedo ayudar?`}
         debugPayload={advisorChatDebugPayload}
         autoSendOnVoiceComplete
+        onVoiceSessionSync={handleVoiceAdvisorSessionSync}
       />
     </main>
   );

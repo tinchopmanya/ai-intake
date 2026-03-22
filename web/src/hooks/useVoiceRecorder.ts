@@ -15,7 +15,6 @@ export type VoiceRecorderStatus =
 type UseVoiceRecorderOptions = {
   lang?: string;
   countdownSeconds?: number;
-  autoStopMs?: number;
 };
 
 type MediaRecorderCtor = new (stream: MediaStream) => MediaRecorder;
@@ -28,7 +27,6 @@ function getMediaRecorderCtor(): MediaRecorderCtor | null {
 
 export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
   const countdownSeconds = options?.countdownSeconds ?? 3;
-  const autoStopMs = options?.autoStopMs ?? 18000;
   const [status, setStatus] = useState<VoiceRecorderStatus>("idle");
   const [countdown, setCountdown] = useState<number>(countdownSeconds);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -38,7 +36,6 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
   const countdownTimerRef = useRef<number | null>(null);
-  const autoStopTimerRef = useRef<number | null>(null);
   const statusRef = useRef<VoiceRecorderStatus>("idle");
 
   const speech = useSpeechToText({
@@ -74,15 +71,7 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
     }
   }, []);
 
-  const clearAutoStopTimer = useCallback(() => {
-    if (autoStopTimerRef.current !== null) {
-      window.clearTimeout(autoStopTimerRef.current);
-      autoStopTimerRef.current = null;
-    }
-  }, []);
-
   const cleanupMedia = useCallback(() => {
-    clearAutoStopTimer();
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       mediaRecorderRef.current.stop();
     }
@@ -94,10 +83,9 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
     if (speechListeningRef.current) {
       speechStopRef.current();
     }
-  }, [clearAutoStopTimer]);
+  }, []);
 
   const stopRecording = useCallback(() => {
-    clearAutoStopTimer();
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       mediaRecorderRef.current.stop();
     }
@@ -107,7 +95,7 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
     if (statusRef.current !== "sending") {
       setStatus("stopped");
     }
-  }, [clearAutoStopTimer]);
+  }, []);
 
   const startRecording = useCallback(async () => {
     const MediaRecorderClass = getMediaRecorderCtor();
@@ -143,15 +131,11 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
       setStatus("recording");
       speechResetRef.current();
       speechStartRef.current();
-      clearAutoStopTimer();
-      autoStopTimerRef.current = window.setTimeout(() => {
-        stopRecording();
-      }, autoStopMs);
     } catch {
       setStatus("error");
       setInternalErrorMessage("No pudimos acceder al microfono. Revisa los permisos del navegador.");
     }
-  }, [autoStopMs, clearAutoStopTimer, stopRecording]);
+  }, []);
 
   const startCountdown = useCallback(() => {
     clearCountdownTimer();
