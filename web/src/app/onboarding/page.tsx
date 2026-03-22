@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { OnboardingOptionCard } from "@/components/onboarding/OnboardingOptionCard";
@@ -117,7 +117,7 @@ function getTotalSteps(mode: RelationshipMode | null): number {
   return 5;
 }
 
-export default function OnboardingPage() {
+function OnboardingPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editMode = searchParams.get("edit") === "1";
@@ -514,5 +514,13 @@ export default function OnboardingPage() {
         </>
       ) : null}
     </OnboardingWizardShell>
+  );
+}
+
+export default function OnboardingPage() {
+  return (
+    <Suspense fallback={null}>
+      <OnboardingPageContent />
+    </Suspense>
   );
 }
