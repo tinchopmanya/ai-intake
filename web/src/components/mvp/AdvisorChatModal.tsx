@@ -3,6 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 
+import {
+  advisorDarkHeaderClass,
+  advisorDarkHeaderGlowClass,
+  advisorMutedSurfaceClass,
+  advisorPanelShellClass,
+} from "@/components/mvp/advisorUiStyles";
 import { Button, Textarea } from "@/components/mvp/ui";
 import { VoiceMicButton } from "@/components/mvp/VoiceControls";
 import {
@@ -92,6 +98,11 @@ export function AdvisorChatModal({
     entryMode === "advisor_conversation"
       ? "Escribe o habla para que te ayude."
       : "Que quieres cambiar de mi sugerencia?";
+  const voiceSupportCopy =
+    microphoneStatusMessage ??
+    (voice.speechSupported
+      ? "Puedes usar dictado por voz en este navegador."
+      : "La entrada por voz no esta disponible en este navegador.");
   const [voiceModalOpen, setVoiceModalOpen] = useState(false);
 
   function pushVoiceUiDebugEvent(event: string, details?: Record<string, unknown>) {
@@ -236,34 +247,31 @@ export function AdvisorChatModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-[2px]">
-      <div className="relative flex h-[min(92vh,860px)] w-full max-w-3xl flex-col overflow-hidden rounded-[28px] border border-[#dbe4ee] bg-[#f8fafc] shadow-[0_32px_90px_rgba(15,23,42,0.28)]">
-        <header className="relative overflow-hidden border-b border-white/10 bg-[linear-gradient(135deg,#44556b_0%,#334155_48%,#243244_100%)] px-5 py-4 md:px-6 md:py-5">
-          <div
-            className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(148,163,184,0.26),transparent_42%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.14),transparent_36%)]"
-            aria-hidden
-          />
+      <div className={`relative flex h-[min(92vh,840px)] w-full max-w-3xl flex-col overflow-hidden ${advisorPanelShellClass}`}>
+        <header className={`${advisorDarkHeaderClass} px-4 py-3 md:px-5 md:py-3.5`}>
+          <div className={advisorDarkHeaderGlowClass} aria-hidden />
           <div className="relative flex items-start justify-between gap-4">
             <div className="flex min-w-0 items-start gap-4">
               {advisorAvatarSrc ? (
                 <Image
                   src={advisorAvatarSrc}
                   alt={advisorName}
-                  width={56}
-                  height={56}
-                  className="h-14 w-14 rounded-2xl border border-white/20 object-cover shadow-[0_12px_24px_rgba(15,23,42,0.24)]"
+                  width={48}
+                  height={48}
+                  className="h-12 w-12 rounded-2xl border border-white/18 object-cover shadow-[0_10px_24px_rgba(15,23,42,0.2)]"
                 />
               ) : (
-                <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/20 bg-white/12 text-[13px] font-semibold text-white shadow-[0_12px_24px_rgba(15,23,42,0.2)]">
+                <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/18 bg-white/12 text-[12px] font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.2)]">
                   {advisorName.slice(0, 2).toUpperCase()}
                 </span>
               )}
               <div className="min-w-0 pt-0.5">
-                <p className="truncate text-[18px] font-semibold tracking-[-0.01em] text-white">{advisorName}</p>
+                <p className="truncate text-[16px] font-semibold tracking-[-0.01em] text-white">{advisorName}</p>
                 {advisorRole ? (
-                  <p className="mt-1 text-[13px] font-medium text-slate-200/95">{advisorRole}</p>
+                  <p className="mt-0.5 text-[12px] font-medium text-slate-200/92">{advisorRole}</p>
                 ) : null}
                 {advisorDescription ? (
-                  <p className="mt-2 max-w-2xl text-[13px] leading-6 text-slate-200/85">{advisorDescription}</p>
+                  <p className="mt-1 max-w-2xl text-[12px] leading-5 text-slate-200/82">{advisorDescription}</p>
                 ) : null}
               </div>
             </div>
@@ -271,34 +279,34 @@ export function AdvisorChatModal({
               type="button"
               variant="secondary"
               onClick={handleCloseAdvisorModal}
-              className="shrink-0 border-white/18 bg-white/12 px-3.5 py-2 text-sm font-medium text-white backdrop-blur-sm hover:bg-white/18"
+              className="shrink-0 border-white/15 bg-white/10 px-3 py-1.5 text-[13px] font-medium text-white backdrop-blur-sm hover:bg-white/16"
             >
               Cerrar
             </Button>
           </div>
         </header>
 
-        <div className="min-h-0 flex-1 bg-[linear-gradient(180deg,#f3f6fa_0%,#eef3f8_100%)] px-4 py-4 md:px-6 md:py-5">
+        <div className="min-h-0 flex-1 bg-[linear-gradient(180deg,#f3f6fa_0%,#eef3f8_100%)] px-4 py-3 md:px-5 md:py-4">
           <div className="h-full overflow-y-auto pr-1">
             {messages.length === 0 ? (
-              <div className="rounded-2xl border border-white/80 bg-white/90 px-4 py-4 text-[14px] leading-7 text-[#475569] shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
+              <div className="rounded-2xl border border-white/80 bg-white/90 px-4 py-3.5 text-[13px] leading-6 text-[#475569] shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
                 {resolvedHelperCopy}
               </div>
             ) : (
-              <div className="space-y-4 pb-1">
+              <div className="space-y-3 pb-1">
                 {messages.map((message) => {
                   const isUser = message.role === "user";
                   return (
                     <div key={message.id} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
                       <div
-                        className={`max-w-[90%] whitespace-pre-wrap break-words rounded-[24px] border px-4 py-3 text-[14px] leading-7 shadow-[0_12px_24px_rgba(15,23,42,0.05)] ${
+                        className={`max-w-[90%] whitespace-pre-wrap break-words rounded-[22px] border px-4 py-2.5 text-[13px] leading-6 shadow-[0_10px_24px_rgba(15,23,42,0.05)] ${
                           isUser
-                            ? "border-[#b7e4c7] bg-[#ecfdf3] text-[#166534]"
-                            : "border-[#c9d9ff] bg-[#ebf2ff] text-[#1e40af]"
+                            ? "border-[#b9e5c7] bg-[#edf9f1] text-[#166534]"
+                            : "border-[#ccdbff] bg-[#edf4ff] text-[#1e40af]"
                         }`}
                       >
                         <p
-                          className={`mb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] ${
+                          className={`mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] ${
                             isUser ? "text-[#15803d]" : "text-[#3156b7]"
                           }`}
                         >
@@ -314,9 +322,7 @@ export function AdvisorChatModal({
           </div>
         </div>
 
-        <footer className="space-y-4 border-t border-[#dbe4ee] bg-white/95 px-4 py-4 md:px-6 md:py-5">
-          <p className="text-[13px] leading-6 text-[#526173]">{resolvedHelperCopy}</p>
-
+        <footer className="space-y-3 border-t border-[#dbe4ee] bg-white/95 px-4 py-3 md:px-5 md:py-4">
           <div
             id="advisor-chat-draft-wrap"
             className="rounded-2xl border border-[#dbe4ee] bg-white p-1 shadow-[0_8px_24px_rgba(15,23,42,0.05)] transition-all duration-200"
@@ -325,59 +331,49 @@ export function AdvisorChatModal({
               id="advisor-chat-draft"
               value={draft}
               onChange={(event) => onDraftChange(event.target.value)}
-              rows={4}
+              rows={3}
               spellCheck={false}
               placeholder={inputPlaceholder}
-              className="border-0 bg-transparent px-3 py-3 text-[#0F172A] placeholder:text-[#7c8b9d] focus:ring-0"
+              className="border-0 bg-transparent px-3 py-2.5 text-[13px] leading-6 text-[#0F172A] placeholder:text-[#7c8b9d] focus:ring-0"
             />
           </div>
 
-          <div className="rounded-2xl border border-[#dbe4ee] bg-[#f6f9fc] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                {microphoneStatusMessage ? (
-                  <p className="text-[12px] leading-5 text-[#526173]">{microphoneStatusMessage}</p>
-                ) : null}
-                {voice.error ? (
-                  <p className="text-[12px] leading-5 text-[#92400e]">
-                    {getSpeechToTextErrorMessage(voice.error)}
-                  </p>
-                ) : null}
-                {!microphoneStatusMessage && voice.speechSupported ? (
-                  <p className="text-[12px] leading-5 text-[#526173]">
-                    Habla con naturalidad. El texto se inserta en el campo y puedes editarlo antes de enviar.
-                  </p>
-                ) : null}
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <VoiceMicButton
-                  listening={voice.listening}
+          <div className="space-y-2">
+            <div className={`${advisorMutedSurfaceClass} flex flex-wrap items-center gap-2 px-3 py-2.5`}>
+              <VoiceMicButton
+                listening={voice.listening}
+                disabled={voice.microphoneStatus === "requesting"}
+                onClick={openVoiceModal}
+                idleLabel="Hablar con el advisor"
+                listeningLabel="Escuchando..."
+                iconOnly
+                ariaLabel="Hablar con el advisor"
+                className="border-[#cad5e2] bg-white text-[#526173] shadow-[0_1px_2px_rgba(15,23,42,0.03)] hover:border-[#b7c7d9] hover:bg-[#f8fbff]"
+              />
+              <p className="min-w-0 flex-1 text-[12px] leading-5 text-[#526173]">{voiceSupportCopy}</p>
+              {isDevelopment ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void voice.requestMicrophonePermission();
+                  }}
                   disabled={voice.microphoneStatus === "requesting"}
-                  onClick={openVoiceModal}
-                  idleLabel="Hablar con el advisor"
-                  listeningLabel="Escuchando..."
-                />
-                {isDevelopment ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void voice.requestMicrophonePermission();
-                    }}
-                    disabled={voice.microphoneStatus === "requesting"}
-                    className="inline-flex h-9 items-center rounded-full border border-[#cad5e2] bg-white px-3.5 text-[12px] font-medium text-[#334155] shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition hover:bg-[#f8fafc] disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    Probar microfono
-                  </button>
-                ) : null}
-              </div>
-
-              {voice.transcript.trim() ? (
-                <span className="inline-flex h-8 items-center rounded-full border border-[#b7e4c7] bg-[#ecfdf3] px-3 text-[12px] font-medium text-[#166534]">
-                  Transcript listo para revisar
-                </span>
+                  className="inline-flex h-8 items-center rounded-full border border-[#cad5e2] bg-white px-3 text-[12px] font-medium text-[#334155] shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition hover:bg-[#f8fafc] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Probar microfono
+                </button>
               ) : null}
             </div>
+
+            {voice.error ? (
+              <p className="text-[12px] leading-5 text-[#92400e]">{getSpeechToTextErrorMessage(voice.error)}</p>
+            ) : null}
+
+            {!voice.error && voice.transcript.trim() ? (
+              <span className="inline-flex h-7 items-center rounded-full border border-[#b9e5c7] bg-[#edf9f1] px-3 text-[11px] font-medium text-[#166534]">
+                Transcript listo para revisar
+              </span>
+            ) : null}
           </div>
 
           {isDevelopment && debugPayload ? (
@@ -391,12 +387,12 @@ export function AdvisorChatModal({
             </details>
           ) : null}
 
-          <div className="flex flex-wrap justify-between gap-2 pt-1">
+          <div className="flex flex-wrap justify-between gap-2 pt-0.5">
             <Button
               type="button"
               variant="secondary"
               onClick={onUseResponse}
-              className="border-[#CBD5E1] bg-white px-4 py-2.5 font-medium text-[#334155]"
+              className="border-[#CBD5E1] bg-white px-4 py-2 text-[13px] font-medium text-[#334155]"
             >
               Usar esta respuesta
             </Button>
@@ -405,7 +401,7 @@ export function AdvisorChatModal({
               variant="primary"
               disabled={sending || !draft.trim()}
               onClick={onSend}
-              className="bg-[#1D4ED8] px-4 py-2.5 font-medium shadow-[0_8px_20px_rgba(29,78,216,0.24)] hover:bg-[#1E40AF]"
+              className="bg-[#1D4ED8] px-4 py-2 text-[13px] font-medium shadow-[0_8px_20px_rgba(29,78,216,0.24)] hover:bg-[#1E40AF]"
             >
               {sending
                 ? "Enviando..."
@@ -417,182 +413,189 @@ export function AdvisorChatModal({
         </footer>
 
         {voiceModalOpen ? (
-          <div className="absolute inset-0 z-30 flex items-center justify-center bg-slate-900/55 p-4">
-            <div className="w-full max-w-3xl rounded-3xl border border-[#dbe3ec] bg-gradient-to-b from-[#ffffff] to-[#f8fbff] p-6 shadow-[0_24px_60px_rgba(15,23,42,0.35)]">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className="relative">
-                    <span
-                      className={`voice-avatar-ring ${voiceUiState === "listening" ? "is-active" : ""}`}
-                      aria-hidden
-                    />
-                    {advisorAvatarSrc ? (
-                      <Image
-                        src={advisorAvatarSrc}
-                        alt={advisorName}
-                        width={64}
-                        height={64}
-                        className="relative z-10 h-16 w-16 rounded-full border border-[#dbe3ec] object-cover"
+          <div className="absolute inset-0 z-30 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-[2px]">
+            <div className={`w-full max-w-2xl overflow-hidden ${advisorPanelShellClass}`}>
+              <div className={`${advisorDarkHeaderClass} px-4 py-3`}>
+                <div className={advisorDarkHeaderGlowClass} aria-hidden />
+                <div className="relative flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="relative">
+                      <span
+                        className={`voice-avatar-ring ${voiceUiState === "listening" ? "is-active" : ""}`}
+                        aria-hidden
                       />
-                    ) : (
-                      <span className="relative z-10 flex h-16 w-16 items-center justify-center rounded-full bg-[#111827] text-sm font-semibold text-white">
-                        {advisorName.slice(0, 2).toUpperCase()}
-                      </span>
-                    )}
+                      {advisorAvatarSrc ? (
+                        <Image
+                          src={advisorAvatarSrc}
+                          alt={advisorName}
+                          width={48}
+                          height={48}
+                          className="relative z-10 h-12 w-12 rounded-2xl border border-white/18 object-cover"
+                        />
+                      ) : (
+                        <span className="relative z-10 flex h-12 w-12 items-center justify-center rounded-2xl border border-white/18 bg-white/12 text-[12px] font-semibold text-white">
+                          {advisorName.slice(0, 2).toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-[16px] font-semibold text-white">{advisorName}</p>
+                      {advisorRole ? (
+                        <p className="mt-0.5 text-[12px] font-medium text-slate-200/92">{advisorRole}</p>
+                      ) : null}
+                      <p className="mt-1 text-[12px] text-slate-100/95">{stateCopy.title}</p>
+                      <p className="text-[11px] leading-5 text-slate-200/80">{stateCopy.description}</p>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-[18px] font-semibold text-[#0f172a]">{advisorName}</p>
-                    {advisorRole ? (
-                      <p className="text-[13px] font-medium text-[#475569]">{advisorRole}</p>
-                    ) : null}
-                    <p className="mt-1 text-[13px] text-[#334155]">{stateCopy.title}</p>
-                    <p className="text-[12px] text-[#64748b]">{stateCopy.description}</p>
-                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={closeVoiceModal}
+                    className="shrink-0 border-white/15 bg-white/10 px-3 py-1.5 text-[13px] text-white hover:bg-white/16"
+                  >
+                    Cerrar
+                  </Button>
                 </div>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={closeVoiceModal}
-                  className="border-[#cbd5e1] bg-white px-3 py-1.5 text-sm text-[#334155]"
-                >
-                  Cerrar
-                </Button>
               </div>
 
-              <div className="mt-5 rounded-2xl border border-[#e2e8f0] bg-white/80 p-4">
-                <div className="mb-3 flex items-center gap-2">
-                  <span className="text-[12px] font-medium uppercase tracking-wide text-[#64748b]">
-                    Estado
-                  </span>
-                  <span
-                    className={`inline-flex h-7 items-center rounded-full border px-3 text-[12px] ${
-                      voiceUiState === "listening"
-                        ? "border-[#fecaca] bg-[#fff1f2] text-[#b42318]"
-                        : voiceUiState === "processing"
-                          ? "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]"
-                          : voiceUiState === "transcript_ready"
-                            ? "border-[#bbf7d0] bg-[#f0fdf4] text-[#166534]"
-                            : voiceUiState === "error"
-                              ? "border-[#fcd34d] bg-[#fffbeb] text-[#92400e]"
-                              : "border-[#e2e8f0] bg-[#f8fafc] text-[#334155]"
-                    }`}
-                  >
-                    {voiceUiState === "listening"
-                      ? "Escuchando"
-                      : voiceUiState === "processing"
-                        ? "Procesando"
-                        : voiceUiState === "transcript_ready"
-                          ? "Transcript listo"
-                          : voiceUiState === "error"
-                            ? "Error"
-                            : "En espera"}
-                  </span>
-                </div>
-
-                <div className="mb-4 flex h-14 items-end justify-center gap-1.5 rounded-xl border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2">
-                  {Array.from({ length: 14 }).map((_, index) => (
+              <div className="space-y-4 bg-[#f8fafc] p-4">
+                <div className={`${advisorMutedSurfaceClass} p-3.5`}>
+                  <div className="mb-3 flex items-center gap-2">
+                    <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-[#64748b]">
+                      Estado
+                    </span>
                     <span
-                      key={`voice-bar-${index}`}
-                      className={`voice-level-bar ${voiceUiState === "listening" ? "is-active" : ""}`}
-                      style={{ animationDelay: `${index * 70}ms` }}
-                      aria-hidden
-                    />
-                  ))}
+                      className={`inline-flex h-7 items-center rounded-full border px-3 text-[11px] font-medium ${
+                        voiceUiState === "listening"
+                          ? "border-[#fecaca] bg-[#fff1f2] text-[#b42318]"
+                          : voiceUiState === "processing"
+                            ? "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]"
+                            : voiceUiState === "transcript_ready"
+                              ? "border-[#bbf7d0] bg-[#f0fdf4] text-[#166534]"
+                              : voiceUiState === "error"
+                                ? "border-[#fcd34d] bg-[#fffbeb] text-[#92400e]"
+                                : "border-[#e2e8f0] bg-[#f8fafc] text-[#334155]"
+                      }`}
+                    >
+                      {voiceUiState === "listening"
+                        ? "Escuchando"
+                        : voiceUiState === "processing"
+                          ? "Procesando"
+                          : voiceUiState === "transcript_ready"
+                            ? "Transcript listo"
+                            : voiceUiState === "error"
+                              ? "Error"
+                              : "En espera"}
+                    </span>
+                  </div>
+
+                  <div className="mb-3 flex h-11 items-end justify-center gap-1 rounded-xl border border-[#d8e1eb] bg-white/75 px-3 py-2">
+                    {Array.from({ length: 14 }).map((_, index) => (
+                      <span
+                        key={`voice-bar-${index}`}
+                        className={`voice-level-bar ${voiceUiState === "listening" ? "is-active" : ""}`}
+                        style={{ animationDelay: `${index * 70}ms` }}
+                        aria-hidden
+                      />
+                    ))}
+                  </div>
+
+                  <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.16em] text-[#64748b]">
+                    Transcript
+                  </p>
+                  <p className="min-h-20 whitespace-pre-wrap break-words rounded-xl border border-[#dbe3ec] bg-white px-3 py-2.5 text-[13px] leading-6 text-[#0f172a]">
+                    {voice.transcript.trim()
+                      ? voice.transcript.trim()
+                      : voiceUiState === "listening"
+                        ? "Estoy escuchando. Habla cuando quieras."
+                        : "Aun no hay transcript."}
+                  </p>
                 </div>
 
-                <p className="mb-2 text-[12px] font-medium text-[#334155]">Transcript</p>
-                <p className="min-h-24 whitespace-pre-wrap break-words rounded-xl border border-[#dbe3ec] bg-[#f8fafc] px-3 py-2 text-[14px] text-[#0f172a]">
-                  {voice.transcript.trim()
-                    ? voice.transcript.trim()
-                    : voiceUiState === "listening"
-                      ? "Estoy escuchando. Habla cuando quieras."
-                      : "Aun no hay transcript."}
-                </p>
-              </div>
+                <div className="flex flex-wrap justify-end gap-2">
+                  {voiceUiState === "listening" ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={voice.stopListening}
+                      className="border-[#fecdd3] bg-white px-4 py-2 text-[13px] text-[#9f1239] hover:bg-[#fff1f2]"
+                    >
+                      Terminar grabacion
+                    </Button>
+                  ) : null}
 
-              <div className="mt-5 flex flex-wrap justify-end gap-2">
-                {voiceUiState === "listening" ? (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={voice.stopListening}
-                    className="border-[#fecdd3] bg-white text-[#9f1239] hover:bg-[#fff1f2]"
-                  >
-                    Terminar grabacion
-                  </Button>
-                ) : null}
-
-                {voiceUiState === "idle" || voiceUiState === "error" ? (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={startOrRestartRecording}
-                    className="border-[#cbd5e1] bg-white text-[#334155]"
-                  >
-                    {voice.error === "voice_no_speech" ? "Reintentar" : "Iniciar grabacion"}
-                  </Button>
-                ) : null}
-
-                {voiceUiState === "transcript_ready" ? (
-                  <>
+                  {voiceUiState === "idle" || voiceUiState === "error" ? (
                     <Button
                       type="button"
                       variant="secondary"
                       onClick={startOrRestartRecording}
-                      className="border-[#cbd5e1] bg-white text-[#334155]"
+                      className="border-[#cbd5e1] bg-white px-4 py-2 text-[13px] text-[#334155]"
                     >
-                      Volver a grabar
+                      {voice.error === "voice_no_speech" ? "Reintentar" : "Iniciar grabacion"}
                     </Button>
-                    <Button
-                      type="button"
-                      variant="primary"
-                      onClick={applyTranscriptToDraft}
-                      className="bg-[#1d4ed8] text-white hover:bg-[#1e40af]"
-                    >
-                      Enviar transcript
-                    </Button>
-                  </>
+                  ) : null}
+
+                  {voiceUiState === "transcript_ready" ? (
+                    <>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={startOrRestartRecording}
+                        className="border-[#cbd5e1] bg-white px-4 py-2 text-[13px] text-[#334155]"
+                      >
+                        Volver a grabar
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="primary"
+                        onClick={applyTranscriptToDraft}
+                        className="bg-[#1d4ed8] px-4 py-2 text-[13px] text-white hover:bg-[#1e40af]"
+                      >
+                        Enviar transcript
+                      </Button>
+                    </>
+                  ) : null}
+
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={closeVoiceModal}
+                    className="border-[#cbd5e1] bg-white px-4 py-2 text-[13px] text-[#334155]"
+                  >
+                    Cancelar
+                  </Button>
+                </div>
+
+                {isDevelopment ? (
+                  <details className="rounded-xl border border-[#e2e8f0] bg-white/75 p-3">
+                    <summary className="cursor-pointer text-[12px] font-medium text-[#334155]">
+                      Debug voz (solo desarrollo)
+                    </summary>
+                    <pre className="mt-2 whitespace-pre-wrap break-words text-[11px] text-[#334155]">
+                      {JSON.stringify(
+                        {
+                          speechSupported: voice.speechSupported,
+                          microphoneStatus: voice.microphoneStatus,
+                          phase: voice.phase,
+                          listening: voice.listening,
+                          transcriptSource: voice.transcriptSource,
+                          resultCount: voice.resultCount,
+                          recognitionConfig: voice.config,
+                          lastSessionDurationMs: voice.lastSessionDurationMs,
+                          lastSessionHadResult: voice.lastSessionHadResult,
+                          lastSessionHadTranscript: voice.lastSessionHadTranscript,
+                          transcriptPreview: voice.transcript.slice(0, 280),
+                          error: voice.error,
+                          uiEvents: voiceUiDebugEvents,
+                          hookEvents: voice.debugEvents ?? [],
+                        },
+                        null,
+                        2,
+                      )}
+                    </pre>
+                  </details>
                 ) : null}
-
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={closeVoiceModal}
-                  className="border-[#cbd5e1] bg-white text-[#334155]"
-                >
-                  Cancelar
-                </Button>
               </div>
-
-              {isDevelopment ? (
-                <details className="mt-4 rounded-xl border border-[#e2e8f0] bg-white/70 p-3">
-                  <summary className="cursor-pointer text-[12px] font-medium text-[#334155]">
-                    Debug voz (solo desarrollo)
-                  </summary>
-                  <pre className="mt-2 whitespace-pre-wrap break-words text-[11px] text-[#334155]">
-                    {JSON.stringify(
-                      {
-                        speechSupported: voice.speechSupported,
-                        microphoneStatus: voice.microphoneStatus,
-                        phase: voice.phase,
-                        listening: voice.listening,
-                        transcriptSource: voice.transcriptSource,
-                        resultCount: voice.resultCount,
-                        recognitionConfig: voice.config,
-                        lastSessionDurationMs: voice.lastSessionDurationMs,
-                        lastSessionHadResult: voice.lastSessionHadResult,
-                        lastSessionHadTranscript: voice.lastSessionHadTranscript,
-                        transcriptPreview: voice.transcript.slice(0, 280),
-                        error: voice.error,
-                        uiEvents: voiceUiDebugEvents,
-                        hookEvents: voice.debugEvents ?? [],
-                      },
-                      null,
-                      2,
-                    )}
-                  </pre>
-                </details>
-              ) : null}
             </div>
           </div>
         ) : null}

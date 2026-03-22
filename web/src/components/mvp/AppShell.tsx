@@ -6,6 +6,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { AdvisorChatModal } from "@/components/mvp/AdvisorChatModal";
+import {
+  advisorFloatingPanelClass,
+} from "@/components/mvp/advisorUiStyles";
 import { ADVISOR_PROFILES } from "@/data/advisors";
 import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
 import { postAdvisorChat } from "@/lib/api/client";
@@ -176,34 +179,33 @@ export function AppShell({ children }: AppShellProps) {
               onClick={() => setAdvisorMenuOpen((prev) => !prev)}
               aria-haspopup="menu"
               aria-expanded={advisorMenuOpen}
-              className="h-9 rounded-[10px] border border-[#e5e5e5] bg-white px-3 text-[13px] font-medium text-[#111] transition-colors hover:border-[#d8d8d8] hover:bg-[#fafafa] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(17,17,17,0.2)]"
+              className="h-9 rounded-full border border-[#cad5e2] bg-white px-3.5 text-[13px] font-medium text-[#1f2937] shadow-[0_6px_16px_rgba(15,23,42,0.05)] transition-all hover:border-[#b6c4d5] hover:bg-[#f8fbff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(51,65,85,0.18)]"
             >
               Hablar con un advisor
             </button>
             {advisorMenuOpen ? (
-              <div
-                role="menu"
-                className="absolute right-0 z-20 mt-2 w-[320px] rounded-xl border border-[#e5e5e5] bg-white p-2 shadow-[0_8px_18px_rgba(15,23,42,0.08)]"
-              >
-                <ul className="space-y-1">
+              <div role="menu" className={`absolute right-0 z-20 mt-2 w-[340px] ${advisorFloatingPanelClass}`}>
+                <ul className="space-y-2 p-2.5">
                   {ADVISOR_PROFILES.map((advisor, index) => (
                     <li key={advisor.id}>
                       <button
                         type="button"
                         role="menuitem"
                         onClick={() => handleSelectAdvisor(index)}
-                        className="flex w-full items-start gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-[#fafafa]"
+                        className="flex w-full items-start gap-3 rounded-2xl border border-white/10 bg-white/6 px-3 py-3 text-left transition-all hover:border-white/16 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
                       >
                         <Image
                           src={advisor.avatar128}
                           alt={advisor.name}
-                          width={40}
-                          height={40}
-                          className="h-10 w-10 rounded-full border border-[#e5e5e5] object-cover"
+                          width={44}
+                          height={44}
+                          className="h-11 w-11 rounded-2xl border border-white/14 object-cover shadow-[0_8px_20px_rgba(15,23,42,0.18)]"
                         />
-                        <div className="min-w-0">
-                          <p className="text-[14px] font-semibold text-[#111]">{advisor.name}</p>
-                          <p className="line-clamp-2 text-[12px] text-[#666]">{advisor.description}</p>
+                        <div className="min-w-0 flex-1 pt-0.5">
+                          <p className="text-[13px] font-semibold text-white">{advisor.name}</p>
+                          <p className="mt-1 line-clamp-2 text-[12px] leading-5 text-slate-200/78">
+                            {advisor.description}
+                          </p>
                         </div>
                       </button>
                     </li>

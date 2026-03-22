@@ -8,6 +8,9 @@ type VoiceMicButtonProps = {
   onClick: () => void;
   idleLabel: string;
   listeningLabel: string;
+  iconOnly?: boolean;
+  ariaLabel?: string;
+  className?: string;
 };
 
 type VoiceListeningBadgeProps = {
@@ -27,29 +30,62 @@ export function VoiceMicButton({
   onClick,
   idleLabel,
   listeningLabel,
+  iconOnly = false,
+  ariaLabel,
+  className = "",
 }: VoiceMicButtonProps) {
+  const baseClass = iconOnly
+    ? "group inline-flex h-9 w-9 items-center justify-center rounded-full border text-[13px] font-medium transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(15,23,42,0.2)] disabled:cursor-not-allowed disabled:border-[#e7e7e7] disabled:bg-[#f8f8f8] disabled:text-[#9ca3af]"
+    : "group inline-flex h-9 items-center gap-2 rounded-full border px-3.5 text-[13px] font-medium transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(15,23,42,0.2)] disabled:cursor-not-allowed disabled:border-[#e7e7e7] disabled:bg-[#f8f8f8] disabled:text-[#9ca3af]";
+  const stateClass = listening
+    ? "border-[#f2d2d8] bg-[#fff7f8] text-[#7f1d1d] shadow-[0_1px_2px_rgba(127,29,29,0.08)]"
+    : "border-[#e5e5e5] bg-white text-[#111] shadow-[0_1px_2px_rgba(15,23,42,0.04)] hover:border-[#d7d7d7] hover:bg-[#fafafa]";
+
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`group inline-flex h-9 items-center gap-2 rounded-full border px-3.5 text-[13px] font-medium transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(15,23,42,0.2)] disabled:cursor-not-allowed disabled:border-[#e7e7e7] disabled:bg-[#f8f8f8] disabled:text-[#9ca3af] ${
-        listening
-          ? "border-[#f2d2d8] bg-[#fff7f8] text-[#7f1d1d] shadow-[0_1px_2px_rgba(127,29,29,0.08)]"
-          : "border-[#e5e5e5] bg-white text-[#111] shadow-[0_1px_2px_rgba(15,23,42,0.04)] hover:border-[#d7d7d7] hover:bg-[#fafafa]"
-      }`}
+      className={`${baseClass} ${stateClass} ${className}`.trim()}
       aria-pressed={listening}
+      aria-label={ariaLabel ?? (listening ? listeningLabel : idleLabel)}
+      title={ariaLabel ?? (listening ? listeningLabel : idleLabel)}
     >
-      <span
-        className={`relative h-2.5 w-2.5 rounded-full transition-colors ${
-          listening ? "bg-[#ef4444]" : "bg-[#c5ced9] group-hover:bg-[#a8b4c3]"
-        }`}
-      >
-        {listening ? (
-          <span className="absolute inset-0 rounded-full bg-[#ef4444] opacity-70 animate-ping" />
-        ) : null}
-      </span>
-      {listening ? listeningLabel : idleLabel}
+      {iconOnly ? (
+        <>
+          <svg
+            aria-hidden
+            viewBox="0 0 24 24"
+            className={`h-[18px] w-[18px] transition-colors ${
+              listening ? "text-[#7f1d1d]" : "text-[#526173] group-hover:text-[#334155]"
+            }`}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.85"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M12 3.75a2.75 2.75 0 0 0-2.75 2.75v4.75a2.75 2.75 0 1 0 5.5 0V6.5A2.75 2.75 0 0 0 12 3.75Z" />
+            <path d="M6.75 10.75a5.25 5.25 0 1 0 10.5 0" />
+            <path d="M12 16v4.25" />
+            <path d="M9.25 20.25h5.5" />
+          </svg>
+          <span className="sr-only">{listening ? listeningLabel : idleLabel}</span>
+        </>
+      ) : (
+        <>
+          <span
+            className={`relative h-2.5 w-2.5 rounded-full transition-colors ${
+              listening ? "bg-[#ef4444]" : "bg-[#c5ced9] group-hover:bg-[#a8b4c3]"
+            }`}
+          >
+            {listening ? (
+              <span className="absolute inset-0 rounded-full bg-[#ef4444] opacity-70 animate-ping" />
+            ) : null}
+          </span>
+          {listening ? listeningLabel : idleLabel}
+        </>
+      )}
     </button>
   );
 }
