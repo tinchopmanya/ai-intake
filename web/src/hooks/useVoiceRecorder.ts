@@ -7,6 +7,7 @@ import { getSpeechToTextErrorMessage, useSpeechToText } from "@/hooks/useSpeechT
 export type VoiceRecorderStatus =
   | "idle"
   | "countdown"
+  | "initializing_media"
   | "recording"
   | "recording_no_transcript"
   | "stopping"
@@ -28,6 +29,7 @@ function getMediaRecorderCtor(): MediaRecorderCtor | null {
 
 export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
   const countdownSeconds = options?.countdownSeconds ?? 3;
+  const isDevelopment = process.env.NODE_ENV !== "production";
   const [status, setStatus] = useState<VoiceRecorderStatus>("idle");
   const [countdown, setCountdown] = useState<number>(countdownSeconds);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -38,6 +40,7 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
   const chunksRef = useRef<BlobPart[]>([]);
   const countdownTimerRef = useRef<number | null>(null);
   const manualStopRef = useRef(false);
+  const recorderStartedRef = useRef(false);
   const recognitionRestartAttemptsRef = useRef(0);
   const finalizePromiseRef = useRef<Promise<{ audioBlob: Blob | null; transcript: string }> | null>(null);
   const finalizeResolverRef = useRef<((value: { audioBlob: Blob | null; transcript: string }) => void) | null>(
@@ -59,10 +62,23 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
   const startListening = speech.startListening;
   const stopListening = speech.stopListening;
   const resetTranscript = speech.resetTranscript;
+  const requestMicrophonePermission = speech.requestMicrophonePermission;
   const statusRef = useRef<VoiceRecorderStatus>(status);
   useEffect(() => {
     statusRef.current = status;
   }, [status]);
+
+  const pushDebug = useCallback(
+    (event: string, details?: Record<string, unknown>) => {
+      if (!isDevelopment) return;
+      if (details) {
+        console.debug("[voice][recorder]", event, details);
+      } else {
+        console.debug("[voice][recorder]", event);
+      }
+    },
+    [isDevelopment],
+  );
 
   const clearCountdownTimer = useCallback(() => {
     if (countdownTimerRef.current !== null) {
@@ -109,53 +125,86 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia || !MediaRecorderClass) {
       setStatus("error");
       setInternalErrorMessage("La grabacion de audio no esta disponible en este navegador.");
+      pushDebug("startRecording blocked", { reason: "media recorder unsupported" });
       return;
     }
 
+    setStatus("initializing_media");
     setInternalErrorMessage(null);
     setAudioBlob(null);
     chunksRef.current = [];
     manualStopRef.current = false;
+    recorderStartedRef.current = false;
     recognitionRestartAttemptsRef.current = 0;
     finalizePromiseRef.current = null;
     finalizeResolverRef.current = null;
 
     try {
+      pushDebug("requesting microphone permission");
+      const micPermissionGranted = await requestMicrophonePermission();
+      if (!micPermissionGranted) {
+        setStatus("error");
+        setInternalErrorMessage("No pudimos acceder al microfono. Revisa los permisos del navegador.");
+        pushDebug("microphone permission denied");
+        return;
+      }
+      pushDebug("requesting media stream");
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaStreamRef.current = stream;
+      pushDebug("media stream acquired");
       const recorder = new MediaRecorderClass(stream);
       mediaRecorderRef.current = recorder;
+      pushDebug("media recorder created", { state: recorder.state });
       recorder.ondataavailable = (event) => {
         if (event.data && event.data.size > 0) {
           chunksRef.current.push(event.data);
         }
       };
+      recorder.onerror = () => {
+        setStatus("error");
+        setInternalErrorMessage("No se pudo iniciar la grabacion de audio. Intenta nuevamente.");
+        pushDebug("media recorder error");
+      };
+      recorder.onstart = () => {
+        recorderStartedRef.current = true;
+        setStatus("recording");
+        pushDebug("media recorder started");
+        startListening();
+        pushDebug("speech recognition start requested");
+      };
       recorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
         const resolvedBlob = blob.size > 0 ? blob : null;
         setAudioBlob(resolvedBlob);
-        if (
+        pushDebug("media recorder stopped", { blobSize: resolvedBlob?.size ?? 0, manualStop: manualStopRef.current });
+        if (!manualStopRef.current && !recorderStartedRef.current) {
+          setStatus("error");
+          setInternalErrorMessage("No se pudo iniciar la grabacion de audio. Intenta nuevamente.");
+        } else if (
           !manualStopRef.current &&
+          recorderStartedRef.current &&
           (statusRef.current === "recording" || statusRef.current === "recording_no_transcript")
         ) {
           setStatus("error");
           setInternalErrorMessage("La grabacion se detuvo inesperadamente. Intenta nuevamente.");
         }
-        if (mediaStreamRef.current) {
+        if (
+          mediaStreamRef.current
+        ) {
           mediaStreamRef.current.getTracks().forEach((track) => track.stop());
           mediaStreamRef.current = null;
         }
         resolveFinalize(resolvedBlob);
       };
+      pushDebug("starting media recorder");
       recorder.start(250);
-      setStatus("recording");
       resetTranscript();
-      startListening();
     } catch {
       setStatus("error");
       setInternalErrorMessage("No pudimos acceder al microfono. Revisa los permisos del navegador.");
+      pushDebug("startRecording failed");
     }
-  }, [resolveFinalize, resetTranscript, startListening]);
+  }, [pushDebug, requestMicrophonePermission, resolveFinalize, resetTranscript, startListening]);
 
   const startCountdown = useCallback(() => {
     clearCountdownTimer();
@@ -170,12 +219,13 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
       if (remaining <= 0) {
         clearCountdownTimer();
         setCountdown(0);
+        pushDebug("countdown completed");
         void startRecording();
         return;
       }
       setCountdown(remaining);
     }, 1000);
-  }, [clearCountdownTimer, countdownSeconds, resetTranscript, startRecording]);
+  }, [clearCountdownTimer, countdownSeconds, pushDebug, resetTranscript, startRecording]);
 
   const stopRecording = useCallback((): Promise<{ audioBlob: Blob | null; transcript: string }> => {
     clearCountdownTimer();
@@ -184,6 +234,19 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
     if (statusRef.current === "countdown") {
       const payload = buildFinalPayload(null);
       setStatus("idle");
+      pushDebug("stopRecording during countdown");
+      return Promise.resolve(payload);
+    }
+
+    if (statusRef.current === "initializing_media") {
+      const payload = buildFinalPayload(null);
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+        mediaStreamRef.current = null;
+      }
+      mediaRecorderRef.current = null;
+      setStatus("idle");
+      pushDebug("stopRecording during media init");
       return Promise.resolve(payload);
     }
 
@@ -214,19 +277,22 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
       resolveFinalize(audioBlob);
     }
     return finalizePromise;
-  }, [audioBlob, buildFinalPayload, clearCountdownTimer, resolveFinalize, speechListening, stopListening]);
+  }, [audioBlob, buildFinalPayload, clearCountdownTimer, pushDebug, resolveFinalize, speechListening, stopListening]);
 
   const finalizeRecording = useCallback(async () => {
+    pushDebug("finalizeRecording called", { status: statusRef.current });
     const payload = await stopRecording();
     if (statusRef.current !== "sending") {
       setStatus("idle");
     }
+    pushDebug("finalizeRecording resolved", { hasAudio: Boolean(payload.audioBlob), transcriptLength: payload.transcript.length });
     return payload;
-  }, [stopRecording]);
+  }, [pushDebug, stopRecording]);
 
   const resetRecording = useCallback(() => {
     clearCountdownTimer();
     manualStopRef.current = true;
+    recorderStartedRef.current = false;
     cleanupMedia();
     resetTranscript();
     setAudioBlob(null);
@@ -278,6 +344,7 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
     const noTranscriptTimer = window.setTimeout(() => {
       if (speechSupported && !manualStopRef.current && recognitionRestartAttemptsRef.current < 2) {
         recognitionRestartAttemptsRef.current += 1;
+        pushDebug("speech recognition ended, attempting restart", { attempt: recognitionRestartAttemptsRef.current });
         startListening();
         return;
       }
@@ -286,7 +353,7 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
       }
     }, 220);
     return () => window.clearTimeout(noTranscriptTimer);
-  }, [speechListening, speechSupported, startListening, status]);
+  }, [pushDebug, speechListening, speechSupported, startListening, status]);
 
   useEffect(() => {
     if (status === "countdown" || status === "recording" || status === "recording_no_transcript" || status === "stopping") {
@@ -294,6 +361,7 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
     }
     manualStopRef.current = false;
     recognitionRestartAttemptsRef.current = 0;
+    recorderStartedRef.current = false;
   }, [status]);
 
   useEffect(() => {

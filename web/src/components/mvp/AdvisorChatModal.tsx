@@ -167,6 +167,8 @@ export function AdvisorChatModal({
   const statusText =
     recorder.status === "countdown"
       ? `Iniciando en ${recorder.countdown} segundo${recorder.countdown === 1 ? "" : "s"}...`
+      : recorder.status === "initializing_media"
+        ? "Iniciando grabacion..."
       : recorder.status === "recording"
         ? recorder.transcribing
           ? "Escuchando..."
@@ -328,7 +330,14 @@ export function AdvisorChatModal({
   );
 
   const handleFinalize = useCallback(async () => {
-    if (finalizeInFlight || recorder.status === "countdown" || recorder.status === "sending") return;
+    if (
+      finalizeInFlight ||
+      recorder.status === "countdown" ||
+      recorder.status === "initializing_media" ||
+      recorder.status === "sending"
+    ) {
+      return;
+    }
     setFinalizeInFlight(true);
     const payload = await recorder.finalizeRecording();
     await sendVoice(payload);
@@ -405,7 +414,7 @@ export function AdvisorChatModal({
                     <div className={`w-full overflow-hidden rounded-[10px] bg-white/6 px-3.5 text-[12px] leading-5 text-white/60 transition-all duration-300 ${voiceTranscriptOpen ? "mb-3 max-h-[44px] py-2" : "mb-0 max-h-0 py-0"}`}>El transcript en vivo se muestra en el chat lateral.</div>
                     {voiceSendError || recorder.errorMessage ? <p className="mb-2 w-full text-center text-[12px] text-[#fca5a5]">{voiceSendError ?? recorder.errorMessage}</p> : null}
                     <div className="mt-auto flex w-full gap-2.5">
-                      <button type="button" onClick={() => void handleFinalize()} disabled={finalizeInFlight || recorder.status === "countdown" || recorder.status === "sending"} className="flex-1 rounded-xl border-0 bg-[#2d6be4] px-4 py-[11px] text-[14px] font-semibold text-white transition-all hover:bg-[#1d5bcd] disabled:cursor-not-allowed disabled:opacity-45">Finalizar grabacion</button>
+                      <button type="button" onClick={() => void handleFinalize()} disabled={finalizeInFlight || recorder.status === "countdown" || recorder.status === "initializing_media" || recorder.status === "sending"} className="flex-1 rounded-xl border-0 bg-[#2d6be4] px-4 py-[11px] text-[14px] font-semibold text-white transition-all hover:bg-[#1d5bcd] disabled:cursor-not-allowed disabled:opacity-45">Finalizar grabacion</button>
                       <button type="button" onClick={() => closeVoice()} className="rounded-xl border border-white/12 bg-white/[0.06] px-4 py-[11px] text-[13px] text-white/70 transition-all hover:bg-white/[0.1] hover:text-white">Cancelar</button>
                     </div>
                   </section>
