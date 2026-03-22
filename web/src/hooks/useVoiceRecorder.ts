@@ -19,12 +19,38 @@ type UseVoiceRecorderOptions = {
   countdownSeconds?: number;
 };
 
-type MediaRecorderCtor = new (stream: MediaStream) => MediaRecorder;
+type MediaRecorderCtor = new (stream: MediaStream, options?: MediaRecorderOptions) => MediaRecorder;
 
 function getMediaRecorderCtor(): MediaRecorderCtor | null {
   if (typeof window === "undefined") return null;
   const candidate = (window as typeof window & { MediaRecorder?: MediaRecorderCtor }).MediaRecorder;
   return candidate ?? null;
+}
+
+function mapMediaInitError(error: unknown): string {
+  const maybeError = error as { name?: string };
+  if (maybeError?.name === "NotAllowedError" || maybeError?.name === "PermissionDeniedError") {
+    return "No pudimos acceder al microfono. Revisa los permisos del navegador.";
+  }
+  if (
+    maybeError?.name === "NotFoundError" ||
+    maybeError?.name === "DevicesNotFoundError" ||
+    maybeError?.name === "TrackStartError" ||
+    maybeError?.name === "NotReadableError"
+  ) {
+    return "No detectamos un microfono disponible.";
+  }
+  return "No se pudo iniciar la grabacion de audio. Intenta nuevamente.";
+}
+
+function pickSupportedMimeType(MediaRecorderClass: MediaRecorderCtor): string | null {
+  const probe = MediaRecorderClass as typeof MediaRecorder & { isTypeSupported?: (mime: string) => boolean };
+  if (typeof probe.isTypeSupported !== "function") return null;
+  const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
+  for (const mime of candidates) {
+    if (probe.isTypeSupported(mime)) return mime;
+  }
+  return null;
 }
 
 export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
@@ -40,6 +66,7 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
   const chunksRef = useRef<BlobPart[]>([]);
   const countdownTimerRef = useRef<number | null>(null);
   const manualStopRef = useRef(false);
+  const startAttemptRef = useRef(0);
   const recorderStartedRef = useRef(false);
   const recognitionRestartAttemptsRef = useRef(0);
   const finalizePromiseRef = useRef<Promise<{ audioBlob: Blob | null; transcript: string }> | null>(null);
@@ -62,7 +89,14 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
   const startListening = speech.startListening;
   const stopListening = speech.stopListening;
   const resetTranscript = speech.resetTranscript;
-  const requestMicrophonePermission = speech.requestMicrophonePermission;
+  const speechListeningRef = useRef(speechListening);
+  const stopListeningRef = useRef(stopListening);
+  useEffect(() => {
+    speechListeningRef.current = speechListening;
+  }, [speechListening]);
+  useEffect(() => {
+    stopListeningRef.current = stopListening;
+  }, [stopListening]);
   const statusRef = useRef<VoiceRecorderStatus>(status);
   useEffect(() => {
     statusRef.current = status;
@@ -87,7 +121,8 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
     }
   }, []);
 
-  const cleanupMedia = useCallback(() => {
+  const cleanupMedia = useCallback((reason = "cleanup") => {
+    pushDebug("cleanup media", { reason, recorderState: mediaRecorderRef.current?.state ?? "none" });
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       mediaRecorderRef.current.stop();
     }
@@ -96,10 +131,10 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
       mediaStreamRef.current.getTracks().forEach((track) => track.stop());
     }
     mediaStreamRef.current = null;
-    if (speechListening) {
-      stopListening();
+    if (speechListeningRef.current) {
+      stopListeningRef.current();
     }
-  }, [speechListening, stopListening]);
+  }, [pushDebug]);
 
   const buildFinalPayload = useCallback(
     (blob: Blob | null) => ({
@@ -121,6 +156,16 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
   );
 
   const startRecording = useCallback(async () => {
+    if (
+      statusRef.current === "initializing_media" ||
+      statusRef.current === "recording" ||
+      statusRef.current === "recording_no_transcript" ||
+      statusRef.current === "stopping" ||
+      statusRef.current === "sending"
+    ) {
+      pushDebug("startRecording ignored", { status: statusRef.current });
+      return;
+    }
     const MediaRecorderClass = getMediaRecorderCtor();
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia || !MediaRecorderClass) {
       setStatus("error");
@@ -129,6 +174,9 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
       return;
     }
 
+    startAttemptRef.current += 1;
+    const attemptId = startAttemptRef.current;
+    pushDebug("startRecording begin", { attemptId });
     setStatus("initializing_media");
     setInternalErrorMessage(null);
     setAudioBlob(null);
@@ -140,32 +188,53 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
     finalizeResolverRef.current = null;
 
     try {
-      pushDebug("requesting microphone permission");
-      const micPermissionGranted = await requestMicrophonePermission();
-      if (!micPermissionGranted) {
-        setStatus("error");
-        setInternalErrorMessage("No pudimos acceder al microfono. Revisa los permisos del navegador.");
-        pushDebug("microphone permission denied");
+      pushDebug("getUserMedia requested", { attemptId });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (attemptId !== startAttemptRef.current || manualStopRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        pushDebug("stale media stream discarded", { attemptId, currentAttempt: startAttemptRef.current });
         return;
       }
-      pushDebug("requesting media stream");
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaStreamRef.current = stream;
-      pushDebug("media stream acquired");
-      const recorder = new MediaRecorderClass(stream);
+      pushDebug("media stream acquired", {
+        attemptId,
+        tracks: stream.getAudioTracks().map((track) => ({
+          kind: track.kind,
+          readyState: track.readyState,
+          enabled: track.enabled,
+          muted: track.muted,
+          label: track.label,
+        })),
+      });
+      const selectedMimeType = pickSupportedMimeType(MediaRecorderClass);
+      pushDebug("mime type selected", { selectedMimeType: selectedMimeType ?? "default" });
+      let recorder: MediaRecorder;
+      try {
+        recorder = selectedMimeType
+          ? new MediaRecorderClass(stream, { mimeType: selectedMimeType })
+          : new MediaRecorderClass(stream);
+      } catch {
+        recorder = new MediaRecorderClass(stream);
+        pushDebug("media recorder created without explicit mime fallback");
+      }
       mediaRecorderRef.current = recorder;
-      pushDebug("media recorder created", { state: recorder.state });
+      pushDebug("media recorder created", { state: recorder.state, mimeType: recorder.mimeType || null });
       recorder.ondataavailable = (event) => {
+        pushDebug("media recorder ondataavailable", { size: event.data?.size ?? 0 });
         if (event.data && event.data.size > 0) {
           chunksRef.current.push(event.data);
         }
       };
-      recorder.onerror = () => {
+      recorder.onerror = (event) => {
         setStatus("error");
         setInternalErrorMessage("No se pudo iniciar la grabacion de audio. Intenta nuevamente.");
-        pushDebug("media recorder error");
+        pushDebug("media recorder onerror", { error: String((event as Event).type) });
       };
       recorder.onstart = () => {
+        if (attemptId !== startAttemptRef.current) {
+          pushDebug("media recorder onstart ignored stale attempt", { attemptId, currentAttempt: startAttemptRef.current });
+          return;
+        }
         recorderStartedRef.current = true;
         setStatus("recording");
         pushDebug("media recorder started");
@@ -196,15 +265,18 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
         }
         resolveFinalize(resolvedBlob);
       };
-      pushDebug("starting media recorder");
+      pushDebug("media recorder start() invoked", { attemptId, timesliceMs: 250 });
       recorder.start(250);
       resetTranscript();
-    } catch {
+    } catch (error) {
       setStatus("error");
-      setInternalErrorMessage("No pudimos acceder al microfono. Revisa los permisos del navegador.");
-      pushDebug("startRecording failed");
+      setInternalErrorMessage(mapMediaInitError(error));
+      pushDebug("startRecording failed", {
+        name: error instanceof Error ? error.name : "unknown",
+        message: error instanceof Error ? error.message : String(error),
+      });
     }
-  }, [pushDebug, requestMicrophonePermission, resolveFinalize, resetTranscript, startListening]);
+  }, [pushDebug, resolveFinalize, resetTranscript, startListening]);
 
   const startCountdown = useCallback(() => {
     clearCountdownTimer();
@@ -230,6 +302,7 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
   const stopRecording = useCallback((): Promise<{ audioBlob: Blob | null; transcript: string }> => {
     clearCountdownTimer();
     manualStopRef.current = true;
+    pushDebug("stopRecording called", { status: statusRef.current });
 
     if (statusRef.current === "countdown") {
       const payload = buildFinalPayload(null);
@@ -292,8 +365,9 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
   const resetRecording = useCallback(() => {
     clearCountdownTimer();
     manualStopRef.current = true;
+    startAttemptRef.current += 1;
     recorderStartedRef.current = false;
-    cleanupMedia();
+    cleanupMedia("resetRecording");
     resetTranscript();
     setAudioBlob(null);
     setInternalErrorMessage(null);
@@ -367,7 +441,7 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
   useEffect(() => {
     return () => {
       clearCountdownTimer();
-      cleanupMedia();
+      cleanupMedia("unmount");
     };
   }, [cleanupMedia, clearCountdownTimer]);
 
