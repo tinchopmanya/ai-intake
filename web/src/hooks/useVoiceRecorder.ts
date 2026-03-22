@@ -69,6 +69,7 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
   const startAttemptRef = useRef(0);
   const recorderStartedRef = useRef(false);
   const recognitionRestartAttemptsRef = useRef(0);
+  const lastRecognitionRestartAtRef = useRef(0);
   const finalizePromiseRef = useRef<Promise<{ audioBlob: Blob | null; transcript: string }> | null>(null);
   const finalizeResolverRef = useRef<((value: { audioBlob: Blob | null; transcript: string }) => void) | null>(
     null,
@@ -238,6 +239,8 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
         recorderStartedRef.current = true;
         setStatus("recording");
         pushDebug("media recorder started");
+        recognitionRestartAttemptsRef.current = 0;
+        lastRecognitionRestartAtRef.current = 0;
         startListening();
         pushDebug("speech recognition start requested");
       };
@@ -416,7 +419,12 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
     }
 
     const noTranscriptTimer = window.setTimeout(() => {
-      if (speechSupported && !manualStopRef.current && recognitionRestartAttemptsRef.current < 2) {
+      if (speechSupported && !manualStopRef.current) {
+        const now = Date.now();
+        if (now - lastRecognitionRestartAtRef.current < 900) {
+          return;
+        }
+        lastRecognitionRestartAtRef.current = now;
         recognitionRestartAttemptsRef.current += 1;
         pushDebug("speech recognition ended, attempting restart", { attempt: recognitionRestartAttemptsRef.current });
         startListening();
@@ -430,11 +438,17 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
   }, [pushDebug, speechListening, speechSupported, startListening, status]);
 
   useEffect(() => {
-    if (status === "countdown" || status === "recording" || status === "recording_no_transcript" || status === "stopping") {
+    if (
+      status === "countdown" ||
+      status === "recording" ||
+      status === "recording_no_transcript" ||
+      status === "stopping"
+    ) {
       return;
     }
     manualStopRef.current = false;
     recognitionRestartAttemptsRef.current = 0;
+    lastRecognitionRestartAtRef.current = 0;
     recorderStartedRef.current = false;
   }, [status]);
 

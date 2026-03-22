@@ -21,6 +21,15 @@ export type AdvisorChatMessage = {
 
 export type AdvisorChatEntryMode = "advisor_conversation" | "advisor_refine_response";
 type VoiceSessionTurn = { role: "user" | "advisor"; text: string };
+type VoiceFlowPhase =
+  | "countdown"
+  | "initializing_media"
+  | "user_recording"
+  | "user_paused"
+  | "sending"
+  | "advisor_speaking"
+  | "ready_for_next_turn"
+  | "error";
 
 type AdvisorChatModalProps = {
   isOpen: boolean;
@@ -115,9 +124,11 @@ export function AdvisorChatModal({
   const [voiceChatExpanded, setVoiceChatExpanded] = useState(false);
   const [voiceSpeaking, setVoiceSpeaking] = useState(false);
   const [finalizeInFlight, setFinalizeInFlight] = useState(false);
+  const [readyForNextTurn, setReadyForNextTurn] = useState(false);
   const autoStartGuardRef = useRef(false);
   const synthVoicesRef = useRef<SpeechSynthesisVoice[]>([]);
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
+  const wasSpeakingRef = useRef(false);
 
   const headerAvatar = useMemo(() => resolveAvatarVariant(advisorAvatarSrc, "128"), [advisorAvatarSrc]);
   const heroAvatar = useMemo(() => resolveAvatarVariant(advisorAvatarSrc, "256"), [advisorAvatarSrc]);
@@ -163,23 +174,56 @@ export function AdvisorChatModal({
     recorder.startFlow();
   }, [recorder, voiceOpen]);
 
+  useEffect(() => {
+    if (!voiceOpen) return;
+    const wasSpeaking = wasSpeakingRef.current;
+    if (voiceSpeaking) {
+      wasSpeakingRef.current = true;
+      return;
+    }
+    if (wasSpeaking) {
+      wasSpeakingRef.current = false;
+      setReadyForNextTurn(true);
+      recorder.setStatus("idle");
+    }
+  }, [recorder, voiceOpen, voiceSpeaking]);
+
   const voiceLiveTranscript = recorder.transcript.trim();
+  const flowPhase: VoiceFlowPhase =
+    voiceSpeaking
+      ? "advisor_speaking"
+      : recorder.status === "countdown"
+        ? "countdown"
+        : recorder.status === "initializing_media"
+          ? "initializing_media"
+          : recorder.status === "recording"
+            ? "user_recording"
+            : recorder.status === "recording_no_transcript"
+              ? "user_paused"
+              : recorder.status === "sending" || finalizeInFlight
+                ? "sending"
+                : recorder.status === "error"
+                  ? "error"
+                  : readyForNextTurn
+                    ? "ready_for_next_turn"
+                    : "ready_for_next_turn";
+
   const statusText =
-    recorder.status === "countdown"
+    flowPhase === "countdown"
       ? `Iniciando en ${recorder.countdown} segundo${recorder.countdown === 1 ? "" : "s"}...`
-      : recorder.status === "initializing_media"
+      : flowPhase === "initializing_media"
         ? "Iniciando grabacion..."
-      : recorder.status === "recording"
-        ? recorder.transcribing
-          ? "Escuchando..."
-          : "Escuchando microfono..."
-        : recorder.status === "recording_no_transcript"
+      : flowPhase === "user_recording"
+        ? "Escuchando..."
+        : flowPhase === "user_paused"
           ? "Grabando audio, sin transcripcion en vivo."
-          : recorder.status === "stopping"
+          : flowPhase === "sending" || recorder.status === "stopping"
             ? "Finalizando grabacion..."
-            : recorder.status === "sending"
-              ? "Enviando..."
-              : recorder.status === "error"
+            : flowPhase === "advisor_speaking"
+              ? "El advisor esta respondiendo..."
+              : flowPhase === "ready_for_next_turn"
+                ? "Listo para hablar de nuevo."
+                : flowPhase === "error"
                 ? "No pudimos grabar el audio."
                 : "Preparando...";
 
@@ -188,7 +232,9 @@ export function AdvisorChatModal({
       window.speechSynthesis.cancel();
     }
     setVoiceSpeaking(false);
-  }, []);
+    setReadyForNextTurn(true);
+    recorder.setStatus("idle");
+  }, [recorder]);
 
   const speak = useCallback((text: string) => {
     if (!text.trim() || typeof window === "undefined" || !("speechSynthesis" in window)) return;
@@ -293,6 +339,7 @@ export function AdvisorChatModal({
         ]);
         setVoiceLastSuggestedReply(result.suggested_reply);
         setVoiceLastDebug(result.debug ?? null);
+        setReadyForNextTurn(false);
         speak(advisorReply);
         recorder.resetRecording();
         recorder.setStatus("idle");
@@ -343,6 +390,37 @@ export function AdvisorChatModal({
     await sendVoice(payload);
   }, [finalizeInFlight, recorder, sendVoice]);
 
+  const beginNextTurnRecording = useCallback(async () => {
+    if (finalizeInFlight || flowPhase === "sending" || flowPhase === "initializing_media") return;
+    setVoiceSendError(null);
+    setReadyForNextTurn(false);
+    recorder.resetRecording();
+    await recorder.startRecording();
+  }, [finalizeInFlight, flowPhase, recorder]);
+
+  const handlePrimaryVoiceAction = useCallback(async () => {
+    if (flowPhase === "advisor_speaking") {
+      stopTts();
+      return;
+    }
+    if (
+      flowPhase === "ready_for_next_turn" ||
+      flowPhase === "error" ||
+      (flowPhase === "user_paused" && !voiceLiveTranscript)
+    ) {
+      await beginNextTurnRecording();
+      return;
+    }
+    if (
+      flowPhase === "countdown" ||
+      flowPhase === "initializing_media" ||
+      flowPhase === "sending"
+    ) {
+      return;
+    }
+    await handleFinalize();
+  }, [beginNextTurnRecording, flowPhase, handleFinalize, stopTts, voiceLiveTranscript]);
+
   if (!isOpen) return null;
 
   const helperText =
@@ -360,6 +438,7 @@ export function AdvisorChatModal({
     setVoiceLastSuggestedReply(null);
     setVoiceLastDebug(null);
     setFinalizeInFlight(false);
+    setReadyForNextTurn(false);
     const desktopDefault =
       typeof window !== "undefined" ? window.matchMedia("(min-width: 1024px)").matches : false;
     setVoiceChatExpanded(desktopDefault);
@@ -392,13 +471,33 @@ export function AdvisorChatModal({
                     </button>
 
                     <div className="relative mt-16 flex h-[256px] w-[256px] items-center justify-center">
-                      <span className={`voice-pulse-ring voice-pulse-ring-1 ${voiceSpeaking ? "is-speaking" : ""} ${recorder.status === "recording" ? "is-listening" : ""}`} />
-                      <span className={`voice-pulse-ring voice-pulse-ring-2 ${voiceSpeaking ? "is-speaking" : ""} ${recorder.status === "recording" ? "is-listening" : ""}`} />
-                      <span className={`voice-pulse-ring voice-pulse-ring-3 ${voiceSpeaking ? "is-speaking" : ""} ${recorder.status === "recording" ? "is-listening" : ""}`} />
+                      <span className={`voice-pulse-ring voice-pulse-ring-1 ${voiceSpeaking ? "is-speaking" : ""} ${(flowPhase === "user_recording" || flowPhase === "user_paused") ? "is-listening" : ""}`} />
+                      <span className={`voice-pulse-ring voice-pulse-ring-2 ${voiceSpeaking ? "is-speaking" : ""} ${(flowPhase === "user_recording" || flowPhase === "user_paused") ? "is-listening" : ""}`} />
+                      <span className={`voice-pulse-ring voice-pulse-ring-3 ${voiceSpeaking ? "is-speaking" : ""} ${(flowPhase === "user_recording" || flowPhase === "user_paused") ? "is-listening" : ""}`} />
                       {heroAvatar ? (
-                        <Image src={heroAvatar} alt={advisorName} width={168} height={168} priority className="relative z-[2] h-[168px] w-[168px] rounded-full border-[3px] border-white/12 object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (voiceSpeaking) stopTts();
+                          }}
+                          disabled={!voiceSpeaking}
+                          className={`relative z-[2] rounded-full ${voiceSpeaking ? "cursor-pointer" : "cursor-default"}`}
+                          aria-label={voiceSpeaking ? "Detener voz del advisor" : "Avatar del advisor"}
+                        >
+                          <Image src={heroAvatar} alt={advisorName} width={168} height={168} priority className={`h-[168px] w-[168px] rounded-full border-[3px] object-cover ${flowPhase === "user_recording" ? "border-[#ef4444]/80 shadow-[0_0_0_8px_rgba(239,68,68,0.18)]" : "border-white/12"}`} />
+                        </button>
                       ) : (
-                        <span className="relative z-[2] flex h-[168px] w-[168px] items-center justify-center rounded-full border-[3px] border-white/15 bg-[#4a9eff] text-[52px] font-bold text-white">{(getInitials(advisorName) || "A")[0]}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (voiceSpeaking) stopTts();
+                          }}
+                          disabled={!voiceSpeaking}
+                          className={`relative z-[2] rounded-full ${voiceSpeaking ? "cursor-pointer" : "cursor-default"}`}
+                          aria-label={voiceSpeaking ? "Detener voz del advisor" : "Avatar del advisor"}
+                        >
+                          <span className={`flex h-[168px] w-[168px] items-center justify-center rounded-full border-[3px] bg-[#4a9eff] text-[52px] font-bold text-white ${flowPhase === "user_recording" ? "border-[#ef4444]/80 shadow-[0_0_0_8px_rgba(239,68,68,0.18)]" : "border-white/15"}`}>{(getInitials(advisorName) || "A")[0]}</span>
+                        </button>
                       )}
                       {recorder.status === "countdown" ? <span className="absolute bottom-2 right-2 z-[4] flex h-11 w-11 items-center justify-center rounded-full border-[3px] border-[#0d1520] bg-[#2d6be4] text-[22px] font-bold text-white">{recorder.countdown}</span> : null}
                     </div>
@@ -406,15 +505,21 @@ export function AdvisorChatModal({
                     <div className="mb-3 mt-2 text-center">
                       <p className="text-[14px] font-semibold text-white">{advisorName}</p>
                       {advisorRole ? <p className="text-[11px] text-white/55">{advisorRole}</p> : null}
-                      <p className={`mt-1 text-[13px] ${recorder.status === "recording" && recorder.transcribing ? "text-[#ff6b6b]" : recorder.status === "recording" || recorder.status === "recording_no_transcript" ? "text-[#fbbf24]" : recorder.status === "sending" || finalizeInFlight ? "text-[#4a9eff]" : "text-white/70"}`}>{statusText}</p>
+                      <p className={`mt-1 text-[13px] ${flowPhase === "user_recording" ? "text-[#ff6b6b]" : flowPhase === "user_paused" ? "text-[#fbbf24]" : flowPhase === "advisor_speaking" ? "text-[#9dc7ff]" : flowPhase === "sending" ? "text-[#4a9eff]" : "text-white/70"}`}>{statusText}</p>
                     </div>
 
-                    <div className="mb-3 flex h-9 items-center gap-[3px]">{Array.from({ length: 12 }).map((_, index) => <span key={`wave-${index}`} className={`voice-wave-bar ${recorder.status === "recording" || voiceSpeaking ? "is-active" : "is-paused"}`} style={{ animationDelay: `${index * 0.1}s` }} />)}</div>
+                    <div className="mb-3 flex h-9 items-center gap-[3px]">{Array.from({ length: 12 }).map((_, index) => <span key={`wave-${index}`} className={`voice-wave-bar ${flowPhase === "user_recording" || flowPhase === "advisor_speaking" ? "is-active" : "is-paused"}`} style={{ animationDelay: `${index * 0.1}s` }} />)}</div>
                     <button type="button" onClick={() => setVoiceTranscriptOpen((prev) => !prev)} className="mb-1 flex items-center gap-2 bg-transparent text-[12px] text-white/40 transition-colors hover:text-white/65"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" className={`h-3 w-3 transition-transform ${voiceTranscriptOpen ? "rotate-90" : ""}`}><path d="M4 2l4 4-4 4" /></svg>lo que se escucho</button>
                     <div className={`w-full overflow-hidden rounded-[10px] bg-white/6 px-3.5 text-[12px] leading-5 text-white/60 transition-all duration-300 ${voiceTranscriptOpen ? "mb-3 max-h-[44px] py-2" : "mb-0 max-h-0 py-0"}`}>El transcript en vivo se muestra en el chat lateral.</div>
                     {voiceSendError || recorder.errorMessage ? <p className="mb-2 w-full text-center text-[12px] text-[#fca5a5]">{voiceSendError ?? recorder.errorMessage}</p> : null}
                     <div className="mt-auto flex w-full gap-2.5">
-                      <button type="button" onClick={() => void handleFinalize()} disabled={finalizeInFlight || recorder.status === "countdown" || recorder.status === "initializing_media" || recorder.status === "sending"} className="flex-1 rounded-xl border-0 bg-[#2d6be4] px-4 py-[11px] text-[14px] font-semibold text-white transition-all hover:bg-[#1d5bcd] disabled:cursor-not-allowed disabled:opacity-45">Finalizar grabacion</button>
+                      <button type="button" onClick={() => void handlePrimaryVoiceAction()} disabled={finalizeInFlight || flowPhase === "countdown" || flowPhase === "initializing_media" || flowPhase === "sending"} className="flex-1 rounded-xl border-0 bg-[#2d6be4] px-4 py-[11px] text-[14px] font-semibold text-white transition-all hover:bg-[#1d5bcd] disabled:cursor-not-allowed disabled:opacity-45">
+                        {flowPhase === "advisor_speaking"
+                          ? "Detener"
+                          : flowPhase === "ready_for_next_turn" || flowPhase === "error"
+                            ? "Responder"
+                            : "Enviar mensaje"}
+                      </button>
                       <button type="button" onClick={() => closeVoice()} className="rounded-xl border border-white/12 bg-white/[0.06] px-4 py-[11px] text-[13px] text-white/70 transition-all hover:bg-white/[0.1] hover:text-white">Cancelar</button>
                     </div>
                   </section>
@@ -434,10 +539,10 @@ export function AdvisorChatModal({
                           </div>
                         ))}
 
-                        {(recorder.status === "recording" ||
-                          recorder.status === "recording_no_transcript" ||
+                        {(flowPhase === "user_recording" ||
+                          flowPhase === "user_paused" ||
                           recorder.status === "stopping" ||
-                          recorder.status === "sending" ||
+                          flowPhase === "sending" ||
                           finalizeInFlight) &&
                         voiceLiveTranscript ? (
                           <div className="flex justify-end">
@@ -445,7 +550,7 @@ export function AdvisorChatModal({
                               <p className="mb-1 text-right text-[10px] font-bold tracking-[0.08em] text-[#a16207]">TU VOZ</p>
                               <div className="rounded-[16px_16px_4px_16px] border border-amber-300/60 bg-amber-100 px-[12px] py-[9px] text-[13px] leading-[1.55] text-amber-950">
                                 {voiceLiveTranscript}
-                                {recorder.status === "recording" && recorder.transcribing ? (
+                                {flowPhase === "user_recording" && recorder.transcribing ? (
                                   <span className="voice-live-caret ml-0.5 inline-block h-[15px] w-[1px] bg-amber-900 align-[-2px]" />
                                 ) : null}
                               </div>
