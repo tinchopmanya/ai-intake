@@ -1,25 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 
-import {
-  advisorPanelShellClass,
-  advisorVoiceBodyClass,
-  advisorVoiceHeaderClass,
-} from "@/components/mvp/advisorUiStyles";
+import { advisorPanelShellClass, advisorVoiceBodyClass, advisorVoiceHeaderClass } from "@/components/mvp/advisorUiStyles";
 import { Button, Textarea } from "@/components/mvp/ui";
 import { postAdvisorVoice } from "@/lib/api/client";
 import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
 
-export type AdvisorChatMessage = {
-  id: string;
-  role: "user" | "advisor";
-  text: string;
-};
-
+export type AdvisorChatMessage = { id: string; role: "user" | "advisor"; text: string };
 export type AdvisorChatEntryMode = "advisor_conversation" | "advisor_refine_response";
-
 type VoiceSessionTurn = { role: "user" | "advisor"; text: string };
 
 type AdvisorChatModalProps = {
@@ -55,27 +46,19 @@ type AdvisorChatModalProps = {
   }) => void;
 };
 
-function getInitials(value: string): string {
-  return value
-    .split(" ")
-    .filter((part) => part.trim().length > 0)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("");
+function initials(value: string) {
+  return value.split(" ").filter(Boolean).slice(0, 2).map((p) => p[0]!.toUpperCase()).join("");
 }
 
-function resolveAvatarVariant(src: string | null | undefined, variant: "128" | "256"): string | null {
+function avatarVariant(src: string | null | undefined, variant: "128" | "256") {
   if (!src) return null;
-  if (variant === "128") {
-    if (src.includes("_128")) return src;
-    if (src.includes("_64")) return src.replace("_64", "_128");
-    if (src.includes("_256")) return src.replace("_256", "_128");
-    return src;
-  }
-  if (src.includes("_256")) return src;
-  if (src.includes("_128")) return src.replace("_128", "_256");
-  if (src.includes("_64")) return src.replace("_64", "_256");
-  return src;
+  if (variant === "128") return src.replace("_64", "_128").replace("_256", "_128");
+  return src.replace("_64", "_256").replace("_128", "_256");
+}
+
+function pickSpanishVoice(voices: SpeechSynthesisVoice[]) {
+  const spanish = voices.filter((v) => v.lang.toLowerCase().startsWith("es"));
+  return spanish.find((v) => /(female|mujer|sofia|paulina|monica|helena|maria)/i.test(v.name)) ?? spanish[0] ?? voices[0] ?? null;
 }
 
 export function AdvisorChatModal({
@@ -102,464 +85,195 @@ export function AdvisorChatModal({
   onVoiceSessionSync,
 }: AdvisorChatModalProps) {
   const isDevelopment = process.env.NODE_ENV !== "production";
-  const [voiceModalOpen, setVoiceModalOpen] = useState(false);
+  const [voiceOpen, setVoiceOpen] = useState(false);
   const [voiceTranscriptOpen, setVoiceTranscriptOpen] = useState(false);
   const [voiceSendError, setVoiceSendError] = useState<string | null>(null);
-  const [voiceSessionTurns, setVoiceSessionTurns] = useState<VoiceSessionTurn[]>([]);
-  const [voiceSessionLastSuggestedReply, setVoiceSessionLastSuggestedReply] = useState<string | null>(null);
-  const [voiceSessionLastDebug, setVoiceSessionLastDebug] = useState<Record<string, unknown> | null>(null);
-  const voiceAutoStartGuardRef = useRef(false);
-  const voiceSendAfterStopRef = useRef(false);
+  const [voiceTurns, setVoiceTurns] = useState<VoiceSessionTurn[]>([]);
+  const [lastSuggestedReply, setLastSuggestedReply] = useState<string | null>(null);
+  const [lastVoiceDebug, setLastVoiceDebug] = useState<Record<string, unknown> | null>(null);
+  const [voiceChatExpanded, setVoiceChatExpanded] = useState(false);
+  const [voiceSpeaking, setVoiceSpeaking] = useState(false);
+  const autoStartGuardRef = useRef(false);
+  const sendAfterStopRef = useRef(false);
+  const synthVoicesRef = useRef<SpeechSynthesisVoice[]>([]);
+  const sendVoiceRef = useRef<() => Promise<void>>(async () => undefined);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
 
-  const headerAvatarSrc = useMemo(() => resolveAvatarVariant(advisorAvatarSrc, "128"), [advisorAvatarSrc]);
-  const voiceHeroAvatarSrc = useMemo(() => resolveAvatarVariant(advisorAvatarSrc, "256"), [advisorAvatarSrc]);
+  const headerAvatar = useMemo(() => avatarVariant(advisorAvatarSrc, "128"), [advisorAvatarSrc]);
+  const heroAvatar = useMemo(() => avatarVariant(advisorAvatarSrc, "256"), [advisorAvatarSrc]);
+  const preferredVoiceLang = useMemo(() => (typeof navigator !== "undefined" && navigator.language.toLowerCase().startsWith("es-uy") ? "es-UY" : "es-ES"), []);
+  const recorder = useVoiceRecorder({ lang: preferredVoiceLang, countdownSeconds: 3 });
+  const statusRef = useRef(recorder.status);
+  const blobRef = useRef(recorder.audioBlob);
+  const startFlowRef = useRef(recorder.startFlow);
 
-  const preferredVoiceLang = useMemo(() => {
-    if (typeof navigator === "undefined") return "es-UY";
-    const browserLanguages = [navigator.language, ...(navigator.languages ?? [])]
-      .filter((item): item is string => Boolean(item))
-      .map((item) => item.toLowerCase());
-    return browserLanguages.some((item) => item.startsWith("es-uy")) ? "es-UY" : "es-ES";
+  useEffect(() => { statusRef.current = recorder.status; blobRef.current = recorder.audioBlob; }, [recorder.audioBlob, recorder.status]);
+  useEffect(() => { startFlowRef.current = recorder.startFlow; }, [recorder.startFlow]);
+  useEffect(() => { if (!voiceChatExpanded) return; scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }); }, [voiceChatExpanded, voiceTurns]);
+  useEffect(() => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    const load = () => { synthVoicesRef.current = window.speechSynthesis.getVoices(); };
+    load();
+    window.speechSynthesis.addEventListener("voiceschanged", load);
+    return () => window.speechSynthesis.removeEventListener("voiceschanged", load);
+  }, []);
+  useEffect(() => {
+    if (!voiceOpen || typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    const id = window.setInterval(() => setVoiceSpeaking(window.speechSynthesis.speaking), 100);
+    return () => window.clearInterval(id);
+  }, [voiceOpen]);
+  useEffect(() => {
+    if (!voiceOpen) { autoStartGuardRef.current = false; return; }
+    if (autoStartGuardRef.current) return;
+    autoStartGuardRef.current = true;
+    startFlowRef.current();
+  }, [voiceOpen]);
+
+  const voiceText = recorder.transcript.trim() || "Mensaje de voz";
+  const statusText = recorder.status === "countdown"
+    ? `Iniciando en ${recorder.countdown} segundo${recorder.countdown === 1 ? "" : "s"}...`
+    : recorder.status === "recording" ? "Escuchando..." : recorder.status === "sending" ? "Enviando..." : recorder.status === "error" ? "No pudimos grabar el audio." : "Preparando...";
+
+  const stopTts = useCallback(() => { if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel(); setVoiceSpeaking(false); }, []);
+  const speak = useCallback((text: string) => {
+    if (!text.trim() || typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    const synth = window.speechSynthesis;
+    synth.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "es-UY";
+    u.rate = 0.94;
+    u.pitch = 1.04;
+    const v = pickSpanishVoice(synthVoicesRef.current);
+    if (v) u.voice = v;
+    u.onstart = () => setVoiceSpeaking(true);
+    u.onend = () => setVoiceSpeaking(false);
+    u.onerror = () => setVoiceSpeaking(false);
+    synth.speak(u);
   }, []);
 
-  const recorder = useVoiceRecorder({
-    lang: preferredVoiceLang,
-    countdownSeconds: 3,
-  });
-  const recorderStatusRef = useRef(recorder.status);
-  const recorderAudioBlobRef = useRef(recorder.audioBlob);
-
-  const startVoiceFlowRef = useRef(recorder.startFlow);
-  useEffect(() => {
-    startVoiceFlowRef.current = recorder.startFlow;
-  }, [recorder.startFlow]);
-
-  const voiceUserText = recorder.transcript.trim() || "Mensaje de voz";
-
-  const statusText = useMemo(() => {
-    if (recorder.status === "countdown") {
-      if (recorder.countdown > 1) return `Iniciando en ${recorder.countdown} segundos...`;
-      return `Iniciando en ${recorder.countdown} segundo...`;
-    }
-    if (recorder.status === "recording") return "Escuchando...";
-    if (recorder.status === "sending") return "Enviando...";
-    if (recorder.status === "error") return "No pudimos grabar el audio.";
-    if (recorder.audioBlob) return "Grabacion lista para enviar";
-    return "Preparando...";
-  }, [recorder.audioBlob, recorder.countdown, recorder.status]);
-
-  const headerStatusText = useMemo(() => {
-    if (recorder.status === "countdown") return "Preparando...";
-    if (recorder.status === "recording") return "Escuchando tu mensaje";
-    if (recorder.status === "sending") return "Procesando tu mensaje";
-    if (recorder.audioBlob) return "Listo para enviar";
-    if (recorder.status === "error") return "Error";
-    return "Preparando...";
-  }, [recorder.audioBlob, recorder.status]);
-
   const commitVoiceSession = useCallback(() => {
-    if (voiceSessionTurns.length === 0) return;
-    if (onVoiceSessionSync) {
-      onVoiceSessionSync({
-        turns: voiceSessionTurns,
-        lastSuggestedReply: voiceSessionLastSuggestedReply,
-        debug: voiceSessionLastDebug,
-      });
-      return;
-    }
-    if (onVoiceExchangeComplete) {
-      for (let index = 0; index < voiceSessionTurns.length - 1; index += 2) {
-        const userTurn = voiceSessionTurns[index];
-        const advisorTurn = voiceSessionTurns[index + 1];
-        if (!userTurn || !advisorTurn || userTurn.role !== "user" || advisorTurn.role !== "advisor") continue;
-        onVoiceExchangeComplete({
-          userText: userTurn.text,
-          advisorText: advisorTurn.text,
-          suggestedReply: null,
-          debug: null,
-        });
-      }
-    }
-  }, [
-    onVoiceExchangeComplete,
-    onVoiceSessionSync,
-    voiceSessionLastDebug,
-    voiceSessionLastSuggestedReply,
-    voiceSessionTurns,
-  ]);
+    if (voiceTurns.length === 0) return;
+    if (onVoiceSessionSync) { onVoiceSessionSync({ turns: voiceTurns, lastSuggestedReply, debug: lastVoiceDebug }); return; }
+    if (onVoiceExchangeComplete) for (let i = 0; i < voiceTurns.length - 1; i += 2) if (voiceTurns[i]?.role === "user" && voiceTurns[i + 1]?.role === "advisor") onVoiceExchangeComplete({ userText: voiceTurns[i]!.text, advisorText: voiceTurns[i + 1]!.text, suggestedReply: null, debug: null });
+  }, [lastSuggestedReply, lastVoiceDebug, onVoiceExchangeComplete, onVoiceSessionSync, voiceTurns]);
 
-  const closeVoiceModal = useCallback(
-    ({ commitSession = true }: { commitSession?: boolean } = {}) => {
-      if (commitSession) {
-        commitVoiceSession();
-      }
-      voiceAutoStartGuardRef.current = false;
-      recorder.resetRecording();
-      setVoiceTranscriptOpen(false);
-      setVoiceSendError(null);
-      voiceSendAfterStopRef.current = false;
-      setVoiceSessionTurns([]);
-      setVoiceSessionLastSuggestedReply(null);
-      setVoiceSessionLastDebug(null);
-      setVoiceModalOpen(false);
-    },
-    [commitVoiceSession, recorder],
-  );
-
-  function openVoiceModal() {
+  const closeVoice = useCallback(({ commit = true }: { commit?: boolean } = {}) => {
+    if (commit) commitVoiceSession();
+    stopTts();
+    recorder.resetRecording();
+    setVoiceOpen(false);
     setVoiceTranscriptOpen(false);
     setVoiceSendError(null);
-    voiceSendAfterStopRef.current = false;
-    setVoiceSessionTurns([]);
-    setVoiceSessionLastSuggestedReply(null);
-    setVoiceSessionLastDebug(null);
-    setVoiceModalOpen(true);
-  }
+    setVoiceTurns([]);
+    setLastSuggestedReply(null);
+    setLastVoiceDebug(null);
+    setVoiceChatExpanded(false);
+    sendAfterStopRef.current = false;
+  }, [commitVoiceSession, recorder, stopTts]);
 
-  useEffect(() => {
-    if (!voiceModalOpen) {
-      voiceAutoStartGuardRef.current = false;
-      return;
-    }
-    if (voiceAutoStartGuardRef.current) return;
-    voiceAutoStartGuardRef.current = true;
-    startVoiceFlowRef.current();
-  }, [voiceModalOpen]);
-
-  const handleSendVoice = useCallback(async () => {
-    if (!advisorId || !recorder.audioBlob || recorder.status === "sending") return;
-    setVoiceSendError(null);
+  const sendVoice = useCallback(async () => {
+    if (!advisorId || !blobRef.current) return;
     recorder.setStatus("sending");
+    setVoiceSendError(null);
     try {
-      const baseMessages = [
-        ...messages.map((item) => ({ role: item.role, content: item.text })),
-        ...voiceSessionTurns.map((item) => ({ role: item.role, content: item.text })),
-      ];
-      const userVoiceMessage = { role: "user" as const, content: voiceUserText };
-      const payloadMessages =
-        baseMessages.length > 0 &&
-        baseMessages[baseMessages.length - 1]?.role === "user" &&
-        baseMessages[baseMessages.length - 1]?.content.trim() === userVoiceMessage.content.trim()
-          ? baseMessages
-          : [...baseMessages, userVoiceMessage];
-
+      const history = [...messages.map((m) => ({ role: m.role, content: m.text })), ...voiceTurns.map((t) => ({ role: t.role, content: t.text }))];
       const result = await postAdvisorVoice({
         advisor_id: advisorId,
         entry_mode: entryMode,
-        transcript: voiceUserText,
-        audio_blob: recorder.audioBlob,
-        audio_mime_type: recorder.audioBlob.type,
-        messages: payloadMessages,
+        transcript: voiceText,
+        audio_blob: blobRef.current,
+        audio_mime_type: blobRef.current.type,
+        messages: [...history, { role: "user", content: voiceText }],
         case_id: caseId,
-        conversation_context: {
-          user_name: userName || null,
-          relationship_type: "otro",
-          extra: {
-            voice_flow: true,
-            transcript_supported: recorder.speechSupported,
-            voice_session_turns: voiceSessionTurns.length,
-          },
-        },
+        conversation_context: { user_name: userName || null, relationship_type: "otro", extra: { voice_flow: true } },
         debug: isDevelopment,
       });
-
-      const advisorText = result.message.trim() || "No pude responder ahora. Intenta nuevamente.";
-      setVoiceSessionTurns((current) => [
-        ...current,
-        { role: "user", text: voiceUserText },
-        { role: "advisor", text: advisorText },
-      ]);
-      setVoiceSessionLastSuggestedReply(result.suggested_reply);
-      setVoiceSessionLastDebug(result.debug ?? null);
+      const reply = result.message.trim() || "No pude responder ahora. Intenta nuevamente.";
+      setVoiceTurns((prev) => [...prev, { role: "user", text: voiceText }, { role: "advisor", text: reply }]);
+      setLastSuggestedReply(result.suggested_reply);
+      setLastVoiceDebug(result.debug ?? null);
+      speak(reply);
       recorder.resetRecording();
       recorder.setStatus("idle");
-
-      if (!onVoiceSessionSync && onVoiceExchangeComplete) {
-        onVoiceExchangeComplete({
-          userText: voiceUserText,
-          advisorText,
-          suggestedReply: result.suggested_reply,
-          debug: result.debug ?? null,
-        });
-      }
-      if (!onVoiceSessionSync && !onVoiceExchangeComplete) {
-        onDraftChange(voiceUserText);
-        if (autoSendOnVoiceComplete) {
-          window.setTimeout(() => onSend(), 0);
-        }
-      }
+      sendAfterStopRef.current = false;
+      if (!onVoiceSessionSync && !onVoiceExchangeComplete) { onDraftChange(voiceText); if (autoSendOnVoiceComplete) window.setTimeout(() => onSend(), 0); }
     } catch {
       recorder.setStatus("error");
       setVoiceSendError("No pudimos enviar la grabacion. Intenta de nuevo.");
     }
-  }, [
-    advisorId,
-    autoSendOnVoiceComplete,
-    caseId,
-    entryMode,
-    isDevelopment,
-    messages,
-    onDraftChange,
-    onSend,
-    onVoiceExchangeComplete,
-    onVoiceSessionSync,
-    recorder,
-    userName,
-    voiceSessionTurns,
-    voiceUserText,
-  ]);
-  const handleSendVoiceRef = useRef(handleSendVoice);
-  useEffect(() => {
-    handleSendVoiceRef.current = handleSendVoice;
-  }, [handleSendVoice]);
-  useEffect(() => {
-    recorderStatusRef.current = recorder.status;
-    recorderAudioBlobRef.current = recorder.audioBlob;
-  }, [recorder.audioBlob, recorder.status]);
+  }, [advisorId, autoSendOnVoiceComplete, caseId, entryMode, isDevelopment, messages, onDraftChange, onSend, onVoiceExchangeComplete, onVoiceSessionSync, recorder, speak, userName, voiceText, voiceTurns]);
+  useEffect(() => { sendVoiceRef.current = sendVoice; }, [sendVoice]);
 
-  function handleFinishRecording() {
-    if (recorder.status !== "recording") return;
-    voiceSendAfterStopRef.current = true;
-    recorder.stopRecording();
-    const waitForBlobAndSend = () => {
-      if (!voiceSendAfterStopRef.current || !voiceModalOpen) return;
-      if (recorderStatusRef.current === "stopped" && recorderAudioBlobRef.current) {
-        voiceSendAfterStopRef.current = false;
-        void handleSendVoiceRef.current();
-        return;
-      }
-      window.setTimeout(waitForBlobAndSend, 120);
-    };
-    window.setTimeout(waitForBlobAndSend, 120);
-  }
-
-  function handleCloseAdvisorModal() {
-    if (voiceModalOpen) {
-      closeVoiceModal();
+  const finalize = () => {
+    if (recorder.status === "countdown" || recorder.status === "sending") return;
+    if (recorder.status === "recording") {
+      sendAfterStopRef.current = true;
+      recorder.stopRecording();
+      const waitBlob = () => {
+        if (!sendAfterStopRef.current || !voiceOpen) return;
+        if (statusRef.current === "stopped" && blobRef.current) { sendAfterStopRef.current = false; void sendVoiceRef.current(); return; }
+        window.setTimeout(waitBlob, 120);
+      };
+      window.setTimeout(waitBlob, 120);
+      return;
     }
-    onClose();
-  }
-
-  const inputPlaceholder =
-    entryMode === "advisor_conversation" ? "Escribi tu mensaje..." : "Escribi como queres ajustarlo...";
-  const helperFallback =
-    entryMode === "advisor_conversation"
-      ? `Como estas hoy${userName ? `, ${userName}` : ""}? En que te puedo ayudar?`
-      : "Contame que queres ajustar y lo mejoramos juntos.";
-  const resolvedHelperCopy = helperCopy || helperFallback;
-
-  function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      if (!sending && draft.trim()) {
-        onSend();
-      }
-    }
-  }
+    if (recorder.status === "stopped" && blobRef.current) { void sendVoiceRef.current(); return; }
+    if (recorder.status === "idle" || recorder.status === "error") startFlowRef.current();
+  };
 
   if (!isOpen) return null;
 
+  const helper = helperCopy || (entryMode === "advisor_conversation" ? `Como estas hoy${userName ? `, ${userName}` : ""}? En que te puedo ayudar?` : "Contame que queres ajustar y lo mejoramos juntos.");
+  const inputPlaceholder = entryMode === "advisor_conversation" ? "Escribi tu mensaje..." : "Escribi como queres ajustarlo...";
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-[2px]">
-      <div className={`relative flex h-[min(92vh,760px)] w-full max-w-[560px] flex-col overflow-hidden ${advisorPanelShellClass}`}>
-        <header className="flex items-center gap-3 bg-[#1e2a3a] px-5 py-4">
-          {headerAvatarSrc ? (
-            <Image src={headerAvatarSrc} alt={advisorName} width={48} height={48} className="h-12 w-12 rounded-full border-2 border-white/20 object-cover" />
-          ) : (
-            <span className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-white/20 bg-[#4a9eff] text-[18px] font-bold text-white">
-              {(getInitials(advisorName) || "A").slice(0, 1)}
-            </span>
-          )}
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[17px] font-semibold text-white">{advisorName}</p>
-            {advisorRole ? <p className="mt-0.5 text-[12px] text-white/55">{advisorRole}</p> : null}
-            {advisorDescription ? <p className="mt-1 line-clamp-2 text-[11px] text-white/70">{advisorDescription}</p> : null}
-          </div>
-          <Button type="button" variant="secondary" onClick={handleCloseAdvisorModal} className="shrink-0 rounded-[10px] border-0 bg-white/10 px-4 py-[7px] text-[13px] text-white hover:bg-white/20">
-            Cerrar
-          </Button>
-        </header>
-
-        <div className="flex min-h-0 flex-1 flex-col bg-[#f4f6fa]">
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-3 pt-5">
-            {messages.length === 0 ? (
-              <div className="max-w-[80%]">
-                <p className="mb-1 text-[10px] font-bold tracking-[0.08em] text-[#2d6be4]">{advisorName.toUpperCase()}</p>
-                <div className="rounded-[4px_16px_16px_16px] border border-[#e8ecf2] bg-white px-4 py-3 text-[14px] leading-[1.55] text-[#2c3e50]">{resolvedHelperCopy}</div>
+    <>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-[2px]">
+        <div className={`relative flex h-[min(92vh,760px)] w-full max-w-[560px] flex-col overflow-hidden ${advisorPanelShellClass}`}>
+          <header className="flex items-center gap-3 bg-[#1e2a3a] px-5 py-4">
+            {headerAvatar ? <Image src={headerAvatar} alt={advisorName} width={48} height={48} className="h-12 w-12 rounded-full border-2 border-white/20 object-cover" /> : <span className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-white/20 bg-[#4a9eff] text-[18px] font-bold text-white">{(initials(advisorName) || "A")[0]}</span>}
+            <div className="min-w-0 flex-1"><p className="truncate text-[17px] font-semibold text-white">{advisorName}</p>{advisorRole ? <p className="mt-0.5 text-[12px] text-white/55">{advisorRole}</p> : null}{advisorDescription ? <p className="mt-1 line-clamp-2 text-[11px] text-white/70">{advisorDescription}</p> : null}</div>
+            <Button type="button" variant="secondary" onClick={() => { if (voiceOpen) closeVoice(); onClose(); }} className="rounded-full border border-white/20 bg-black/30 px-4 py-1.5 text-[13px] text-white hover:bg-black/45">Cerrar</Button>
+          </header>
+          <div className="flex min-h-0 flex-1 flex-col bg-[#f4f6fa]">
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-3 pt-5">{messages.length === 0 ? <div className="max-w-[80%]"><p className="mb-1 text-[10px] font-bold tracking-[0.08em] text-[#2d6be4]">{advisorName.toUpperCase()}</p><div className="rounded-[4px_16px_16px_16px] border border-[#e8ecf2] bg-white px-4 py-3 text-[14px] leading-[1.55] text-[#2c3e50]">{helper}</div></div> : <div className="flex flex-col gap-3">{messages.map((m) => <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}><div className={m.role === "user" ? "max-w-[70%]" : "max-w-[80%]"}><p className={`mb-1 text-[10px] font-bold tracking-[0.08em] ${m.role === "user" ? "text-right text-[#2d8a50]" : "text-[#2d6be4]"}`}>{m.role === "user" ? "TU" : advisorName.toUpperCase()}</p><div className={`whitespace-pre-wrap break-words px-[14px] py-[10px] text-[14px] leading-[1.55] ${m.role === "user" ? "rounded-[16px_16px_4px_16px] bg-[#d4edda] text-[#1a4a2a]" : "rounded-[4px_16px_16px_16px] border border-[#e8ecf2] bg-white text-[#2c3e50]"}`}>{m.text}</div></div></div>)}</div>}</div>
+            <footer className="border-t border-[#e8ecf2] bg-white px-4 py-3">
+              <div className="mb-2 flex items-end gap-2">
+                <Textarea id="advisor-chat-draft" value={draft} onChange={(e) => onDraftChange(e.target.value)} rows={1} spellCheck={false} placeholder={inputPlaceholder} onKeyDown={(e: KeyboardEvent<HTMLTextAreaElement>) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (!sending && draft.trim()) onSend(); } }} className="min-h-[42px] max-h-[120px] flex-1 rounded-xl border-[1.5px] border-[#dde3ef] px-[14px] py-[10px] text-[14px] text-[#2c3e50] placeholder:text-[#aab3c5] focus:border-[#4a9eff] focus:ring-0" />
+                <button type="button" onClick={() => { setVoiceTranscriptOpen(false); setVoiceSendError(null); setVoiceTurns([]); setLastSuggestedReply(null); setLastVoiceDebug(null); setVoiceChatExpanded(false); sendAfterStopRef.current = false; setVoiceOpen(true); }} className="inline-flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full border-[1.5px] border-[#dde3ef] bg-[#f4f6fa] text-[#6b7a99] transition-all hover:border-[#4a9eff] hover:bg-[#e8ecf2]" aria-label="Hablar con el advisor"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10a7 7 0 0 0 14 0" /><path d="M12 19v3" /><path d="M8 22h8" /></svg></button>
+                <Button type="button" variant="primary" disabled={sending || !draft.trim()} onClick={onSend} className="h-[42px] rounded-xl border-0 bg-[#2d6be4] px-[18px] text-[14px] font-semibold text-white hover:bg-[#1d5bcd]">{sending ? "Enviando..." : "Enviar"}</Button>
               </div>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {messages.map((message) => {
-                  const isUser = message.role === "user";
-                  return (
-                    <div key={message.id} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-                      <div className={isUser ? "max-w-[70%]" : "max-w-[80%]"}>
-                        <p className={`mb-1 text-[10px] font-bold tracking-[0.08em] ${isUser ? "text-right text-[#2d8a50]" : "text-[#2d6be4]"}`}>
-                          {isUser ? "TU" : advisorName.toUpperCase()}
-                        </p>
-                        <div className={`whitespace-pre-wrap break-words px-[14px] py-[10px] text-[14px] leading-[1.55] ${isUser ? "rounded-[16px_16px_4px_16px] bg-[#d4edda] text-[#1a4a2a]" : "rounded-[4px_16px_16px_16px] border border-[#e8ecf2] bg-white text-[#2c3e50]"}`}>
-                          {message.text}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="flex items-center justify-between gap-2">
+                <Button type="button" variant="secondary" onClick={onUseResponse} className="rounded-[10px] border-[1.5px] border-[#dde3ef] bg-transparent px-[14px] py-[7px] text-[13px] text-[#6b7a99] hover:border-[#4a9eff] hover:text-[#2d6be4]">Usar esta respuesta</Button>
+                {isDevelopment && debugPayload ? <details className="text-right"><summary className="cursor-pointer text-[11px] text-[#aab3c5]">Debug prompt (solo desarrollo)</summary><pre className="mt-2 max-h-40 overflow-auto rounded-lg border border-[#e8ecf2] bg-[#f8fafc] p-2 text-left text-[11px] text-[#334155]">{JSON.stringify(debugPayload, null, 2)}</pre></details> : null}
               </div>
-            )}
+            </footer>
           </div>
-
-          <footer className="border-t border-[#e8ecf2] bg-white px-4 py-3">
-            <div className="mb-2 flex items-end gap-2">
-              <Textarea id="advisor-chat-draft" value={draft} onChange={(event) => onDraftChange(event.target.value)} rows={1} spellCheck={false} placeholder={inputPlaceholder} onKeyDown={handleKeyDown} className="min-h-[42px] max-h-[120px] flex-1 rounded-xl border-[1.5px] border-[#dde3ef] px-[14px] py-[10px] text-[14px] text-[#2c3e50] placeholder:text-[#aab3c5] focus:border-[#4a9eff] focus:ring-0" />
-              <button type="button" onClick={openVoiceModal} className="inline-flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full border-[1.5px] border-[#dde3ef] bg-[#f4f6fa] text-[#6b7a99] transition-all hover:border-[#4a9eff] hover:bg-[#e8ecf2]" aria-label="Hablar con el advisor">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]">
-                  <rect x="9" y="2" width="6" height="12" rx="3" />
-                  <path d="M5 10a7 7 0 0 0 14 0" />
-                  <path d="M12 19v3" />
-                  <path d="M8 22h8" />
-                </svg>
-              </button>
-              <Button type="button" variant="primary" disabled={sending || !draft.trim()} onClick={onSend} className="h-[42px] rounded-xl border-0 bg-[#2d6be4] px-[18px] text-[14px] font-semibold text-white hover:bg-[#1d5bcd]">
-                {sending ? "Enviando..." : "Enviar"}
-              </Button>
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <Button type="button" variant="secondary" onClick={onUseResponse} className="rounded-[10px] border-[1.5px] border-[#dde3ef] bg-transparent px-[14px] py-[7px] text-[13px] text-[#6b7a99] hover:border-[#4a9eff] hover:text-[#2d6be4]">
-                Usar esta respuesta
-              </Button>
-              {isDevelopment && debugPayload ? (
-                <details className="text-right">
-                  <summary className="cursor-pointer text-[11px] text-[#aab3c5]">Debug prompt (solo desarrollo)</summary>
-                  <pre className="mt-2 max-h-40 overflow-auto rounded-lg border border-[#e8ecf2] bg-[#f8fafc] p-2 text-left text-[11px] text-[#334155]">{JSON.stringify(debugPayload, null, 2)}</pre>
-                </details>
-              ) : null}
-            </div>
-          </footer>
         </div>
-
-        {voiceModalOpen ? (
-          <div className="absolute inset-0 z-30 flex items-center justify-center bg-slate-950/65 p-3 backdrop-blur-[2px]">
-            <div className={`w-full max-w-[560px] overflow-hidden ${advisorPanelShellClass}`}>
-              <header className={`${advisorVoiceHeaderClass} flex items-center gap-3 px-5 py-3.5`}>
-                {headerAvatarSrc ? (
-                  <Image src={headerAvatarSrc} alt={advisorName} width={48} height={48} priority={voiceModalOpen} className="h-12 w-12 rounded-full border-2 border-white/18 object-cover" />
-                ) : (
-                  <span className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-white/18 bg-[#4a9eff] text-[18px] font-bold text-white">
-                    {(getInitials(advisorName) || "A").slice(0, 1)}
-                  </span>
-                )}
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[16px] font-semibold text-white">{advisorName}</p>
-                  {advisorRole ? <p className="mt-0.5 text-[11px] text-white/45">{advisorRole}</p> : null}
-                  <p className="mt-0.5 flex items-center gap-1.5 text-[12px] text-[#4a9eff]">
-                    <span className={`h-1.5 w-1.5 rounded-full ${recorder.status === "recording" ? "animate-pulse bg-[#ff6b6b]" : "bg-[#4a9eff]"}`} />
-                    {headerStatusText}
-                  </p>
-                </div>
-                <Button type="button" variant="secondary" onClick={() => closeVoiceModal()} className="rounded-[10px] border-0 bg-white/10 px-4 py-[7px] text-[13px] text-white hover:bg-white/20">
-                  Cerrar
-                </Button>
-              </header>
-
-              <div className={`${advisorVoiceBodyClass} flex flex-col items-center px-6 pb-6 pt-8`}>
-                <div className="relative mb-5 flex h-[256px] w-[256px] items-center justify-center">
-                  <span className={`voice-pulse-ring voice-pulse-ring-1 ${recorder.status === "recording" ? "is-listening" : ""}`} aria-hidden />
-                  <span className={`voice-pulse-ring voice-pulse-ring-2 ${recorder.status === "recording" ? "is-listening" : ""}`} aria-hidden />
-                  <span className={`voice-pulse-ring voice-pulse-ring-3 ${recorder.status === "recording" ? "is-listening" : ""}`} aria-hidden />
-                  {voiceHeroAvatarSrc ? (
-                    <Image src={voiceHeroAvatarSrc} alt={advisorName} width={168} height={168} priority={voiceModalOpen} className="relative z-[2] h-[168px] w-[168px] rounded-full border-[3px] border-white/12 object-cover" />
-                  ) : (
-                    <span className="relative z-[2] flex h-[168px] w-[168px] items-center justify-center rounded-full border-[3px] border-white/15 bg-[#4a9eff] text-[52px] font-bold text-white">
-                      {(getInitials(advisorName) || "A").slice(0, 1)}
-                    </span>
-                  )}
-                  {recorder.status === "countdown" ? (
-                    <span className="absolute bottom-2 right-2 z-[4] flex h-11 w-11 items-center justify-center rounded-full border-[3px] border-[#0d1520] bg-[#2d6be4] text-[22px] font-bold text-white">{recorder.countdown}</span>
-                  ) : null}
-                </div>
-
-                <p className={`mb-4 text-center text-[15px] font-medium ${recorder.status === "recording" ? "text-[#ff6b6b]" : recorder.status === "sending" ? "text-[#4a9eff]" : recorder.status === "error" ? "text-[#fca5a5]" : "text-white/70"}`}>
-                  {statusText}
-                </p>
-
-                <div className="mb-4 flex h-9 items-center gap-[3px]">
-                  {Array.from({ length: 12 }).map((_, index) => (
-                    <span key={`voice-wave-${index}`} className={`voice-wave-bar ${recorder.status === "recording" ? "is-active" : "is-paused"}`} style={{ animationDelay: `${index * 0.1}s` }} />
-                  ))}
-                </div>
-
-                <button type="button" onClick={() => setVoiceTranscriptOpen((current) => !current)} className="mb-1 flex items-center gap-2 bg-transparent text-[12px] text-white/35 transition-colors hover:text-white/60">
-                  <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" className={`h-3 w-3 transition-transform ${voiceTranscriptOpen ? "rotate-90" : ""}`}>
-                    <path d="M4 2l4 4-4 4" />
-                  </svg>
-                  lo que se escucho
-                </button>
-                <div className={`w-full overflow-hidden rounded-[10px] bg-white/5 px-3.5 text-[12px] leading-6 text-white/55 transition-all duration-300 ${voiceTranscriptOpen ? "mb-3 max-h-[120px] py-2.5" : "mb-0 max-h-0 py-0"}`}>
-                  {recorder.transcript || "Aun no hay texto transcripto."}
-                </div>
-
-                <div className="mb-3 max-h-[164px] w-full space-y-2 overflow-y-auto rounded-xl border border-white/10 bg-white/[0.03] p-2.5">
-                  {voiceSessionTurns.length === 0 ? (
-                    <p className="text-[12px] text-white/45">Aun no hay respuestas en esta sesion de voz.</p>
-                  ) : (
-                    voiceSessionTurns.map((turn, index) => (
-                      <div key={`voice-session-${index}-${turn.role}`} className={`rounded-xl px-3 py-2 text-[12px] leading-5 ${turn.role === "user" ? "ml-10 border border-[#1f4f37] bg-[#123126] text-[#d4f5df]" : "mr-10 border border-white/14 bg-[#111d2e] text-white/90"}`}>
-                        <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-white/60">{turn.role === "user" ? "Tu voz" : advisorName}</p>
-                        <p>{turn.text}</p>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                {recorder.errorMessage || voiceSendError ? (
-                  <p className="mb-2 w-full text-center text-[12px] text-[#fca5a5]">{voiceSendError ?? recorder.errorMessage}</p>
-                ) : null}
-
-                <div className="mt-1 flex w-full flex-wrap gap-2.5">
-                  <button type="button" onClick={() => void recorder.requestMicProbe().then((ok) => { if (ok) { voiceSendAfterStopRef.current = false; recorder.startFlow(); } })} className="min-w-[110px] flex-1 rounded-xl border border-white/12 bg-white/[0.07] px-3 py-[11px] text-[13px] text-white/65 transition-all hover:bg-white/12 hover:text-white">
-                    Probar mic
-                  </button>
-                  <button type="button" onClick={handleFinishRecording} disabled={recorder.status !== "recording"} className="min-w-[150px] flex-1 rounded-xl border border-[#fca5a5]/40 bg-[#3a1720] px-3 py-[11px] text-[13px] font-medium text-[#fecdd3] transition-all hover:bg-[#4a1c28] disabled:cursor-not-allowed disabled:opacity-45">
-                    Finalizar grabacion
-                  </button>
-                  <button type="button" onClick={() => void handleSendVoice()} disabled={!recorder.canSend || recorder.status === "sending" || recorder.status === "recording"} className="min-w-[180px] flex-[2] rounded-xl border-0 bg-[#2d6be4] px-5 py-[11px] text-[14px] font-semibold text-white transition-all hover:bg-[#1d5bcd] disabled:cursor-not-allowed disabled:opacity-40">
-                    Enviar grabacion
-                  </button>
-                  <button type="button" onClick={() => { voiceSendAfterStopRef.current = false; recorder.startFlow(); }} disabled={recorder.status === "countdown" || recorder.status === "recording" || recorder.status === "sending"} className="min-w-[130px] flex-1 rounded-xl border border-white/12 bg-transparent px-3 py-[11px] text-[13px] text-white/70 transition-all hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-45">
-                    Hablar otra vez
-                  </button>
-                  <button type="button" onClick={() => closeVoiceModal()} className="min-w-[110px] flex-1 rounded-xl border border-white/8 bg-white/[0.04] px-3 py-[11px] text-[13px] text-white/35 transition-all hover:bg-white/8 hover:text-white/65">
-                    Cancelar
-                  </button>
-                </div>
-
-                {isDevelopment ? (
-                  <details className="mt-2 w-full">
-                    <summary className="cursor-pointer text-[11px] text-white/25">Debug voz (solo desarrollo)</summary>
-                    <pre className="mt-2 max-h-40 overflow-auto rounded-lg border border-white/8 bg-white/5 p-2 text-[11px] text-white/60">
-                      {JSON.stringify(
-                        {
-                          status: recorder.status,
-                          countdown: recorder.countdown,
-                          transcriptLength: recorder.transcript.length,
-                          audioSize: recorder.audioBlob?.size ?? 0,
-                          audioType: recorder.audioBlob?.type ?? null,
-                          speechSupported: recorder.speechSupported,
-                          microphoneStatus: recorder.microphoneStatus,
-                          micSupported: recorder.micSupported,
-                          voiceTurns: voiceSessionTurns.length,
-                        },
-                        null,
-                        2,
-                      )}
-                    </pre>
-                  </details>
-                ) : null}
+      </div>
+      {typeof document !== "undefined" && voiceOpen ? createPortal(
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/70 p-3 backdrop-blur-[2px]">
+          <div className={`w-full transition-all duration-300 ${voiceChatExpanded ? "max-w-[780px]" : "max-w-[420px]"}`}>
+            <div className={`overflow-hidden ${advisorPanelShellClass}`}>
+              <div className="relative lg:flex">
+                <section className={`relative flex min-h-[620px] flex-col items-center px-6 pb-6 pt-8 ${advisorVoiceBodyClass} lg:min-h-[640px] lg:w-[380px] lg:shrink-0`}>
+                  <header className={`${advisorVoiceHeaderClass} absolute inset-x-0 top-0 flex items-center gap-3 px-5 py-3.5`}>{headerAvatar ? <Image src={headerAvatar} alt={advisorName} width={48} height={48} priority className="h-12 w-12 rounded-full border-2 border-white/18 object-cover" /> : <span className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-white/18 bg-[#4a9eff] text-[18px] font-bold text-white">{(initials(advisorName) || "A")[0]}</span>}<div className="min-w-0 flex-1"><p className="truncate text-[16px] font-semibold text-white">{advisorName}</p>{advisorRole ? <p className="mt-0.5 text-[11px] text-white/45">{advisorRole}</p> : null}</div><Button type="button" variant="secondary" onClick={() => closeVoice()} className="rounded-full border border-white/20 bg-black/30 px-4 py-1.5 text-[13px] text-white hover:bg-black/45">Cerrar</Button></header>
+                  <button type="button" onClick={() => setVoiceChatExpanded((p) => !p)} className="absolute -right-4 top-1/2 z-10 hidden -translate-y-1/2 rounded-full border border-white/20 bg-[#17253a]/90 px-2 py-6 text-white/80 shadow-[0_8px_18px_rgba(0,0,0,0.32)] transition hover:bg-[#1f3554] lg:inline-flex" aria-label={voiceChatExpanded ? "Contraer chat de voz" : "Expandir chat de voz"}><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" className={`h-4 w-4 transition-transform ${voiceChatExpanded ? "rotate-180" : ""}`}><path d="m7 4 6 6-6 6" /></svg></button>
+                  <div className="relative mt-16 flex h-[256px] w-[256px] items-center justify-center"><span className={`voice-pulse-ring voice-pulse-ring-1 ${recorder.status === "recording" ? "is-listening" : ""} ${voiceSpeaking ? "is-speaking" : ""}`} /><span className={`voice-pulse-ring voice-pulse-ring-2 ${recorder.status === "recording" ? "is-listening" : ""} ${voiceSpeaking ? "is-speaking" : ""}`} /><span className={`voice-pulse-ring voice-pulse-ring-3 ${recorder.status === "recording" ? "is-listening" : ""} ${voiceSpeaking ? "is-speaking" : ""}`} />{heroAvatar ? <Image src={heroAvatar} alt={advisorName} width={168} height={168} priority className="relative z-[2] h-[168px] w-[168px] rounded-full border-[3px] border-white/12 object-cover" /> : <span className="relative z-[2] flex h-[168px] w-[168px] items-center justify-center rounded-full border-[3px] border-white/15 bg-[#4a9eff] text-[52px] font-bold text-white">{(initials(advisorName) || "A")[0]}</span>}{recorder.status === "countdown" ? <span className="absolute bottom-2 right-2 z-[4] flex h-11 w-11 items-center justify-center rounded-full border-[3px] border-[#0d1520] bg-[#2d6be4] text-[22px] font-bold text-white">{recorder.countdown}</span> : null}</div>
+                  <div className="mb-4 mt-2 text-center"><p className="text-[14px] font-semibold text-white">{advisorName}</p>{advisorRole ? <p className="text-[11px] text-white/55">{advisorRole}</p> : null}<p className={`mt-1 text-[13px] ${recorder.status === "recording" ? "text-[#ff6b6b]" : recorder.status === "sending" ? "text-[#4a9eff]" : "text-white/70"}`}>{statusText}</p></div>
+                  <div className="mb-4 flex h-9 items-center gap-[3px]">{Array.from({ length: 12 }).map((_, i) => <span key={`b-${i}`} className={`voice-wave-bar ${recorder.status === "recording" || voiceSpeaking ? "is-active" : "is-paused"}`} style={{ animationDelay: `${i * 0.1}s` }} />)}</div>
+                  <button type="button" onClick={() => setVoiceTranscriptOpen((c) => !c)} className="mb-1 flex items-center gap-2 bg-transparent text-[12px] text-white/40 transition-colors hover:text-white/65"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" className={`h-3 w-3 transition-transform ${voiceTranscriptOpen ? "rotate-90" : ""}`}><path d="M4 2l4 4-4 4" /></svg>lo que se escucho</button>
+                  <div className={`w-full overflow-hidden rounded-[10px] bg-white/6 px-3.5 text-[12px] leading-6 text-white/60 transition-all duration-300 ${voiceTranscriptOpen ? "mb-3 max-h-[120px] py-2.5" : "mb-0 max-h-0 py-0"}`}>{recorder.transcript || "Aun no hay texto transcripto."}</div>
+                  {voiceSendError || recorder.errorMessage ? <p className="mb-2 w-full text-center text-[12px] text-[#fca5a5]">{voiceSendError ?? recorder.errorMessage}</p> : null}
+                  <div className="mt-auto flex w-full gap-2.5"><button type="button" onClick={finalize} disabled={recorder.status === "countdown" || recorder.status === "sending"} className="flex-1 rounded-xl border-0 bg-[#2d6be4] px-4 py-[11px] text-[14px] font-semibold text-white transition-all hover:bg-[#1d5bcd] disabled:cursor-not-allowed disabled:opacity-45">Finalizar grabacion</button><button type="button" onClick={() => closeVoice()} className="rounded-xl border border-white/12 bg-white/[0.06] px-4 py-[11px] text-[13px] text-white/70 transition-all hover:bg-white/[0.1] hover:text-white">Cancelar</button></div>
+                </section>
+                {voiceChatExpanded ? <aside className="hidden w-[360px] border-l border-white/12 bg-[#f4f6fa] lg:flex lg:flex-col"><div className="border-b border-[#dde5ee] px-4 py-3"><p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-[#64748b]">Conversacion</p></div><div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">{voiceTurns.length === 0 ? <p className="text-[12px] text-[#64748b]">Aun no hay turnos en esta sesion.</p> : voiceTurns.map((t, i) => <div key={`${i}-${t.role}`} className={`flex ${t.role === "user" ? "justify-end" : "justify-start"}`}><div className={t.role === "user" ? "max-w-[76%]" : "max-w-[82%]"}><p className={`mb-1 text-[10px] font-bold tracking-[0.08em] ${t.role === "user" ? "text-right text-[#2d8a50]" : "text-[#2d6be4]"}`}>{t.role === "user" ? "TU VOZ" : advisorName.toUpperCase()}</p><div className={`whitespace-pre-wrap break-words px-[12px] py-[9px] text-[13px] leading-[1.55] ${t.role === "user" ? "rounded-[16px_16px_4px_16px] bg-[#d4edda] text-[#1a4a2a]" : "rounded-[4px_16px_16px_16px] border border-[#e8ecf2] bg-white text-[#2c3e50]"}`}>{t.text}</div></div></div>)}</div></aside> : null}
               </div>
             </div>
           </div>
-        ) : null}
-      </div>
-    </div>
+        </div>,
+        document.body,
+      ) : null}
+    </>
   );
 }
