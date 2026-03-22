@@ -1,21 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import Image from "next/image";
 
 import {
-  advisorDarkHeaderClass,
-  advisorDarkHeaderGlowClass,
-  advisorMutedSurfaceClass,
   advisorPanelShellClass,
+  advisorVoiceBodyClass,
+  advisorVoiceHeaderClass,
 } from "@/components/mvp/advisorUiStyles";
 import { Button, Textarea } from "@/components/mvp/ui";
-import { VoiceMicButton } from "@/components/mvp/VoiceControls";
-import {
-  getMicrophoneStatusMessage,
-  getSpeechToTextErrorMessage,
-  useSpeechToText,
-} from "@/hooks/useSpeechToText";
+import { postAdvisorVoice } from "@/lib/api/client";
+import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
 
 export type AdvisorChatMessage = {
   id: string;
@@ -30,7 +25,9 @@ type AdvisorChatModalProps = {
   advisorName: string;
   advisorRole?: string;
   advisorDescription?: string;
+  advisorId?: string;
   userName?: string;
+  caseId?: string | null;
   advisorAvatarSrc?: string | null;
   messages: AdvisorChatMessage[];
   draft: string;
@@ -43,14 +40,45 @@ type AdvisorChatModalProps = {
   onSend: () => void;
   onUseResponse: () => void;
   onClose: () => void;
+  onVoiceExchangeComplete?: (payload: {
+    userText: string;
+    advisorText: string;
+    suggestedReply: string | null;
+    debug?: Record<string, unknown> | null;
+  }) => void;
 };
+
+function getInitials(value: string): string {
+  return value
+    .split(" ")
+    .filter((part) => part.trim().length > 0)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
+function resolveAvatarVariant(src: string | null | undefined, variant: "128" | "256"): string | null {
+  if (!src) return null;
+  if (variant === "128") {
+    if (src.includes("_128")) return src;
+    if (src.includes("_64")) return src.replace("_64", "_128");
+    if (src.includes("_256")) return src.replace("_256", "_128");
+    return src;
+  }
+  if (src.includes("_256")) return src;
+  if (src.includes("_128")) return src.replace("_128", "_256");
+  if (src.includes("_64")) return src.replace("_64", "_256");
+  return src;
+}
 
 export function AdvisorChatModal({
   isOpen,
   advisorName,
   advisorRole,
   advisorDescription,
+  advisorId,
   userName = "",
+  caseId = null,
   advisorAvatarSrc,
   messages,
   draft,
@@ -58,266 +86,232 @@ export function AdvisorChatModal({
   entryMode,
   helperCopy,
   debugPayload,
+  autoSendOnVoiceComplete = true,
   onDraftChange,
   onSend,
   onUseResponse,
   onClose,
+  onVoiceExchangeComplete,
 }: AdvisorChatModalProps) {
   const isDevelopment = process.env.NODE_ENV !== "production";
-  const [voiceUiDebugEvents, setVoiceUiDebugEvents] = useState<
-    Array<{ at: string; event: string; details?: Record<string, unknown> }>
-  >([]);
-  const headerAvatarSrc = useMemo(() => {
-    if (!advisorAvatarSrc) return null;
-    if (advisorAvatarSrc.includes("_128")) return advisorAvatarSrc;
-    return advisorAvatarSrc.replace("_64", "_128");
-  }, [advisorAvatarSrc]);
+  const [voiceModalOpen, setVoiceModalOpen] = useState(false);
+  const [voiceTranscriptOpen, setVoiceTranscriptOpen] = useState(false);
+  const [voiceSendError, setVoiceSendError] = useState<string | null>(null);
+  const voiceAutoStartGuardRef = useRef(false);
+
+  const headerAvatarSrc = useMemo(() => resolveAvatarVariant(advisorAvatarSrc, "128"), [advisorAvatarSrc]);
+  const voiceHeroAvatarSrc = useMemo(() => resolveAvatarVariant(advisorAvatarSrc, "256"), [advisorAvatarSrc]);
+
   const preferredVoiceLang = useMemo(() => {
-    if (typeof navigator === "undefined") return "es-ES";
+    if (typeof navigator === "undefined") return "es-UY";
     const browserLanguages = [navigator.language, ...(navigator.languages ?? [])]
       .filter((item): item is string => Boolean(item))
       .map((item) => item.toLowerCase());
     return browserLanguages.some((item) => item.startsWith("es-uy")) ? "es-UY" : "es-ES";
   }, []);
 
-  const voice = useSpeechToText({
+  const recorder = useVoiceRecorder({
     lang: preferredVoiceLang,
-    continuous: false,
-    interimResults: true,
-    silenceTimeoutMs: 0,
-    noSpeechIsRecoverable: true,
-    emitNoSpeechOnEnd: true,
+    countdownSeconds: 3,
+    autoStopMs: 18000,
   });
-  const voiceListening = voice.listening;
-  const stopVoiceListening = voice.stopListening;
-  const microphoneStatusMessage = getMicrophoneStatusMessage(
-    voice.microphoneStatus,
-    voice.speechSupported,
-  );
-  const defaultHelperCopy =
-    entryMode === "advisor_conversation"
-      ? `Como estas hoy${userName ? `, ${userName}` : ""}? Estoy aqui para escucharte y ayudarte a ordenar esto.`
-      : `${userName || "Cuentame"}, que te parecio mi sugerencia? Si quieres, la ajustamos juntos.`;
-  const resolvedHelperCopy = helperCopy || defaultHelperCopy;
-  const inputPlaceholder =
-    entryMode === "advisor_conversation"
-      ? "Escribe o habla para que te ayude."
-      : "Que quieres cambiar de mi sugerencia?";
-  const voiceSupportCopy =
-    microphoneStatusMessage ??
-    (voice.speechSupported
-      ? "Puedes usar dictado por voz en este navegador."
-      : "La entrada por voz no esta disponible en este navegador.");
-  const [voiceModalOpen, setVoiceModalOpen] = useState(false);
+  const startVoiceFlowRef = useRef(recorder.startFlow);
+  useEffect(() => {
+    startVoiceFlowRef.current = recorder.startFlow;
+  }, [recorder.startFlow]);
 
-  function pushVoiceUiDebugEvent(event: string, details?: Record<string, unknown>) {
-    if (!isDevelopment) return;
-    const entry = {
-      at: new Date().toISOString(),
-      event,
-      details,
-    };
-    setVoiceUiDebugEvents((current) => [...current.slice(-39), entry]);
-    if (details) {
-      console.debug("[voice][advisor-modal]", event, details);
-    } else {
-      console.debug("[voice][advisor-modal]", event);
+  const voiceUserText = recorder.transcript || "Mensaje de voz";
+
+  const statusText = useMemo(() => {
+    if (recorder.status === "countdown") {
+      if (recorder.countdown > 1) return `Iniciando en ${recorder.countdown} segundos...`;
+      return `Iniciando en ${recorder.countdown} segundo...`;
     }
-  }
+    if (recorder.status === "recording") return "Escuchando...";
+    if (recorder.status === "sending") return "Enviando...";
+    if (recorder.status === "error") return "No pudimos grabar el audio.";
+    if (recorder.audioBlob) return "Grabacion lista para enviar";
+    return "Preparando...";
+  }, [recorder.audioBlob, recorder.countdown, recorder.status]);
 
-  const voiceUiState = useMemo(() => {
-    if (voice.error) return "error" as const;
-    if (voice.phase === "listening") return "listening" as const;
-    if (voice.phase === "finishing") return "processing" as const;
-    if (voice.transcript.trim()) return "transcript_ready" as const;
-    return "idle" as const;
-  }, [voice.error, voice.phase, voice.transcript]);
+  const headerStatusText = useMemo(() => {
+    if (recorder.status === "countdown") return "Preparando...";
+    if (recorder.status === "recording") return "Escuchando tu mensaje";
+    if (recorder.status === "sending") return "Procesando tu mensaje";
+    if (recorder.audioBlob) return "Listo para enviar";
+    if (recorder.status === "error") return "Error";
+    return "Preparando...";
+  }, [recorder.audioBlob, recorder.status]);
 
-  const stateCopy = useMemo(() => {
-    switch (voiceUiState) {
-      case "listening":
-        return {
-          title: "Escuchando...",
-          description: "Habla con naturalidad. Puedes terminar cuando quieras.",
-        };
-      case "processing":
-        return {
-          title: "Procesando lo que dijiste...",
-          description: "Estamos finalizando la transcripcion.",
-        };
-      case "transcript_ready":
-        return {
-          title: "Esto es lo que entendi",
-          description: "Revisalo antes de enviarlo al advisor.",
-        };
-      case "error":
-        if (voice.error === "voice_no_speech") {
-          return {
-            title: "No detecte tu voz",
-            description: "No detecte tu voz. Intenta de nuevo y habla apenas empiece a escuchar.",
-          };
-        }
-        return {
-          title: "No se pudo completar la grabacion",
-          description: getSpeechToTextErrorMessage(voice.error) ?? "Intenta de nuevo.",
-        };
-      case "idle":
-      default:
-        return {
-          title: "Listo para escucharte",
-          description: "Pulsa iniciar cuando quieras grabar tu mensaje.",
-        };
-    }
-  }, [voice.error, voiceUiState]);
-
-  function focusDraftInput() {
-    window.setTimeout(() => {
-      const input = document.getElementById("advisor-chat-draft") as HTMLTextAreaElement | null;
-      input?.focus();
-    }, 30);
+  function closeVoiceModal() {
+    voiceAutoStartGuardRef.current = false;
+    recorder.resetRecording();
+    setVoiceTranscriptOpen(false);
+    setVoiceSendError(null);
+    setVoiceModalOpen(false);
   }
 
   function openVoiceModal() {
-    if (voice.clearDebugEvents) {
-      voice.clearDebugEvents();
-    }
-    setVoiceUiDebugEvents([]);
-    pushVoiceUiDebugEvent("talk button clicked", {
-      voiceModalOpen,
-      phase: voice.phase,
-      listening: voice.listening,
-    });
+    setVoiceTranscriptOpen(false);
+    setVoiceSendError(null);
     setVoiceModalOpen(true);
-    voice.resetTranscript();
-    void voice.requestMicrophonePermission();
-  }
-
-  function closeVoiceModal() {
-    pushVoiceUiDebugEvent("voice modal closed", { listening: voice.listening });
-    if (voice.listening) {
-      voice.stopListening();
-    }
-    setVoiceModalOpen(false);
-    voice.resetTranscript();
-  }
-
-  function handleCloseAdvisorModal() {
-    closeVoiceModal();
-    onClose();
-  }
-
-  function startOrRestartRecording() {
-    pushVoiceUiDebugEvent("start/restart recording clicked", {
-      listening: voice.listening,
-      phase: voice.phase,
-      error: voice.error,
-      hasTranscript: Boolean(voice.transcript.trim()),
-    });
-    if (voice.listening) {
-      voice.stopListening();
-    }
-    voice.resetTranscript();
-    voice.startListening();
-  }
-
-  function applyTranscriptToDraft() {
-    pushVoiceUiDebugEvent("apply transcript clicked", {
-      transcriptLength: voice.transcript.trim().length,
-    });
-    const transcript = voice.transcript.trim();
-    if (!transcript) return;
-    const merged = draft.trim() ? `${draft.trim()}\n${transcript}` : transcript;
-    onDraftChange(merged);
-    const wrapper = document.getElementById("advisor-chat-draft-wrap");
-    if (wrapper) {
-      wrapper.style.transition = "box-shadow 180ms ease, background-color 180ms ease";
-      wrapper.style.boxShadow = "0 0 0 2px rgba(191, 219, 254, 1)";
-      wrapper.style.backgroundColor = "#f8fafc";
-      window.setTimeout(() => {
-        wrapper.style.boxShadow = "";
-        wrapper.style.backgroundColor = "";
-      }, 850);
-    }
-    closeVoiceModal();
-    focusDraftInput();
   }
 
   useEffect(() => {
-    if (!isOpen && voiceListening) {
-      stopVoiceListening();
+    if (!voiceModalOpen) {
+      voiceAutoStartGuardRef.current = false;
+      return;
     }
-  }, [isOpen, stopVoiceListening, voiceListening]);
+    if (voiceAutoStartGuardRef.current) return;
+    voiceAutoStartGuardRef.current = true;
+    startVoiceFlowRef.current();
+  }, [voiceModalOpen]);
+
+  async function handleSendVoice() {
+    if (!advisorId || !recorder.audioBlob || recorder.status === "sending") return;
+    setVoiceSendError(null);
+    recorder.setStatus("sending");
+
+    try {
+      const baseMessages = messages.map((item) => ({
+        role: item.role,
+        content: item.text,
+      }));
+      const userVoiceMessage = {
+        role: "user" as const,
+        content: voiceUserText,
+      };
+      const payloadMessages =
+        baseMessages.length > 0 &&
+        baseMessages[baseMessages.length - 1]?.role === "user" &&
+        baseMessages[baseMessages.length - 1]?.content.trim() === userVoiceMessage.content.trim()
+          ? baseMessages
+          : [...baseMessages, userVoiceMessage];
+
+      const result = await postAdvisorVoice({
+        advisor_id: advisorId,
+        entry_mode: entryMode,
+        transcript: voiceUserText,
+        audio_blob: recorder.audioBlob,
+        audio_mime_type: recorder.audioBlob.type,
+        messages: payloadMessages,
+        case_id: caseId,
+        conversation_context: {
+          user_name: userName || null,
+          relationship_type: "otro",
+          extra: {
+            voice_flow: true,
+            transcript_supported: recorder.speechSupported,
+          },
+        },
+        debug: isDevelopment,
+      });
+
+      const advisorText = result.message.trim() || "No pude responder ahora. Intenta nuevamente.";
+      if (onVoiceExchangeComplete) {
+        onVoiceExchangeComplete({
+          userText: voiceUserText,
+          advisorText,
+          suggestedReply: result.suggested_reply,
+          debug: result.debug ?? null,
+        });
+      } else {
+        onDraftChange(voiceUserText);
+        if (autoSendOnVoiceComplete) {
+          window.setTimeout(() => onSend(), 0);
+        }
+      }
+      closeVoiceModal();
+    } catch {
+      recorder.setStatus("error");
+      setVoiceSendError("No pudimos enviar la grabacion. Intenta de nuevo.");
+    }
+  }
+
+  const inputPlaceholder =
+    entryMode === "advisor_conversation" ? "Escribi tu mensaje..." : "Escribi como queres ajustarlo...";
+
+  const helperFallback =
+    entryMode === "advisor_conversation"
+      ? `Como estas hoy${userName ? `, ${userName}` : ""}? En que te puedo ayudar?`
+      : "Contame que queres ajustar y lo mejoramos juntos.";
+  const resolvedHelperCopy = helperCopy || helperFallback;
+
+  function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      if (!sending && draft.trim()) {
+        onSend();
+      }
+    }
+  }
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-[2px]">
-      <div className={`relative flex h-[min(92vh,840px)] w-full max-w-3xl flex-col overflow-hidden ${advisorPanelShellClass}`}>
-        <header className={`${advisorDarkHeaderClass} px-4 py-2.5 md:px-5 md:py-3`}>
-          <div className={advisorDarkHeaderGlowClass} aria-hidden />
-          <div className="relative flex items-start justify-between gap-4">
-            <div className="flex min-w-0 items-start gap-4">
-              {advisorAvatarSrc ? (
-                <Image
-                  src={headerAvatarSrc}
-                  alt={advisorName}
-                  width={48}
-                  height={48}
-                  className="h-12 w-12 rounded-2xl border border-white/18 object-cover shadow-[0_10px_24px_rgba(15,23,42,0.2)]"
-                />
-              ) : (
-                <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/18 bg-white/12 text-[12px] font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.2)]">
-                  {advisorName.slice(0, 2).toUpperCase()}
-                </span>
-              )}
-              <div className="min-w-0 pt-0.5">
-                <p className="truncate text-[16px] font-semibold tracking-[-0.01em] text-white">{advisorName}</p>
-                {advisorRole ? (
-                  <p className="mt-0.5 text-[12px] font-medium text-slate-200/92">{advisorRole}</p>
-                ) : null}
-                {advisorDescription ? (
-                  <p className="mt-1 max-w-2xl text-[12px] leading-5 text-slate-200/82">{advisorDescription}</p>
-                ) : null}
-              </div>
-            </div>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={handleCloseAdvisorModal}
-              className="shrink-0 border-white/15 bg-white/10 px-3 py-1.5 text-[13px] font-medium text-white backdrop-blur-sm hover:bg-white/16"
-            >
-              Cerrar
-            </Button>
+      <div className={`relative flex h-[min(92vh,760px)] w-full max-w-[560px] flex-col overflow-hidden ${advisorPanelShellClass}`}>
+        <header className="flex items-center gap-3 bg-[#1e2a3a] px-5 py-4">
+          {headerAvatarSrc ? (
+            <Image
+              src={headerAvatarSrc}
+              alt={advisorName}
+              width={48}
+              height={48}
+              className="h-12 w-12 rounded-full border-2 border-white/20 object-cover"
+            />
+          ) : (
+            <span className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-white/20 bg-[#4a9eff] text-[18px] font-bold text-white">
+              {(getInitials(advisorName) || "A").slice(0, 1)}
+            </span>
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[17px] font-semibold text-white">{advisorName}</p>
+            {advisorRole ? <p className="mt-0.5 text-[12px] text-white/55">{advisorRole}</p> : null}
+            {advisorDescription ? <p className="mt-1 line-clamp-2 text-[11px] text-white/70">{advisorDescription}</p> : null}
           </div>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onClose}
+            className="shrink-0 rounded-[10px] border-0 bg-white/10 px-4 py-[7px] text-[13px] text-white hover:bg-white/20"
+          >
+            Cerrar
+          </Button>
         </header>
 
-        <div className="min-h-0 flex-1 bg-[linear-gradient(180deg,#f3f6fa_0%,#eef3f8_100%)] px-4 py-3 md:px-5 md:py-4">
-          <div className="h-full overflow-y-auto pr-1">
+        <div className="flex min-h-0 flex-1 flex-col bg-[#f4f6fa]">
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-3 pt-5">
             {messages.length === 0 ? (
-              <div className="rounded-2xl border border-white/80 bg-white/90 px-4 py-3.5 text-[13px] leading-6 text-[#475569] shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
-                {resolvedHelperCopy}
+              <div className="max-w-[80%]">
+                <p className="mb-1 text-[10px] font-bold tracking-[0.08em] text-[#2d6be4]">{advisorName.toUpperCase()}</p>
+                <div className="rounded-[4px_16px_16px_16px] border border-[#e8ecf2] bg-white px-4 py-3 text-[14px] leading-[1.55] text-[#2c3e50]">
+                  {resolvedHelperCopy}
+                </div>
               </div>
             ) : (
-              <div className="space-y-3 pb-1">
+              <div className="flex flex-col gap-3">
                 {messages.map((message) => {
                   const isUser = message.role === "user";
                   return (
                     <div key={message.id} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-                      <div
-                        className={`max-w-[90%] whitespace-pre-wrap break-words rounded-[22px] border px-4 py-2.5 text-[13px] leading-6 shadow-[0_10px_24px_rgba(15,23,42,0.05)] ${
-                          isUser
-                            ? "border-[#b9e5c7] bg-[#edf9f1] text-[#166534]"
-                            : "border-[#ccdbff] bg-[#edf4ff] text-[#1e40af]"
-                        }`}
-                      >
+                      <div className={isUser ? "max-w-[70%]" : "max-w-[80%]"}>
                         <p
-                          className={`mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] ${
-                            isUser ? "text-[#15803d]" : "text-[#3156b7]"
+                          className={`mb-1 text-[10px] font-bold tracking-[0.08em] ${
+                            isUser ? "text-right text-[#2d8a50]" : "text-[#2d6be4]"
                           }`}
                         >
-                          {isUser ? "Tu" : advisorName}
+                          {isUser ? "TU" : advisorName.toUpperCase()}
                         </p>
-                        <p>{message.text}</p>
+                        <div
+                          className={`whitespace-pre-wrap break-words px-[14px] py-[10px] text-[14px] leading-[1.55] ${
+                            isUser
+                              ? "rounded-[16px_16px_4px_16px] bg-[#d4edda] text-[#1a4a2a]"
+                              : "rounded-[4px_16px_16px_16px] border border-[#e8ecf2] bg-white text-[#2c3e50]"
+                          }`}
+                        >
+                          {message.text}
+                        </div>
                       </div>
                     </div>
                   );
@@ -325,275 +319,234 @@ export function AdvisorChatModal({
               </div>
             )}
           </div>
-        </div>
 
-        <footer className="space-y-3 border-t border-[#dbe4ee] bg-white/95 px-4 py-3 md:px-5 md:py-4">
-          <div
-            id="advisor-chat-draft-wrap"
-            className="rounded-2xl border border-[#dbe4ee] bg-white p-1 shadow-[0_8px_24px_rgba(15,23,42,0.05)] transition-all duration-200"
-          >
-            <Textarea
-              id="advisor-chat-draft"
-              value={draft}
-              onChange={(event) => onDraftChange(event.target.value)}
-              rows={3}
-              spellCheck={false}
-              placeholder={inputPlaceholder}
-              className="border-0 bg-transparent px-3 py-2.5 text-[13px] leading-6 text-[#0F172A] placeholder:text-[#7c8b9d] focus:ring-0"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <div className={`${advisorMutedSurfaceClass} flex flex-wrap items-center gap-2 px-3 py-2.5`}>
-              <VoiceMicButton
-                listening={voice.listening}
-                disabled={voice.microphoneStatus === "requesting"}
-                onClick={openVoiceModal}
-                idleLabel="Hablar con el advisor"
-                listeningLabel="Escuchando..."
-                iconOnly
-                ariaLabel="Hablar con el advisor"
-                className="border-[#cad5e2] bg-white text-[#526173] shadow-[0_1px_2px_rgba(15,23,42,0.03)] hover:border-[#b7c7d9] hover:bg-[#f8fbff]"
+          <footer className="border-t border-[#e8ecf2] bg-white px-4 py-3">
+            <div className="mb-2 flex items-end gap-2">
+              <Textarea
+                id="advisor-chat-draft"
+                value={draft}
+                onChange={(event) => onDraftChange(event.target.value)}
+                rows={1}
+                spellCheck={false}
+                placeholder={inputPlaceholder}
+                onKeyDown={handleKeyDown}
+                className="min-h-[42px] max-h-[120px] flex-1 rounded-xl border-[1.5px] border-[#dde3ef] px-[14px] py-[10px] text-[14px] text-[#2c3e50] placeholder:text-[#aab3c5] focus:border-[#4a9eff] focus:ring-0"
               />
-              <p className="min-w-0 flex-1 text-[12px] leading-5 text-[#526173]">{voiceSupportCopy}</p>
+              <button
+                type="button"
+                onClick={openVoiceModal}
+                className="inline-flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full border-[1.5px] border-[#dde3ef] bg-[#f4f6fa] text-[#6b7a99] transition-all hover:border-[#4a9eff] hover:bg-[#e8ecf2]"
+                aria-label="Hablar con el advisor"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-[18px] w-[18px]"
+                >
+                  <rect x="9" y="2" width="6" height="12" rx="3" />
+                  <path d="M5 10a7 7 0 0 0 14 0" />
+                  <path d="M12 19v3" />
+                  <path d="M8 22h8" />
+                </svg>
+              </button>
+              <Button
+                type="button"
+                variant="primary"
+                disabled={sending || !draft.trim()}
+                onClick={onSend}
+                className="h-[42px] rounded-xl border-0 bg-[#2d6be4] px-[18px] text-[14px] font-semibold text-white hover:bg-[#1d5bcd]"
+              >
+                {sending ? "Enviando..." : "Enviar"}
+              </Button>
             </div>
 
-            {voice.error ? (
-              <p className="text-[12px] leading-5 text-[#92400e]">{getSpeechToTextErrorMessage(voice.error)}</p>
-            ) : null}
-
-            {!voice.error && voice.transcript.trim() ? (
-              <span className="inline-flex h-7 items-center rounded-full border border-[#b9e5c7] bg-[#edf9f1] px-3 text-[11px] font-medium text-[#166534]">
-                Transcript listo para revisar
-              </span>
-            ) : null}
-          </div>
-
-          {isDevelopment && debugPayload ? (
-            <details className="rounded-xl border border-[#e5e5e5] bg-[#fafafa] p-3">
-              <summary className="cursor-pointer text-[12px] font-medium text-[#334155]">
-                Debug prompt advisor (solo desarrollo)
-              </summary>
-              <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words text-[11px] text-[#334155]">
-                {JSON.stringify(debugPayload, null, 2)}
-              </pre>
-            </details>
-          ) : null}
-
-          <div className="flex flex-wrap justify-between gap-2 pt-0.5">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={onUseResponse}
-              className="border-[#CBD5E1] bg-white px-4 py-2 text-[13px] font-medium text-[#334155]"
-            >
-              Usar esta respuesta
-            </Button>
-            <Button
-              type="button"
-              variant="primary"
-              disabled={sending || !draft.trim()}
-              onClick={onSend}
-              className="bg-[#1D4ED8] px-4 py-2 text-[13px] font-medium shadow-[0_8px_20px_rgba(29,78,216,0.24)] hover:bg-[#1E40AF]"
-            >
-              {sending
-                ? "Enviando..."
-                : entryMode === "advisor_conversation"
-                  ? "Enviar al advisor"
-                  : "Refinar sugerencia"}
-            </Button>
-          </div>
-        </footer>
+            <div className="flex items-center justify-between gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={onUseResponse}
+                className="rounded-[10px] border-[1.5px] border-[#dde3ef] bg-transparent px-[14px] py-[7px] text-[13px] text-[#6b7a99] hover:border-[#4a9eff] hover:text-[#2d6be4]"
+              >
+                Usar esta respuesta
+              </Button>
+              {isDevelopment && debugPayload ? (
+                <details className="text-right">
+                  <summary className="cursor-pointer text-[11px] text-[#aab3c5]">Debug prompt (solo desarrollo)</summary>
+                  <pre className="mt-2 max-h-40 overflow-auto rounded-lg border border-[#e8ecf2] bg-[#f8fafc] p-2 text-left text-[11px] text-[#334155]">
+                    {JSON.stringify(debugPayload, null, 2)}
+                  </pre>
+                </details>
+              ) : null}
+            </div>
+          </footer>
+        </div>
 
         {voiceModalOpen ? (
-          <div className="absolute inset-0 z-30 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-[2px]">
-            <div className={`w-full max-w-2xl overflow-hidden ${advisorPanelShellClass}`}>
-              <div className={`${advisorDarkHeaderClass} px-4 py-3`}>
-                <div className={advisorDarkHeaderGlowClass} aria-hidden />
-                <div className="relative flex items-start justify-between gap-3">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className="relative">
-                      <span
-                        className={`voice-avatar-ring ${voiceUiState === "listening" ? "is-active" : ""}`}
-                        aria-hidden
-                      />
-                      {headerAvatarSrc ? (
-                        <Image
-                          src={headerAvatarSrc}
-                          alt={advisorName}
-                          width={48}
-                          height={48}
-                          className="relative z-10 h-12 w-12 rounded-2xl border border-white/18 object-cover"
-                        />
-                      ) : (
-                        <span className="relative z-10 flex h-12 w-12 items-center justify-center rounded-2xl border border-white/18 bg-white/12 text-[12px] font-semibold text-white">
-                          {advisorName.slice(0, 2).toUpperCase()}
-                        </span>
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-[16px] font-semibold text-white">{advisorName}</p>
-                      {advisorRole ? (
-                        <p className="mt-0.5 text-[12px] font-medium text-slate-200/92">{advisorRole}</p>
-                      ) : null}
-                      <p className="mt-1 text-[12px] text-slate-100/95">{stateCopy.title}</p>
-                      <p className="text-[11px] leading-5 text-slate-200/80">{stateCopy.description}</p>
-                    </div>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={closeVoiceModal}
-                    className="shrink-0 border-white/15 bg-white/10 px-3 py-1.5 text-[13px] text-white hover:bg-white/16"
-                  >
-                    Cerrar
-                  </Button>
+          <div className="absolute inset-0 z-30 flex items-center justify-center bg-slate-950/65 p-3 backdrop-blur-[2px]">
+            <div className={`w-full max-w-[560px] overflow-hidden ${advisorPanelShellClass}`}>
+              <header className={`${advisorVoiceHeaderClass} flex items-center gap-3 px-5 py-3.5`}>
+                {headerAvatarSrc ? (
+                  <Image
+                    src={headerAvatarSrc}
+                    alt={advisorName}
+                    width={48}
+                    height={48}
+                    priority={voiceModalOpen}
+                    className="h-12 w-12 rounded-full border-2 border-white/18 object-cover"
+                  />
+                ) : (
+                  <span className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-white/18 bg-[#4a9eff] text-[18px] font-bold text-white">
+                    {(getInitials(advisorName) || "A").slice(0, 1)}
+                  </span>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[16px] font-semibold text-white">{advisorName}</p>
+                  {advisorRole ? <p className="mt-0.5 text-[11px] text-white/45">{advisorRole}</p> : null}
+                  <p className="mt-0.5 flex items-center gap-1.5 text-[12px] text-[#4a9eff]">
+                    <span className={`h-1.5 w-1.5 rounded-full ${recorder.status === "recording" ? "animate-pulse bg-[#ff6b6b]" : "bg-[#4a9eff]"}`} />
+                    {headerStatusText}
+                  </p>
                 </div>
-              </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={closeVoiceModal}
+                  className="rounded-[10px] border-0 bg-white/10 px-4 py-[7px] text-[13px] text-white hover:bg-white/20"
+                >
+                  Cerrar
+                </Button>
+              </header>
 
-              <div className="space-y-4 bg-[#f8fafc] p-4">
-                <div className={`${advisorMutedSurfaceClass} p-3.5`}>
-                  <div className="mb-3 flex items-center gap-2">
-                    <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-[#64748b]">
-                      Estado
+              <div className={`${advisorVoiceBodyClass} flex flex-col items-center px-6 pb-6 pt-8`}>
+                <div className="relative mb-5 flex h-[256px] w-[256px] items-center justify-center">
+                  <span className={`voice-pulse-ring voice-pulse-ring-1 ${recorder.status === "recording" ? "is-listening" : ""}`} aria-hidden />
+                  <span className={`voice-pulse-ring voice-pulse-ring-2 ${recorder.status === "recording" ? "is-listening" : ""}`} aria-hidden />
+                  <span className={`voice-pulse-ring voice-pulse-ring-3 ${recorder.status === "recording" ? "is-listening" : ""}`} aria-hidden />
+                  {voiceHeroAvatarSrc ? (
+                    <Image
+                      src={voiceHeroAvatarSrc}
+                      alt={advisorName}
+                      width={168}
+                      height={168}
+                      priority={voiceModalOpen}
+                      className="relative z-[2] h-[168px] w-[168px] rounded-full border-[3px] border-white/12 object-cover"
+                    />
+                  ) : (
+                    <span className="relative z-[2] flex h-[168px] w-[168px] items-center justify-center rounded-full border-[3px] border-white/15 bg-[#4a9eff] text-[52px] font-bold text-white">
+                      {(getInitials(advisorName) || "A").slice(0, 1)}
                     </span>
+                  )}
+                  {recorder.status === "countdown" ? (
+                    <span className="absolute bottom-2 right-2 z-[4] flex h-11 w-11 items-center justify-center rounded-full border-[3px] border-[#0d1520] bg-[#2d6be4] text-[22px] font-bold text-white">
+                      {recorder.countdown}
+                    </span>
+                  ) : null}
+                </div>
+
+                <p
+                  className={`mb-5 text-center text-[15px] font-medium ${
+                    recorder.status === "recording"
+                      ? "text-[#ff6b6b]"
+                      : recorder.status === "sending"
+                        ? "text-[#4a9eff]"
+                        : recorder.status === "error"
+                          ? "text-[#fca5a5]"
+                          : "text-white/70"
+                  }`}
+                >
+                  {statusText}
+                </p>
+
+                <div className="mb-5 flex h-9 items-center gap-[3px]">
+                  {Array.from({ length: 12 }).map((_, index) => (
                     <span
-                      className={`inline-flex h-7 items-center rounded-full border px-3 text-[11px] font-medium ${
-                        voiceUiState === "listening"
-                          ? "border-[#fecaca] bg-[#fff1f2] text-[#b42318]"
-                          : voiceUiState === "processing"
-                            ? "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]"
-                            : voiceUiState === "transcript_ready"
-                              ? "border-[#bbf7d0] bg-[#f0fdf4] text-[#166534]"
-                              : voiceUiState === "error"
-                                ? "border-[#fcd34d] bg-[#fffbeb] text-[#92400e]"
-                                : "border-[#e2e8f0] bg-[#f8fafc] text-[#334155]"
-                      }`}
-                    >
-                      {voiceUiState === "listening"
-                        ? "Escuchando"
-                        : voiceUiState === "processing"
-                          ? "Procesando"
-                          : voiceUiState === "transcript_ready"
-                            ? "Transcript listo"
-                            : voiceUiState === "error"
-                              ? "Error"
-                              : "En espera"}
-                    </span>
-                  </div>
-
-                  <div className="mb-3 flex h-11 items-end justify-center gap-1 rounded-xl border border-[#d8e1eb] bg-white/75 px-3 py-2">
-                    {Array.from({ length: 14 }).map((_, index) => (
-                      <span
-                        key={`voice-bar-${index}`}
-                        className={`voice-level-bar ${voiceUiState === "listening" ? "is-active" : ""}`}
-                        style={{ animationDelay: `${index * 70}ms` }}
-                        aria-hidden
-                      />
-                    ))}
-                  </div>
-
-                  <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.16em] text-[#64748b]">
-                    Transcript
-                  </p>
-                  <p className="min-h-20 whitespace-pre-wrap break-words rounded-xl border border-[#dbe3ec] bg-white px-3 py-2.5 text-[13px] leading-6 text-[#0f172a]">
-                    {voice.transcript.trim()
-                      ? voice.transcript.trim()
-                      : voiceUiState === "listening"
-                        ? "Estoy escuchando. Habla cuando quieras."
-                        : "Aun no hay transcript."}
-                  </p>
+                      key={`voice-wave-${index}`}
+                      className={`voice-wave-bar ${recorder.status === "recording" ? "is-active" : "is-paused"}`}
+                      style={{ animationDelay: `${index * 0.1}s` }}
+                    />
+                  ))}
                 </div>
 
-                <div className="flex flex-wrap justify-end gap-2">
-                  {isDevelopment ? (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={() => {
-                        void voice.requestMicrophonePermission();
-                      }}
-                      disabled={voice.microphoneStatus === "requesting"}
-                      className="border-[#cbd5e1] bg-white px-4 py-2 text-[13px] text-[#334155]"
-                    >
-                      Probar microfono
-                    </Button>
-                  ) : null}
-                  {voiceUiState === "listening" ? (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={voice.stopListening}
-                      className="border-[#fecdd3] bg-white px-4 py-2 text-[13px] text-[#9f1239] hover:bg-[#fff1f2]"
-                    >
-                      Terminar grabacion
-                    </Button>
-                  ) : null}
+                <button
+                  type="button"
+                  onClick={() => setVoiceTranscriptOpen((current) => !current)}
+                  className={`mb-1 flex items-center gap-2 bg-transparent text-[12px] text-white/35 transition-colors hover:text-white/60 ${
+                    voiceTranscriptOpen ? "is-open" : ""
+                  }`}
+                >
+                  <svg
+                    viewBox="0 0 12 12"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    className={`h-3 w-3 transition-transform ${voiceTranscriptOpen ? "rotate-90" : ""}`}
+                  >
+                    <path d="M4 2l4 4-4 4" />
+                  </svg>
+                  lo que se escucho
+                </button>
 
-                  {voiceUiState === "idle" || voiceUiState === "error" ? (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={startOrRestartRecording}
-                      className="border-[#cbd5e1] bg-white px-4 py-2 text-[13px] text-[#334155]"
-                    >
-                      {voice.error === "voice_no_speech" ? "Reintentar" : "Iniciar grabacion"}
-                    </Button>
-                  ) : null}
+                <div
+                  className={`w-full overflow-hidden rounded-[10px] bg-white/5 px-3.5 text-[12px] leading-6 text-white/55 transition-all duration-300 ${
+                    voiceTranscriptOpen ? "mb-3 max-h-[120px] py-2.5" : "mb-0 max-h-0 py-0"
+                  }`}
+                >
+                  {recorder.transcript || "Aun no hay texto transcripto."}
+                </div>
 
-                  {voiceUiState === "transcript_ready" ? (
-                    <>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        onClick={startOrRestartRecording}
-                        className="border-[#cbd5e1] bg-white px-4 py-2 text-[13px] text-[#334155]"
-                      >
-                        Volver a grabar
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="primary"
-                        onClick={applyTranscriptToDraft}
-                        className="bg-[#1d4ed8] px-4 py-2 text-[13px] text-white hover:bg-[#1e40af]"
-                      >
-                        Enviar transcript
-                      </Button>
-                    </>
-                  ) : null}
+                {recorder.errorMessage || voiceSendError ? (
+                  <p className="mb-2 w-full text-center text-[12px] text-[#fca5a5]">
+                    {voiceSendError ?? recorder.errorMessage}
+                  </p>
+                ) : null}
 
-                  <Button
+                <div className="mt-1 flex w-full flex-wrap gap-2.5">
+                  <button
                     type="button"
-                    variant="secondary"
+                    onClick={() => {
+                      void recorder.requestMicProbe().then((ok) => {
+                        if (ok) recorder.startFlow();
+                      });
+                    }}
+                    className="min-w-[110px] flex-1 rounded-xl border border-white/12 bg-white/[0.07] px-3 py-[11px] text-[13px] text-white/65 transition-all hover:bg-white/12 hover:text-white"
+                  >
+                    Probar mic
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleSendVoice()}
+                    disabled={!recorder.canSend || recorder.status === "sending"}
+                    className="min-w-[180px] flex-[2] rounded-xl border-0 bg-[#2d6be4] px-5 py-[11px] text-[14px] font-semibold text-white transition-all hover:bg-[#1d5bcd] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Enviar grabacion
+                  </button>
+                  <button
+                    type="button"
                     onClick={closeVoiceModal}
-                    className="border-[#cbd5e1] bg-white px-4 py-2 text-[13px] text-[#334155]"
+                    className="min-w-[110px] flex-1 rounded-xl border border-white/8 bg-white/[0.04] px-3 py-[11px] text-[13px] text-white/35 transition-all hover:bg-white/8 hover:text-white/65"
                   >
                     Cancelar
-                  </Button>
+                  </button>
                 </div>
 
                 {isDevelopment ? (
-                  <details className="rounded-xl border border-[#e2e8f0] bg-white/75 p-3">
-                    <summary className="cursor-pointer text-[12px] font-medium text-[#334155]">
-                      Debug voz (solo desarrollo)
-                    </summary>
-                    <pre className="mt-2 whitespace-pre-wrap break-words text-[11px] text-[#334155]">
+                  <details className="mt-2 w-full">
+                    <summary className="cursor-pointer text-[11px] text-white/25">Debug voz (solo desarrollo)</summary>
+                    <pre className="mt-2 max-h-40 overflow-auto rounded-lg border border-white/8 bg-white/5 p-2 text-[11px] text-white/60">
                       {JSON.stringify(
                         {
-                          speechSupported: voice.speechSupported,
-                          microphoneStatus: voice.microphoneStatus,
-                          phase: voice.phase,
-                          listening: voice.listening,
-                          transcriptSource: voice.transcriptSource,
-                          resultCount: voice.resultCount,
-                          recognitionConfig: voice.config,
-                          lastSessionDurationMs: voice.lastSessionDurationMs,
-                          lastSessionHadResult: voice.lastSessionHadResult,
-                          lastSessionHadTranscript: voice.lastSessionHadTranscript,
-                          transcriptPreview: voice.transcript.slice(0, 280),
-                          error: voice.error,
-                          uiEvents: voiceUiDebugEvents,
-                          hookEvents: voice.debugEvents ?? [],
+                          status: recorder.status,
+                          countdown: recorder.countdown,
+                          transcriptLength: recorder.transcript.length,
+                          audioSize: recorder.audioBlob?.size ?? 0,
+                          audioType: recorder.audioBlob?.type ?? null,
+                          speechSupported: recorder.speechSupported,
+                          microphoneStatus: recorder.microphoneStatus,
+                          micSupported: recorder.micSupported,
                         },
                         null,
                         2,
