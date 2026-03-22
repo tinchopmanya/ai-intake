@@ -115,15 +115,15 @@ export function VoicePlaybackButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex h-9 items-center gap-2 rounded-[8px] border px-3 text-[13px] transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(15,23,42,0.18)] disabled:cursor-not-allowed disabled:opacity-60 ${
+      className={`inline-flex h-9 items-center gap-2 rounded-full border px-3.5 text-[12px] font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(26,39,68,0.25)] disabled:cursor-not-allowed disabled:opacity-60 ${
         speaking
-          ? "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]"
-          : "border-[#ddd] bg-transparent text-[#111] hover:bg-[#fafafa]"
+          ? "border-[#bfd3ff] bg-[#ebf2ff] text-[#1d4ed8] shadow-[0_2px_6px_rgba(29,78,216,0.12)]"
+          : "border-[#c8d6ea] bg-white text-[#334155] hover:border-[#b7c7de] hover:bg-[#f8fbff]"
       }`}
     >
       <span
         className={`h-2 w-2 rounded-full ${
-          speaking ? "bg-[#1d4ed8] animate-pulse" : "bg-[#94a3b8]"
+          speaking ? "bg-[#1d4ed8] animate-pulse" : "bg-[#90a4c5]"
         }`}
       />
       {speaking ? "Detener" : "Escuchar"}

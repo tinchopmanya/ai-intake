@@ -2,7 +2,7 @@ export const advisorPanelShellClass =
   "rounded-[28px] border border-[#dbe4ee] bg-[#f8fafc] shadow-[0_32px_90px_rgba(15,23,42,0.28)]";
 
 export const advisorDarkHeaderClass =
-  "relative overflow-hidden border-b border-white/10 bg-[linear-gradient(135deg,#3d4a5e_0%,#293546_50%,#1f2a38_100%)]";
+  "relative overflow-hidden border-b border-white/10 bg-[linear-gradient(140deg,#1a2744_0%,#1c2b4b_52%,#16223a_100%)]";
 
 export const advisorDarkHeaderGlowClass =
   "pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(148,163,184,0.22),transparent_42%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.12),transparent_36%)]";

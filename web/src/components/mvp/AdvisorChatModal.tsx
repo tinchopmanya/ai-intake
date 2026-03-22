@@ -67,6 +67,11 @@ export function AdvisorChatModal({
   const [voiceUiDebugEvents, setVoiceUiDebugEvents] = useState<
     Array<{ at: string; event: string; details?: Record<string, unknown> }>
   >([]);
+  const headerAvatarSrc = useMemo(() => {
+    if (!advisorAvatarSrc) return null;
+    if (advisorAvatarSrc.includes("_128")) return advisorAvatarSrc;
+    return advisorAvatarSrc.replace("_64", "_128");
+  }, [advisorAvatarSrc]);
   const preferredVoiceLang = useMemo(() => {
     if (typeof navigator === "undefined") return "es-ES";
     const browserLanguages = [navigator.language, ...(navigator.languages ?? [])]
@@ -248,13 +253,13 @@ export function AdvisorChatModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-[2px]">
       <div className={`relative flex h-[min(92vh,840px)] w-full max-w-3xl flex-col overflow-hidden ${advisorPanelShellClass}`}>
-        <header className={`${advisorDarkHeaderClass} px-4 py-3 md:px-5 md:py-3.5`}>
+        <header className={`${advisorDarkHeaderClass} px-4 py-2.5 md:px-5 md:py-3`}>
           <div className={advisorDarkHeaderGlowClass} aria-hidden />
           <div className="relative flex items-start justify-between gap-4">
             <div className="flex min-w-0 items-start gap-4">
               {advisorAvatarSrc ? (
                 <Image
-                  src={advisorAvatarSrc}
+                  src={headerAvatarSrc}
                   alt={advisorName}
                   width={48}
                   height={48}
@@ -424,9 +429,9 @@ export function AdvisorChatModal({
                         className={`voice-avatar-ring ${voiceUiState === "listening" ? "is-active" : ""}`}
                         aria-hidden
                       />
-                      {advisorAvatarSrc ? (
+                      {headerAvatarSrc ? (
                         <Image
-                          src={advisorAvatarSrc}
+                          src={headerAvatarSrc}
                           alt={advisorName}
                           width={48}
                           height={48}

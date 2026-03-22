@@ -6,9 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { AdvisorChatModal } from "@/components/mvp/AdvisorChatModal";
-import {
-  advisorFloatingPanelClass,
-} from "@/components/mvp/advisorUiStyles";
+import { advisorFloatingPanelClass } from "@/components/mvp/advisorUiStyles";
 import { ADVISOR_PROFILES } from "@/data/advisors";
 import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
 import { postAdvisorChat } from "@/lib/api/client";
@@ -17,6 +15,15 @@ import { getCurrentUser, logoutSession } from "@/lib/auth/client";
 type AppShellProps = {
   children: ReactNode;
 };
+
+function getAdvisorAvatar(
+  advisor: (typeof ADVISOR_PROFILES)[number] | undefined,
+  variant: "64" | "128",
+) {
+  if (!advisor) return null;
+  if (variant === "64") return advisor.avatar64 ?? advisor.avatar128 ?? null;
+  return advisor.avatar128 ?? advisor.avatar64 ?? null;
+}
 
 export function AppShell({ children }: AppShellProps) {
   const router = useRouter();
@@ -186,21 +193,35 @@ export function AppShell({ children }: AppShellProps) {
             {advisorMenuOpen ? (
               <div role="menu" className={`absolute right-0 z-20 mt-2 w-[340px] ${advisorFloatingPanelClass}`}>
                 <ul className="space-y-2 p-2.5">
-                  {ADVISOR_PROFILES.map((advisor, index) => (
-                    <li key={advisor.id}>
+                  {ADVISOR_PROFILES.map((advisor, index) => {
+                    const dropdownAvatarSrc = getAdvisorAvatar(advisor, "64");
+                    const advisorInitials = advisor.name
+                      .split(" ")
+                      .filter((part) => part.trim().length > 0)
+                      .slice(0, 2)
+                      .map((part) => part[0]?.toUpperCase() ?? "")
+                      .join("");
+                    return (
+                      <li key={advisor.id}>
                       <button
                         type="button"
                         role="menuitem"
                         onClick={() => handleSelectAdvisor(index)}
                         className="flex w-full items-start gap-3 rounded-2xl border border-white/10 bg-white/6 px-3 py-3 text-left transition-all hover:border-white/16 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
                       >
-                        <Image
-                          src={advisor.avatar128}
-                          alt={advisor.name}
-                          width={44}
-                          height={44}
-                          className="h-11 w-11 rounded-2xl border border-white/14 object-cover shadow-[0_8px_20px_rgba(15,23,42,0.18)]"
-                        />
+                        {dropdownAvatarSrc ? (
+                          <Image
+                            src={dropdownAvatarSrc}
+                            alt={advisor.name}
+                            width={44}
+                            height={44}
+                            className="h-11 w-11 rounded-2xl border border-white/14 object-cover shadow-[0_8px_20px_rgba(15,23,42,0.18)]"
+                          />
+                        ) : (
+                          <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/14 bg-[#2d3f6b] text-[12px] font-semibold text-white">
+                            {advisorInitials || "AD"}
+                          </span>
+                        )}
                         <div className="min-w-0 flex-1 pt-0.5">
                           <p className="text-[13px] font-semibold text-white">{advisor.name}</p>
                           <p className="mt-1 line-clamp-2 text-[12px] leading-5 text-slate-200/78">
@@ -208,8 +229,9 @@ export function AppShell({ children }: AppShellProps) {
                           </p>
                         </div>
                       </button>
-                    </li>
-                  ))}
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             ) : null}
@@ -266,7 +288,11 @@ export function AppShell({ children }: AppShellProps) {
         advisorRole={advisorChatIndex !== null ? ADVISOR_PROFILES[advisorChatIndex]?.role ?? "" : ""}
         advisorDescription={advisorChatIndex !== null ? ADVISOR_PROFILES[advisorChatIndex]?.description ?? "" : ""}
         userName={displayName}
-        advisorAvatarSrc={advisorChatIndex !== null ? ADVISOR_PROFILES[advisorChatIndex]?.avatar64 ?? null : null}
+        advisorAvatarSrc={
+          advisorChatIndex !== null
+            ? getAdvisorAvatar(ADVISOR_PROFILES[advisorChatIndex], "128")
+            : null
+        }
         messages={advisorChatMessages}
         draft={advisorChatInput}
         sending={advisorChatSending}
