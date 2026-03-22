@@ -1,12 +1,12 @@
 "use client";
 
 import { type ChangeEvent, type ClipboardEvent, useEffect, useRef, useState } from "react";
+import Image from "next/image";
 
 import { AdvisorChatModal } from "@/components/mvp/AdvisorChatModal";
 import { AdvisorProfileModal } from "@/components/mvp/AdvisorProfileModal";
 import { VoiceListeningBadge, VoiceMicButton, VoicePlaybackButton } from "@/components/mvp/VoiceControls";
 import { Button, Panel, Select, Textarea } from "@/components/mvp/ui";
-import { AdvisorAvatarItem } from "@/components/ui/AdvisorAvatarItem";
 import { ADVISOR_PROFILES } from "@/data/advisors";
 import { authFetch } from "@/lib/auth/client";
 import { hasStoredSession } from "@/lib/auth/client";
@@ -45,6 +45,7 @@ const ADVISOR_FALLBACK_VISUAL = {
   name: "Advisor",
   role: "Perspectiva",
   avatar64: "/advisors/generic.svg",
+  avatar128: "/advisors/generic.svg",
 };
 
 const responseStyleBadgeByIndex = ["Empatica", "Estrategica", "Directa"] as const;
@@ -129,6 +130,14 @@ function resolveOcrErrorMessage(detail?: string, message?: string): string {
 
 function getAdvisorVisualByIndex(index: number) {
   return ADVISOR_PROFILES[index] ?? ADVISOR_FALLBACK_VISUAL;
+}
+
+function getAdvisorAvatar(
+  advisor: ReturnType<typeof getAdvisorVisualByIndex>,
+  variant: "64" | "128",
+) {
+  if (variant === "64") return advisor.avatar64 ?? advisor.avatar128;
+  return advisor.avatar128 ?? advisor.avatar64;
 }
 
 function createConversationBlock(
@@ -354,11 +363,14 @@ function Stepper({
               </span>
             </div>
             {index < steps.length - 1 ? (
-              <span
-                className={`h-px min-w-[12px] flex-1 ${
-                  currentStep > step.id ? "bg-emerald-300" : "bg-gray-300"
-                }`}
-              />
+              (() => {
+                const nextStep = steps[index + 1];
+                const connectorClass =
+                  nextStep && nextStep.id < currentStep
+                    ? "bg-[#1a7a5e]"
+                    : "bg-[var(--color-border-tertiary)]";
+                return <span className={`h-px min-w-[12px] flex-1 ${connectorClass}`} />;
+              })()
             ) : null}
           </div>
         );
@@ -1519,38 +1531,66 @@ export function WizardScaffold() {
           <div className="grid gap-3 lg:grid-cols-3">
             {Array.from({ length: 3 }).map((_, index) => {
               const advisorVisual = getAdvisorVisualByIndex(index);
+              const advisorAvatar64 = getAdvisorAvatar(advisorVisual, "64");
               const responseText = advisorResult?.responses[index]?.text ?? "";
               const isRecommended = index === 0;
+              const advisorInitials = advisorVisual.name
+                .split(" ")
+                .filter((part) => part.trim().length > 0)
+                .slice(0, 2)
+                .map((part) => part[0]?.toUpperCase() ?? "")
+                .join("");
 
               return (
                 <article
                   key={`${advisorVisual.id}-${index}`}
                   onClick={() => openAdvisorChat(index)}
-                  className={`mb-3 flex min-w-0 cursor-pointer flex-col rounded-[10px] border bg-white p-4 transition-all duration-150 ease-in-out hover:border-[#d4d4d4] hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)] ${
-                    isRecommended ? "border-[#22c55e]" : "border-[#e5e5e5]"
+                  className={`relative mb-3 flex min-w-0 cursor-pointer flex-col rounded-[12px] bg-white p-4 transition-all duration-150 ease-in-out hover:shadow-[0_6px_18px_rgba(15,23,42,0.08)] ${
+                    isRecommended
+                      ? "border-2 border-[#1a7a5e]"
+                      : "border-[0.5px] border-[var(--color-border-tertiary)]"
                   }`}
                 >
-                  <header className="rounded-[10px] border border-[#e5e5e5] bg-[#fafafa] px-3 py-3 text-[#111]">
+                  <header className="relative rounded-[10px] bg-[#1a2744] px-3 py-2.5 text-white">
+                    {isRecommended ? (
+                      <span className="absolute -top-px right-3 rounded-b-[6px] bg-[#1a7a5e] px-2.5 py-[3px] text-[10px] font-medium text-white">
+                        Recomendada
+                      </span>
+                    ) : null}
                     <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <AdvisorAvatarItem
-                          name={advisorVisual.name}
-                          role={advisorVisual.role}
-                          avatarSrc={advisorVisual.avatar64}
-                          size={56}
-                          tone="light"
-                          onClick={() => openAdvisorProfileById(advisorVisual.id)}
-                        />
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            openAdvisorProfileById(advisorVisual.id);
+                          }}
+                          className="rounded-full transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-white/40"
+                          aria-label={`Abrir perfil de ${advisorVisual.name}`}
+                        >
+                          {advisorAvatar64 ? (
+                            <Image
+                              src={advisorAvatar64}
+                              alt={advisorVisual.name}
+                              width={44}
+                              height={44}
+                              className="h-11 w-11 rounded-full border-2 border-white/25 object-cover"
+                            />
+                          ) : (
+                            <span className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-white/25 bg-[#2d3f6b] text-[12px] font-semibold text-white">
+                              {advisorInitials || "AD"}
+                            </span>
+                          )}
+                        </button>
+                        <div className="min-w-0">
+                          <p className="truncate text-[13px] font-medium text-white">{advisorVisual.name}</p>
+                          <p className="truncate text-[11px] text-white/60">{advisorVisual.role}</p>
+                        </div>
                       </div>
-                      <span className="shrink-0 rounded-[6px] bg-[#f3f4f6] px-2 py-1 text-[12px] text-[#444]">
+                      <span className="shrink-0 rounded-full bg-white/12 px-2 py-[3px] text-[10px] font-medium text-white/85">
                         {responseStyleBadgeByIndex[index]}
                       </span>
                     </div>
-                    {isRecommended ? (
-                      <p className="mt-2 inline-flex rounded-[6px] border border-[#22c55e] bg-[#ecfdf5] px-2 py-0.5 text-[11px] font-semibold text-[#166534]">
-                        Recomendado
-                      </p>
-                    ) : null}
                   </header>
 
                   <p className="mt-4 flex-1 whitespace-pre-wrap break-words text-[14px] leading-[1.6] text-[#222]">
@@ -1602,39 +1642,44 @@ export function WizardScaffold() {
             })}
           </div>
 
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-            <Button
-              type="button"
-              onClick={openIncidentCapture}
-              variant="secondary"
-              className="border-[#cbd5e1] bg-white text-[#334155] hover:bg-[#f8fafc]"
-            >
-              Registrar incidente
-            </Button>
-            <Button
-              type="button"
-              onClick={() => setCurrentStep(2)}
-              variant="secondary"
-              className="border-[#cbd5e1] bg-white text-[#334155] hover:bg-[#f8fafc]"
-            >
-              Volver al paso 2
-            </Button>
-            <Button
-              type="button"
-              onClick={handleStartNewConversation}
-              variant="primary"
-              className="bg-[#1f2937] hover:bg-[#111827]"
-            >
-              Iniciar nueva conversacion
-            </Button>
+          <div className="mt-6 flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                onClick={openIncidentCapture}
+                variant="secondary"
+                className="border-[0.5px] border-[var(--color-border-secondary)] bg-white text-[#334155] hover:bg-[#f8fafc]"
+              >
+                Registrar incidente
+              </Button>
+              <Button
+                type="button"
+                onClick={() => setCurrentStep(2)}
+                variant="secondary"
+                className="border-[0.5px] border-[var(--color-border-secondary)] bg-white text-[#334155] hover:bg-[#f8fafc]"
+              >
+                Volver al paso 2
+              </Button>
+            </div>
+            <div className="min-w-0 flex-1" />
+            <div className="flex flex-wrap items-center justify-end gap-2">
               <Button
                 type="button"
                 onClick={() => setCurrentStep(1)}
                 variant="secondary"
-                className="border-[#cbd5e1] bg-white text-[#334155] hover:bg-[#f8fafc]"
+                className="border-transparent bg-transparent px-2 py-1 text-[12px] text-[var(--color-text-secondary)] hover:bg-[#f8fafc]"
               >
                 Ninguna me sirve / quiero agregar mas contexto
               </Button>
+              <Button
+                type="button"
+                onClick={handleStartNewConversation}
+                variant="primary"
+                className="bg-[#1a2744] text-white hover:bg-[#14203a]"
+              >
+                Iniciar nueva conversacion
+              </Button>
+            </div>
           </div>
           {incidentVisible ? (
             <div className="rounded-2xl border border-[#dbe3ec] bg-[#f8fafc] p-3">
@@ -1700,7 +1745,11 @@ export function WizardScaffold() {
         advisorDescription={
           advisorChatIndex !== null ? ADVISOR_PROFILES[advisorChatIndex]?.description ?? "" : ""
         }
-        advisorAvatarSrc={advisorChatIndex !== null ? getAdvisorVisualByIndex(advisorChatIndex).avatar64 : null}
+        advisorAvatarSrc={
+          advisorChatIndex !== null
+            ? getAdvisorAvatar(getAdvisorVisualByIndex(advisorChatIndex), "128")
+            : null
+        }
         messages={advisorChatMessages}
         draft={advisorChatInput}
         sending={advisorChatSending}

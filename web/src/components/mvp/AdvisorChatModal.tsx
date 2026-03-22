@@ -356,18 +356,6 @@ export function AdvisorChatModal({
                 className="border-[#cad5e2] bg-white text-[#526173] shadow-[0_1px_2px_rgba(15,23,42,0.03)] hover:border-[#b7c7d9] hover:bg-[#f8fbff]"
               />
               <p className="min-w-0 flex-1 text-[12px] leading-5 text-[#526173]">{voiceSupportCopy}</p>
-              {isDevelopment ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    void voice.requestMicrophonePermission();
-                  }}
-                  disabled={voice.microphoneStatus === "requesting"}
-                  className="inline-flex h-8 items-center rounded-full border border-[#cad5e2] bg-white px-3 text-[12px] font-medium text-[#334155] shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition hover:bg-[#f8fafc] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Probar microfono
-                </button>
-              ) : null}
             </div>
 
             {voice.error ? (
@@ -518,6 +506,19 @@ export function AdvisorChatModal({
                 </div>
 
                 <div className="flex flex-wrap justify-end gap-2">
+                  {isDevelopment ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => {
+                        void voice.requestMicrophonePermission();
+                      }}
+                      disabled={voice.microphoneStatus === "requesting"}
+                      className="border-[#cbd5e1] bg-white px-4 py-2 text-[13px] text-[#334155]"
+                    >
+                      Probar microfono
+                    </Button>
+                  ) : null}
                   {voiceUiState === "listening" ? (
                     <Button
                       type="button"
