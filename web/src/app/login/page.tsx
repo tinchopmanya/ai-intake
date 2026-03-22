@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { DevTokenSection } from "@/components/auth/DevTokenSection";
@@ -75,7 +75,7 @@ function mapLoginError(error: unknown): string {
   return "No se pudo iniciar sesion en este momento.";
 }
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const buttonHostRef = useRef<HTMLDivElement | null>(null);
@@ -209,5 +209,13 @@ export default function LoginPage() {
         )}
       </LoginCard>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPageContent />
+    </Suspense>
   );
 }
