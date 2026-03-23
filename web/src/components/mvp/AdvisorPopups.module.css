@@ -1,7 +1,8 @@
 .vpOverlay,
 .cpOverlay {
   --popup-bg: #0d1825;
-  --popup-header-bg: #1a3a5c;
+  --popup-header-bg: #1c2b3a;
+  --popup-header-accent: #2d6be4;
   --popup-header-text: #ffffff;
   --popup-header-sub: rgba(255, 255, 255, 0.55);
   --popup-header-desc: rgba(255, 255, 255, 0.4);
@@ -62,6 +63,16 @@
   background: var(--backdrop);
 }
 
+.cpOverlay {
+  z-index: 50;
+  backdrop-filter: blur(2px);
+}
+
+.vpOverlay {
+  z-index: 90;
+  backdrop-filter: blur(2px);
+}
+
 .cpPanel,
 .vpCard {
   position: relative;
@@ -75,6 +86,7 @@
 .vpHeader,
 .cpHeader {
   background: var(--popup-header-bg);
+  border-bottom: 2px solid var(--popup-header-accent);
   color: var(--popup-header-text);
   padding: 14px 20px;
   display: flex;
@@ -388,16 +400,17 @@
 }
 
 .vpChatHead {
-  border-bottom: 1px solid var(--bubble-advisor-border);
-  padding: 12px 16px;
+  background: var(--popup-header-bg);
+  border-bottom: 2px solid var(--popup-header-accent);
+  padding: 14px 20px;
 }
 
 .vpChatHeadText {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--popup-header-sub);
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .vpChatList {
