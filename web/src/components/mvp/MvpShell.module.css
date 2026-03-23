@@ -1,5 +1,5 @@
 .shellRoot {
-  --app-bg: #080f18;
+  --app-bg: #08111a;
   --panel-bg: #0d1825;
   --panel-border: #2d6be4;
   --header-bg: #1c2b3a;
@@ -166,7 +166,7 @@
   height: 34px;
   border-radius: 9999px;
   border: 2px solid rgba(255, 255, 255, 0.18);
-  background: #2d5a8e;
+  background: linear-gradient(135deg, #2d6be4, #1a4a9e);
   color: #fff;
   font-size: 12px;
   font-weight: 600;
@@ -217,8 +217,10 @@
   width: 48px;
   background: var(--app-bg);
   border-right: 1px solid var(--separator);
+  height: calc(100vh - 52px);
   transition: width 220ms ease, transform 220ms ease;
   overflow: hidden;
+  overscroll-behavior: contain;
 }
 
 .shellSidebarExpanded {
@@ -283,12 +285,12 @@
 }
 
 .shellSessionList::-webkit-scrollbar {
-  width: 6px;
+  width: 4px;
 }
 
 .shellSessionList::-webkit-scrollbar-thumb {
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .shellSessionItem {
@@ -317,6 +319,9 @@
   font-size: 13px;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.7);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .shellSessionActive .shellSessionTitle {
@@ -327,6 +332,9 @@
   margin-top: 4px;
   font-size: 11px;
   color: rgba(255, 255, 255, 0.32);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .shellSessionActive .shellSessionMeta {
@@ -345,7 +353,7 @@
   border-radius: 999px;
   border: 1px solid rgba(45, 107, 228, 0.28);
   background: rgba(45, 107, 228, 0.1);
-  color: var(--text-primary);
+  color: #7eb8f7;
   padding: 10px 12px;
   font-size: 13px;
   font-weight: 600;
@@ -355,8 +363,8 @@
 }
 
 .shellNewConversation:hover {
-  background: rgba(45, 107, 228, 0.16);
-  border-color: rgba(45, 107, 228, 0.4);
+  background: rgba(45, 107, 228, 0.22);
+  border-color: rgba(45, 107, 228, 0.45);
 }
 
 .shellNewConversationIcon {
@@ -397,19 +405,21 @@
   flex-direction: column;
   gap: 14px;
   overflow: hidden;
-  border: 1px solid rgba(45, 107, 228, 0.3);
+  border: 1px solid rgba(45, 107, 228, 0.25);
   border-radius: 16px;
   background: var(--panel-bg);
   padding: 24px;
-  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.26);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.22);
 }
 
 .wizardStepper {
   display: flex;
   align-items: center;
-  gap: 10px;
+  width: 100%;
+  gap: 0;
   overflow: hidden;
-  padding: 0 0 10px;
+  margin-bottom: 24px;
+  padding: 0;
 }
 
 .wizardStepItem {
@@ -430,14 +440,15 @@
 .wizardStepCircle {
   width: 28px;
   height: 28px;
+  min-width: 28px;
   flex-shrink: 0;
   border-radius: 9999px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 2px solid rgba(255, 255, 255, 0.18);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .wizardStepActive {
@@ -460,7 +471,7 @@
 .wizardStepLabel {
   min-width: 0;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
@@ -468,18 +479,19 @@
 }
 
 .wizardStepLabelPending {
-  color: var(--text-secondary);
+  color: rgba(255, 255, 255, 0.3);
 }
 
 .wizardStepConnector {
   height: 1px;
   min-width: 12px;
   flex: 1;
-  background: var(--separator);
+  margin: 0 10px;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .wizardStepConnectorComplete {
-  background: var(--positive);
+  background: rgba(5, 150, 105, 0.4);
 }
 
 .wizardStepIntroTitle {
