@@ -430,6 +430,8 @@ export function AdvisorChatModal({
       : "Contame que queres ajustar y lo mejoramos juntos.");
   const inputPlaceholder =
     entryMode === "advisor_conversation" ? "Escribi tu mensaje..." : "Escribi como queres ajustarlo...";
+  const floatingCloseButtonClass =
+    "absolute -right-[14px] -top-[14px] z-20 inline-flex h-8 w-8 items-center justify-center rounded-full border-2 border-white/20 bg-[#1e2a3a] text-white shadow-[0_2px_8px_rgba(0,0,0,0.3)] transition hover:bg-[#243449]";
 
   const openVoice = () => {
     setVoiceTranscriptOpen(false);
@@ -448,11 +450,16 @@ export function AdvisorChatModal({
   const voiceOverlay =
     typeof document !== "undefined" && voiceOpen
       ? createPortal(
-          <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/72 p-3 backdrop-blur-[2px]">
-            <div className={`h-[min(88vh,760px)] w-full overflow-hidden transition-all duration-300 ${voiceChatExpanded ? "max-w-[780px]" : "max-w-[420px]"}`}>
+          <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[rgba(226,232,240,0.85)] p-3 backdrop-blur-[2px]">
+            <div className={`relative h-[min(88vh,760px)] w-full transition-all duration-300 ${voiceChatExpanded ? "max-w-[780px]" : "max-w-[420px]"}`}>
+              <button type="button" onClick={() => closeVoice()} className={floatingCloseButtonClass} aria-label="Cerrar">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.1" className="h-4 w-4">
+                  <path d="M5 5l10 10M15 5 5 15" />
+                </svg>
+              </button>
               <div className={`h-full overflow-hidden rounded-[20px] border border-[#1c2a3d] bg-[#0d1520] shadow-[0_24px_60px_rgba(0,0,0,0.34)]`}>
                 <div className="relative flex h-full flex-col lg:flex-row">
-                  <section className={`${advisorVoiceBodyClass} relative flex h-full min-h-0 flex-col items-center px-6 pb-5 pt-8 ${voiceChatExpanded ? "lg:w-[380px] lg:shrink-0 lg:border-r lg:border-[#1f2b3d]" : "lg:w-full"}`}>
+                  <section className={`${advisorVoiceBodyClass} relative flex h-full min-h-0 flex-col items-center px-6 pb-5 pt-4 ${voiceChatExpanded ? "lg:w-[380px] lg:shrink-0 lg:border-r lg:border-[#1f2b3d]" : "lg:w-full"}`}>
                     <header className={`${advisorVoiceHeaderClass} absolute inset-x-0 top-0 flex items-center gap-3 px-5 py-3.5`}>
                       {headerAvatar ? (
                         <Image src={headerAvatar} alt={advisorName} width={48} height={48} priority className="h-12 w-12 rounded-full border-2 border-white/18 object-cover" />
@@ -463,14 +470,13 @@ export function AdvisorChatModal({
                         <p className="truncate text-[16px] font-semibold text-white">{advisorName}</p>
                         {advisorRole ? <p className="mt-0.5 text-[11px] text-white/45">{advisorRole}</p> : null}
                       </div>
-                      <button type="button" onClick={() => closeVoice()} className="rounded-full border border-white/30 bg-[#0b1424]/96 px-4 py-1.5 text-[13px] font-semibold text-white shadow-[0_1px_2px_rgba(0,0,0,0.25)] transition hover:bg-[#132038]">Cerrar</button>
                     </header>
 
                     <button type="button" onClick={() => setVoiceChatExpanded((prev) => !prev)} className="absolute -right-3 top-1/2 z-10 hidden -translate-y-1/2 rounded-full border border-white/20 bg-[#17253a]/95 px-2 py-6 text-white/80 shadow-[0_8px_18px_rgba(0,0,0,0.32)] transition hover:bg-[#1f3554] lg:inline-flex" aria-label={voiceChatExpanded ? "Contraer chat" : "Expandir chat"}>
                       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" className={`h-4 w-4 transition-transform ${voiceChatExpanded ? "rotate-180" : ""}`}><path d="m7 4 6 6-6 6" /></svg>
                     </button>
 
-                    <div className="relative mt-16 flex h-[256px] w-[256px] items-center justify-center">
+                    <div className="relative mt-12 flex h-[256px] w-[256px] items-center justify-center">
                       <span className={`voice-pulse-ring voice-pulse-ring-1 ${voiceSpeaking ? "is-speaking" : ""} ${(flowPhase === "user_recording" || flowPhase === "user_paused") ? "is-listening" : ""}`} />
                       <span className={`voice-pulse-ring voice-pulse-ring-2 ${voiceSpeaking ? "is-speaking" : ""} ${(flowPhase === "user_recording" || flowPhase === "user_paused") ? "is-listening" : ""}`} />
                       <span className={`voice-pulse-ring voice-pulse-ring-3 ${voiceSpeaking ? "is-speaking" : ""} ${(flowPhase === "user_recording" || flowPhase === "user_paused") ? "is-listening" : ""}`} />
@@ -505,6 +511,11 @@ export function AdvisorChatModal({
                     <div className="mb-3 mt-2 text-center">
                       <p className="text-[14px] font-semibold text-white">{advisorName}</p>
                       {advisorRole ? <p className="text-[11px] text-white/55">{advisorRole}</p> : null}
+                      {advisorDescription ? (
+                        <p className="mx-auto mt-1.5 max-w-[280px] text-center text-[12px] leading-[1.5] text-white/45">
+                          {advisorDescription}
+                        </p>
+                      ) : null}
                       <p className={`mt-1 text-[13px] ${flowPhase === "user_recording" ? "text-[#ff6b6b]" : flowPhase === "user_paused" ? "text-[#fbbf24]" : flowPhase === "advisor_speaking" ? "text-[#9dc7ff]" : flowPhase === "sending" ? "text-[#4a9eff]" : "text-white/70"}`}>{statusText}</p>
                     </div>
 
@@ -571,11 +582,24 @@ export function AdvisorChatModal({
   return (
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-[2px]">
-        <div className={`relative flex h-[min(92vh,760px)] w-full max-w-[560px] flex-col overflow-hidden ${advisorPanelShellClass}`}>
-          <header className="flex items-center gap-3 bg-[#1e2a3a] px-5 py-4">
+        <div className="relative w-full max-w-[560px]">
+          <button
+            type="button"
+            onClick={() => {
+              if (voiceOpen) closeVoice();
+              onClose();
+            }}
+            className={floatingCloseButtonClass}
+            aria-label="Cerrar"
+          >
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.1" className="h-4 w-4">
+              <path d="M5 5l10 10M15 5 5 15" />
+            </svg>
+          </button>
+          <div className={`relative flex h-[min(92vh,760px)] w-full flex-col overflow-hidden ${advisorPanelShellClass}`}>
+          <header className="flex items-center gap-3 bg-[#0d1520] px-5 py-4">
             {headerAvatar ? <Image src={headerAvatar} alt={advisorName} width={48} height={48} className="h-12 w-12 rounded-full border-2 border-white/20 object-cover" /> : <span className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-white/20 bg-[#4a9eff] text-[18px] font-bold text-white">{(getInitials(advisorName) || "A")[0]}</span>}
             <div className="min-w-0 flex-1"><p className="truncate text-[17px] font-semibold text-white">{advisorName}</p>{advisorRole ? <p className="mt-0.5 text-[12px] text-white/55">{advisorRole}</p> : null}{advisorDescription ? <p className="mt-1 line-clamp-2 text-[11px] text-white/70">{advisorDescription}</p> : null}</div>
-            <button type="button" onClick={() => { if (voiceOpen) closeVoice(); onClose(); }} className="rounded-full border border-white/30 bg-[#0b1424]/96 px-4 py-1.5 text-[13px] font-semibold text-white shadow-[0_1px_2px_rgba(0,0,0,0.25)] transition hover:bg-[#132038]">Cerrar</button>
           </header>
 
           <div className="flex min-h-0 flex-1 flex-col bg-[#f4f6fa]">
@@ -586,7 +610,7 @@ export function AdvisorChatModal({
             <footer className="border-t border-[#e8ecf2] bg-white px-4 py-3">
               <div className="mb-2 flex items-end gap-2">
                 <Textarea id="advisor-chat-draft" value={draft} onChange={(event) => onDraftChange(event.target.value)} rows={1} spellCheck={false} placeholder={inputPlaceholder} onKeyDown={(event: KeyboardEvent<HTMLTextAreaElement>) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); if (!sending && draft.trim()) onSend(); } }} className="min-h-[42px] max-h-[120px] flex-1 rounded-xl border-[1.5px] border-[#dde3ef] px-[14px] py-[10px] text-[14px] text-[#2c3e50] placeholder:text-[#aab3c5] focus:border-[#4a9eff] focus:ring-0" />
-                <button type="button" onClick={openVoice} className="inline-flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full border-[1.5px] border-[#dde3ef] bg-[#f4f6fa] text-[#6b7a99] transition-all hover:border-[#4a9eff] hover:bg-[#e8ecf2]" aria-label="Hablar con el advisor"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10a7 7 0 0 0 14 0" /><path d="M12 19v3" /><path d="M8 22h8" /></svg></button>
+                <button type="button" onClick={openVoice} className="voice-mic-pulse inline-flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full border-0 bg-[#dc2626] text-white transition-all hover:bg-[#b91c1c]" aria-label="Hablar con el advisor"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10a7 7 0 0 0 14 0" /><path d="M12 19v3" /><path d="M8 22h8" /></svg></button>
                 <Button type="button" variant="primary" disabled={sending || !draft.trim()} onClick={onSend} className="h-[42px] rounded-xl border-0 bg-[#2d6be4] px-[18px] text-[14px] font-semibold text-white hover:bg-[#1d5bcd]">{sending ? "Enviando..." : "Enviar"}</Button>
               </div>
               <div className="flex items-center justify-between gap-2">
@@ -594,6 +618,7 @@ export function AdvisorChatModal({
                 {isDevelopment && debugPayload ? <details className="text-right"><summary className="cursor-pointer text-[11px] text-[#aab3c5]">Debug prompt (solo desarrollo)</summary><pre className="mt-2 max-h-40 overflow-auto rounded-lg border border-[#e8ecf2] bg-[#f8fafc] p-2 text-left text-[11px] text-[#334155]">{JSON.stringify(debugPayload, null, 2)}</pre></details> : null}
               </div>
             </footer>
+          </div>
           </div>
         </div>
       </div>
