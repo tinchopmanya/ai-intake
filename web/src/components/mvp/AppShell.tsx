@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { AdvisorChatModal } from "@/components/mvp/AdvisorChatModal";
-import { advisorFloatingPanelClass } from "@/components/mvp/advisorUiStyles";
+import styles from "@/components/mvp/MvpShell.module.css";
 import { ADVISOR_PROFILES } from "@/data/advisors";
 import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
 import { postAdvisorChat } from "@/lib/api/client";
@@ -31,6 +31,9 @@ export function AppShell({ children }: AppShellProps) {
   const advisorDropdownRef = useRef<HTMLDivElement | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [advisorMenuOpen, setAdvisorMenuOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(false);
+  const [activeConversationId, setActiveConversationId] = useState("current");
   const [displayName, setDisplayName] = useState("Usuario");
   const [advisorChatOpen, setAdvisorChatOpen] = useState(false);
   const [advisorChatIndex, setAdvisorChatIndex] = useState<number | null>(null);
@@ -55,21 +58,36 @@ export function AppShell({ children }: AppShellProps) {
   }, []);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    const media = window.matchMedia("(min-width: 1024px)");
+    const sync = (matches: boolean) => {
+      setIsDesktop(matches);
+      setSidebarOpen(matches);
+    };
+    sync(media.matches);
+    const onChange = (event: MediaQueryListEvent) => sync(event.matches);
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
+
+  useEffect(() => {
     function onDocumentClick(event: MouseEvent) {
-      if (!dropdownRef.current) return;
       const target = event.target as Node | null;
-      if (target && !dropdownRef.current.contains(target)) {
+      if (target && dropdownRef.current && !dropdownRef.current.contains(target)) {
         setMenuOpen(false);
       }
       if (target && advisorDropdownRef.current && !advisorDropdownRef.current.contains(target)) {
         setAdvisorMenuOpen(false);
       }
     }
+
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setMenuOpen(false);
+        setAdvisorMenuOpen(false);
       }
     }
+
     window.addEventListener("mousedown", onDocumentClick);
     window.addEventListener("keydown", onKeyDown);
     return () => {
@@ -86,6 +104,15 @@ export function AppShell({ children }: AppShellProps) {
     if (parts.length === 0) return "U";
     return parts.map((part) => part[0]!.toUpperCase()).join("");
   }, [displayName]);
+
+  const conversationSessions = useMemo(
+    () => [
+      { id: "current", title: "Conversacion actual", meta: "Flujo MVP activo" },
+      { id: "recent-1", title: "Sesion reciente", meta: "Ultima respuesta generada" },
+      { id: "recent-2", title: "Borrador anterior", meta: "Contexto guardado localmente" },
+    ],
+    [],
+  );
 
   async function handleLogout() {
     await logoutSession();
@@ -202,23 +229,23 @@ export function AppShell({ children }: AppShellProps) {
   }
 
   return (
-    <main className="mx-auto flex h-screen w-full max-w-[980px] min-w-0 flex-col overflow-x-hidden bg-white px-4 pb-4 pt-3 sm:px-6">
-      <header className="mx-auto flex w-full items-center justify-between border-b border-[#eee] py-3">
-        <h1 className="text-[20px] font-semibold text-[#111]">Consejero de Conversaciones</h1>
-        <div className="flex items-center gap-2">
+    <main className={styles.shellRoot}>
+      <header className={styles.shellTopbar}>
+        <div className={styles.shellBrand}>ExReply</div>
+        <div className={styles.shellActions}>
           <div ref={advisorDropdownRef} className="relative">
             <button
               type="button"
               onClick={() => setAdvisorMenuOpen((prev) => !prev)}
               aria-haspopup="menu"
               aria-expanded={advisorMenuOpen}
-              className="h-9 rounded-full border border-[#cad5e2] bg-white px-3.5 text-[13px] font-medium text-[#1f2937] shadow-[0_6px_16px_rgba(15,23,42,0.05)] transition-all hover:border-[#b6c4d5] hover:bg-[#f8fbff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(51,65,85,0.18)]"
+              className={styles.shellAdvisorTrigger}
             >
               Hablar con un advisor
             </button>
             {advisorMenuOpen ? (
-              <div role="menu" className={`absolute right-0 z-20 mt-2 w-[340px] ${advisorFloatingPanelClass}`}>
-                <ul className="space-y-2 p-2.5">
+              <div role="menu" className={`absolute right-0 z-20 mt-2 w-[340px] ${styles.shellDropdownPanel}`}>
+                <ul className={styles.shellAdvisorList}>
                   {ADVISOR_PROFILES.map((advisor, index) => {
                     const dropdownAvatarSrc = getAdvisorAvatar(advisor, "64");
                     const advisorInitials = advisor.name
@@ -229,32 +256,28 @@ export function AppShell({ children }: AppShellProps) {
                       .join("");
                     return (
                       <li key={advisor.id}>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => handleSelectAdvisor(index)}
-                        className="flex w-full items-start gap-3 rounded-2xl border border-white/10 bg-white/6 px-3 py-3 text-left transition-all hover:border-white/16 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
-                      >
-                        {dropdownAvatarSrc ? (
-                          <Image
-                            src={dropdownAvatarSrc}
-                            alt={advisor.name}
-                            width={44}
-                            height={44}
-                            className="h-11 w-11 rounded-2xl border border-white/14 object-cover shadow-[0_8px_20px_rgba(15,23,42,0.18)]"
-                          />
-                        ) : (
-                          <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/14 bg-[#2d3f6b] text-[12px] font-semibold text-white">
-                            {advisorInitials || "AD"}
-                          </span>
-                        )}
-                        <div className="min-w-0 flex-1 pt-0.5">
-                          <p className="text-[13px] font-semibold text-white">{advisor.name}</p>
-                          <p className="mt-1 line-clamp-2 text-[12px] leading-5 text-slate-200/78">
-                            {advisor.description}
-                          </p>
-                        </div>
-                      </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => handleSelectAdvisor(index)}
+                          className={styles.shellAdvisorItem}
+                        >
+                          {dropdownAvatarSrc ? (
+                            <Image
+                              src={dropdownAvatarSrc}
+                              alt={advisor.name}
+                              width={42}
+                              height={42}
+                              className={styles.shellAdvisorAvatar}
+                            />
+                          ) : (
+                            <span className={styles.shellAdvisorFallback}>{advisorInitials || "AD"}</span>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <p className={styles.shellAdvisorName}>{advisor.name}</p>
+                            <p className={styles.shellAdvisorDescription}>{advisor.description}</p>
+                          </div>
+                        </button>
                       </li>
                     );
                   })}
@@ -262,24 +285,21 @@ export function AppShell({ children }: AppShellProps) {
               </div>
             ) : null}
           </div>
+
           <div ref={dropdownRef} className="relative">
             <button
               type="button"
               onClick={() => setMenuOpen((prev) => !prev)}
               aria-haspopup="menu"
               aria-expanded={menuOpen}
-              className="flex h-9 items-center gap-2 rounded-full border border-[#ddd] bg-white px-3 text-[13px] font-medium text-[#111] transition-colors hover:bg-[#fafafa] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(17,17,17,0.2)]"
+              className={styles.shellUserButton}
+              title={displayName}
+              aria-label={displayName}
             >
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#111] text-xs font-bold text-white">
-                {initials}
-              </span>
-              <span className="max-w-[110px] truncate">{displayName}</span>
+              {initials}
             </button>
             {menuOpen ? (
-              <div
-                role="menu"
-                className="absolute right-0 z-20 mt-2 w-52 rounded-xl border border-[#e5e5e5] bg-white p-1 shadow-[0_8px_18px_rgba(15,23,42,0.08)]"
-              >
+              <div role="menu" className={`absolute right-0 z-20 mt-2 ${styles.shellUserMenu}`}>
                 <button
                   type="button"
                   onClick={() => {
@@ -287,7 +307,7 @@ export function AppShell({ children }: AppShellProps) {
                     router.push("/onboarding?edit=1");
                   }}
                   role="menuitem"
-                  className="block w-full rounded-lg px-3 py-2 text-left text-sm text-[#111] transition-colors hover:bg-[#fafafa]"
+                  className={styles.shellUserMenuItem}
                 >
                   Editar mis datos
                 </button>
@@ -298,16 +318,85 @@ export function AppShell({ children }: AppShellProps) {
                     void handleLogout();
                   }}
                   role="menuitem"
-                  className="block w-full rounded-lg px-3 py-2 text-left text-sm text-[#B91C1C] transition-colors hover:bg-[#FEF2F2]"
+                  className={styles.shellUserMenuItem}
                 >
-                  Cerrar sesión
+                  Cerrar sesion
                 </button>
               </div>
             ) : null}
           </div>
         </div>
       </header>
-      <section className="mx-auto mt-3 flex min-h-0 w-full min-w-0 flex-1">{children}</section>
+
+      <div className={styles.shellWorkspace}>
+        {!isDesktop && sidebarOpen ? (
+          <button
+            type="button"
+            aria-label="Cerrar sidebar"
+            className={styles.shellMobileBackdrop}
+            onClick={() => setSidebarOpen(false)}
+          />
+        ) : null}
+
+        <aside
+          className={`${styles.shellSidebar} ${sidebarOpen ? styles.shellSidebarExpanded : ""}`}
+          aria-label="Conversaciones"
+        >
+          <div className={styles.shellSidebarHeader}>
+            {sidebarOpen ? <span className={styles.shellSidebarTitle}>Conversaciones</span> : <span />}
+            <button
+              type="button"
+              className={styles.shellSidebarToggle}
+              onClick={() => setSidebarOpen((prev) => !prev)}
+              aria-label={sidebarOpen ? "Colapsar sidebar" : "Expandir sidebar"}
+              aria-expanded={sidebarOpen}
+            >
+              {sidebarOpen ? "‹" : "›"}
+            </button>
+          </div>
+
+          {sidebarOpen ? (
+            <>
+              <div className={styles.shellSessionList}>
+                {conversationSessions.map((session) => {
+                  const isActive = activeConversationId === session.id;
+                  return (
+                    <button
+                      key={session.id}
+                      type="button"
+                      className={`${styles.shellSessionItem} ${isActive ? styles.shellSessionActive : ""}`}
+                      onClick={() => {
+                        setActiveConversationId(session.id);
+                        if (!isDesktop) setSidebarOpen(false);
+                      }}
+                    >
+                      <p className={styles.shellSessionTitle}>{session.title}</p>
+                      <p className={styles.shellSessionMeta}>{session.meta}</p>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className={styles.shellSidebarFooter}>
+                <button
+                  type="button"
+                  className={styles.shellNewConversation}
+                  onClick={() => {
+                    setActiveConversationId("current");
+                    if (!isDesktop) setSidebarOpen(false);
+                  }}
+                >
+                  Nueva conversacion
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className={styles.shellSidebarRail} />
+          )}
+        </aside>
+
+        <section className={styles.shellContent}>{children}</section>
+      </div>
+
       <AdvisorChatModal
         isOpen={advisorChatOpen}
         advisorId={advisorChatIndex !== null ? ADVISOR_PROFILES[advisorChatIndex]?.id : undefined}
@@ -336,4 +425,3 @@ export function AppShell({ children }: AppShellProps) {
     </main>
   );
 }
-

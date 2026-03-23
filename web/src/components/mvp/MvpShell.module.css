@@ -1,0 +1,465 @@
+.shellRoot {
+  --app-bg: #0a1118;
+  --panel-bg: #0d1825;
+  --panel-border: #2d6be4;
+  --header-bg: #1c2b3a;
+  --header-accent: #2d6be4;
+  --text-primary: rgba(255, 255, 255, 0.9);
+  --text-secondary: rgba(255, 255, 255, 0.55);
+  --text-muted: rgba(255, 255, 255, 0.35);
+  --btn-primary: #2d6be4;
+  --btn-secondary-bg: rgba(255, 255, 255, 0.07);
+  --btn-secondary-border: rgba(255, 255, 255, 0.14);
+  min-height: 100vh;
+  width: 100%;
+  background: var(--app-bg);
+  color: var(--text-primary);
+}
+
+.shellTopbar {
+  display: flex;
+  height: 56px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  background: var(--header-bg);
+  border-bottom: 2px solid var(--header-accent);
+}
+
+.shellBrand {
+  font-size: 18px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.shellActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.shellAdvisorTrigger {
+  height: 38px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 180ms ease, border-color 180ms ease;
+  cursor: pointer;
+}
+
+.shellAdvisorTrigger:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.shellDropdownPanel {
+  overflow: hidden;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(160deg, rgba(20, 31, 47, 0.98) 0%, rgba(13, 24, 37, 0.98) 100%);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+}
+
+.shellAdvisorList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+}
+
+.shellAdvisorItem {
+  display: flex;
+  width: 100%;
+  align-items: flex-start;
+  gap: 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 180ms ease, border-color 180ms ease, transform 180ms ease;
+}
+
+.shellAdvisorItem:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.16);
+  transform: translateY(-1px);
+}
+
+.shellAdvisorAvatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  object-fit: cover;
+}
+
+.shellAdvisorFallback {
+  width: 42px;
+  height: 42px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: #2d5a8e;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.shellAdvisorName {
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.shellAdvisorDescription {
+  margin-top: 4px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.shellUserButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: #2d5a8e;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 180ms ease, border-color 180ms ease;
+}
+
+.shellUserButton:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
+.shellUserMenu {
+  width: 200px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(160deg, rgba(20, 31, 47, 0.98) 0%, rgba(13, 24, 37, 0.98) 100%);
+  padding: 6px;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.28);
+}
+
+.shellUserMenuItem {
+  display: block;
+  width: 100%;
+  border-radius: 12px;
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 14px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 180ms ease;
+}
+
+.shellUserMenuItem:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.shellWorkspace {
+  display: flex;
+  min-height: calc(100vh - 56px);
+}
+
+.shellSidebar {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  width: 48px;
+  background: var(--panel-bg);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  transition: width 220ms ease, transform 220ms ease;
+  overflow: hidden;
+}
+
+.shellSidebarExpanded {
+  width: 260px;
+}
+
+.shellSidebarHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 56px;
+  padding: 12px;
+}
+
+.shellSidebarTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.shellSidebarToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 56px;
+  border-radius: 9999px;
+  border: 1px solid var(--btn-secondary-border);
+  background: var(--btn-secondary-bg);
+  color: var(--text-secondary);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+}
+
+.shellSidebarRail {
+  display: flex;
+  justify-content: center;
+  padding-top: 16px;
+}
+
+.shellSessionList {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 12px 12px;
+  overflow-y: auto;
+}
+
+.shellSessionItem {
+  border-radius: 14px;
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 180ms ease, border-color 180ms ease;
+}
+
+.shellSessionItem:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.shellSessionActive {
+  border-color: rgba(45, 107, 228, 0.45);
+  background: rgba(45, 107, 228, 0.14);
+}
+
+.shellSessionTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.shellSessionMeta {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.shellSidebarFooter {
+  padding: 12px;
+}
+
+.shellNewConversation {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid var(--btn-secondary-border);
+  background: var(--btn-secondary-bg);
+  color: var(--text-primary);
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background 180ms ease, border-color 180ms ease;
+}
+
+.shellNewConversation:hover {
+  background: rgba(255, 255, 255, 0.11);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.shellContent {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  padding: 18px;
+}
+
+.shellMobileBackdrop {
+  position: fixed;
+  inset: 56px 0 0 0;
+  background: rgba(10, 17, 24, 0.58);
+  z-index: 19;
+}
+
+.wizardPanel {
+  height: 100%;
+  min-height: 0;
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow: hidden;
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  background: var(--panel-bg);
+  padding: 14px;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.26);
+}
+
+.wizardStepper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+  padding: 4px 2px 10px;
+}
+
+.wizardStepItem {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+}
+
+.wizardStepLead {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.wizardStepCircle {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.wizardStepActive {
+  background: var(--btn-primary);
+  border-color: var(--btn-primary);
+  color: #fff;
+}
+
+.wizardStepComplete {
+  background: #1a7a5e;
+  border-color: #1a7a5e;
+  color: #fff;
+}
+
+.wizardStepPending {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+}
+
+.wizardStepLabel {
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wizardStepLabelPending {
+  color: var(--text-secondary);
+}
+
+.wizardStepConnector {
+  height: 1px;
+  min-width: 12px;
+  flex: 1;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.wizardStepConnectorComplete {
+  background: #1a7a5e;
+}
+
+.wizardStepIntroTitle {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.wizardStepIntroCopy {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.wizardStepStatus {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.wizardSection {
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 14px;
+}
+
+.wizardSectionTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.wizardSectionBody {
+  margin-top: 8px;
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 1023px) {
+  .shellWorkspace {
+    display: block;
+    position: relative;
+  }
+
+  .shellSidebar {
+    position: fixed;
+    top: 56px;
+    left: 0;
+    bottom: 0;
+    z-index: 20;
+    width: 260px;
+    transform: translateX(-100%);
+  }
+
+  .shellSidebarExpanded {
+    transform: translateX(0);
+  }
+
+  .shellContent {
+    padding: 14px;
+  }
+}

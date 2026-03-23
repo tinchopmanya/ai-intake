@@ -5,6 +5,7 @@ import Image from "next/image";
 
 import { AdvisorChatModal } from "@/components/mvp/AdvisorChatModal";
 import { AdvisorProfileModal } from "@/components/mvp/AdvisorProfileModal";
+import styles from "@/components/mvp/MvpShell.module.css";
 import { VoiceListeningBadge, VoiceMicButton, VoicePlaybackButton } from "@/components/mvp/VoiceControls";
 import { Button, Panel, Select, Textarea } from "@/components/mvp/ui";
 import { ADVISOR_PROFILES } from "@/data/advisors";
@@ -320,6 +321,7 @@ function humanizeFlag(flag: AnalysisRiskFlag) {
 /**
  * Visual step indicator for intake, analysis and response stages.
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function Stepper({
   currentStep,
   labels,
@@ -382,6 +384,7 @@ function Stepper({
 /**
  * Reusable wrapper for each wizard step content block.
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function StepSection({
   title,
   children,
@@ -393,6 +396,89 @@ function StepSection({
     <article className="rounded-2xl border border-[#e5e7eb] bg-[#f8fafc] p-3">
       <h4 className="text-sm font-semibold text-[#1f2937]">{title}</h4>
       <div className="mt-2 space-y-2 text-sm leading-6 text-[#334155]">{children}</div>
+    </article>
+  );
+}
+
+function ShellStepper({
+  currentStep,
+  labels,
+}: {
+  currentStep: 1 | 2 | 3;
+  labels: [string, string, string];
+}) {
+  const steps = [
+    { id: 1, label: labels[0] },
+    { id: 2, label: labels[1] },
+    { id: 3, label: labels[2] },
+  ] as const;
+
+  return (
+    <div className={styles.wizardStepper}>
+      {steps.map((step, index) => {
+        const isCompleted = currentStep > step.id;
+        const isActive = currentStep === step.id;
+        const isPending = currentStep < step.id;
+        const nextStep = steps[index + 1];
+        const connectorClass =
+          nextStep && nextStep.id < currentStep
+            ? `${styles.wizardStepConnector} ${styles.wizardStepConnectorComplete}`
+            : styles.wizardStepConnector;
+
+        return (
+          <div key={step.label} className={styles.wizardStepItem}>
+            <div className={styles.wizardStepLead}>
+              <span
+                className={`${styles.wizardStepCircle} ${
+                  isCompleted
+                    ? styles.wizardStepComplete
+                    : isActive
+                      ? styles.wizardStepActive
+                      : styles.wizardStepPending
+                }`}
+              >
+                {isCompleted ? (
+                  <svg aria-hidden="true" viewBox="0 0 16 16" className="h-3.5 w-3.5">
+                    <path
+                      d="M3.5 8.5 6.5 11.5 12.5 5.5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                    />
+                  </svg>
+                ) : (
+                  String(step.id)
+                )}
+              </span>
+              <span
+                className={`${styles.wizardStepLabel} ${
+                  isPending ? styles.wizardStepLabelPending : ""
+                }`}
+              >
+                {step.label}
+              </span>
+            </div>
+            {index < steps.length - 1 ? <span className={connectorClass} /> : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ShellStepSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <article className={styles.wizardSection}>
+      <h4 className={styles.wizardSectionTitle}>{title}</h4>
+      <div className={styles.wizardSectionBody}>{children}</div>
     </article>
   );
 }
@@ -1128,8 +1214,8 @@ export function WizardScaffold() {
   const hasConversationInput = messageText.trim().length > 0 || conversationBlocks.length > 0;
 
   return (
-    <Panel className="mx-auto flex h-full min-h-0 w-full min-w-0 flex-col space-y-3 overflow-hidden border-[#e5e5e5] bg-white p-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:p-4">
-      <Stepper
+    <Panel className={styles.wizardPanel}>
+      <ShellStepper
         currentStep={currentStep}
         labels={[
           t("wizard.step.intake"),
@@ -1141,8 +1227,8 @@ export function WizardScaffold() {
       {currentStep === 1 ? (
         <div className="flex min-h-0 flex-1 flex-col space-y-3">
           <div>
-            <h3 className="text-[19px] font-semibold text-[#111]">Sube, pega o escribe la conversacion.</h3>
-            <p className="mt-1 text-[13px] text-[#666]">
+            <h3 className={styles.wizardStepIntroTitle}>Sube, pega o escribe la conversacion.</h3>
+            <p className={styles.wizardStepIntroCopy}>
               ExReply detecta participantes y prepara los bloques automaticamente.
             </p>
             {caseError ? <p className="mt-2 text-xs text-red-700">{caseError}</p> : null}
@@ -1188,7 +1274,7 @@ export function WizardScaffold() {
                   </p>
                 ) : null}
                 {ocrLoading || autoParsing ? (
-                  <p className="text-xs text-[#666]">Detectando participantes e interpretando contexto...</p>
+                  <p className={styles.wizardStepStatus}>Detectando participantes e interpretando contexto...</p>
                 ) : null}
                 {ocrStatusMessage ? (
                   <p className="text-xs text-[#334155]">
@@ -1382,15 +1468,15 @@ export function WizardScaffold() {
       {currentStep === 2 ? (
         <div className="space-y-4">
           <div>
-            <h3 className="text-lg font-semibold text-[#1f2937]">Paso 2: Analisis</h3>
-            <p className="mt-1 text-sm text-[#334155]">
+            <h3 className={styles.wizardStepIntroTitle}>Paso 2: Analisis</h3>
+            <p className={styles.wizardStepIntroCopy}>
               Revisamos el tono general antes de generar las respuestas.
             </p>
           </div>
 
           <div className="min-h-6">
             {loadingAnalysis ? (
-              <p className="text-sm text-[#334155]">Interpretando contexto...</p>
+              <p className={styles.wizardStepStatus}>Interpretando contexto...</p>
             ) : null}
             {analysisError ? <p className="text-sm text-red-700">{analysisError}</p> : null}
             {advisorError ? <p className="text-sm text-red-700">{advisorError}</p> : null}
@@ -1413,11 +1499,11 @@ export function WizardScaffold() {
               </div>
 
               <div className="grid gap-3 md:grid-cols-2">
-                <StepSection title="Resumen">
+                <ShellStepSection title="Resumen">
                   <p>{analysisResult.summary}</p>
-                </StepSection>
+                </ShellStepSection>
 
-                <StepSection title="Contexto emocional">
+                <ShellStepSection title="Contexto emocional">
                   <p>
                     <span className="font-medium text-[#1f2937]">Tono detectado:</span>{" "}
                     {analysisResult.emotional_context.tone || "no disponible"}.
@@ -1426,9 +1512,9 @@ export function WizardScaffold() {
                     <span className="font-medium text-[#1f2937]">Objetivo sugerido:</span>{" "}
                     {analysisResult.emotional_context.intent_guess || "sin sugerencia clara"}.
                   </p>
-                </StepSection>
+                </ShellStepSection>
 
-                <StepSection title="Riesgos">
+                <ShellStepSection title="Riesgos">
                   {analysisResult.risk_flags.length === 0 ? (
                     <p>No detectamos senales de riesgo.</p>
                   ) : (
@@ -1440,9 +1526,9 @@ export function WizardScaffold() {
                       ))}
                     </ul>
                   )}
-                </StepSection>
+                </ShellStepSection>
 
-                <StepSection title="Alertas">
+                <ShellStepSection title="Alertas">
                   {analysisResult.ui_alerts.length === 0 ? (
                     <p>No hay alertas relevantes.</p>
                   ) : (
@@ -1454,7 +1540,7 @@ export function WizardScaffold() {
                       ))}
                     </ul>
                   )}
-                </StepSection>
+                </ShellStepSection>
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
@@ -1549,8 +1635,8 @@ export function WizardScaffold() {
       {currentStep === 3 ? (
         <div className="space-y-4">
           <div>
-            <h3 className="text-lg font-semibold text-[#1f2937]">Paso 3: Respuestas</h3>
-            <p className="mt-1 text-sm text-[#334155]">
+            <h3 className={styles.wizardStepIntroTitle}>Paso 3: Respuestas</h3>
+            <p className={styles.wizardStepIntroCopy}>
               Elige la variante que mejor encaja con tu objetivo.
             </p>
           </div>
@@ -1558,7 +1644,7 @@ export function WizardScaffold() {
           <div className="min-h-6">
             {advisorError ? <p className="text-sm text-red-700">{advisorError}</p> : null}
             {loadingAdvisor ? (
-              <p className="text-sm text-[#334155]">Generando respuestas...</p>
+              <p className={styles.wizardStepStatus}>Generando respuestas...</p>
             ) : null}
           </div>
 
