@@ -1,12 +1,14 @@
 .shellRoot {
-  --app-bg: #0a1118;
+  --app-bg: #080f18;
   --panel-bg: #0d1825;
   --panel-border: #2d6be4;
   --header-bg: #1c2b3a;
   --header-accent: #2d6be4;
-  --text-primary: rgba(255, 255, 255, 0.9);
-  --text-secondary: rgba(255, 255, 255, 0.55);
-  --text-muted: rgba(255, 255, 255, 0.35);
+  --text-primary: rgba(255, 255, 255, 0.88);
+  --text-secondary: rgba(255, 255, 255, 0.5);
+  --text-muted: rgba(255, 255, 255, 0.28);
+  --positive: #059669;
+  --separator: rgba(255, 255, 255, 0.06);
   --bubble-user-bg: #c8f0d4;
   --bubble-user-text: #1a4a2a;
   --bubble-adv-bg: #162032;
@@ -24,47 +26,71 @@
 
 .shellTopbar {
   display: flex;
-  height: 56px;
+  height: 52px;
   align-items: center;
   justify-content: space-between;
-  padding: 0 24px;
+  padding: 0 20px;
   background: var(--header-bg);
-  border-bottom: 2px solid var(--header-accent);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 -2px 0 0 var(--header-accent);
 }
 
 .shellBrand {
-  font-size: 18px;
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
   color: #fff;
+}
+
+.shellBrandAccent {
+  width: 3px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--header-accent);
+  flex-shrink: 0;
 }
 
 .shellActions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .shellAdvisorTrigger {
-  height: 38px;
-  border-radius: 9999px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: rgba(255, 255, 255, 0.08);
-  color: #fff;
-  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid rgba(45, 107, 228, 0.35);
+  background: rgba(45, 107, 228, 0.12);
+  color: #7eb8f7;
+  padding: 0 15px;
   font-size: 13px;
   font-weight: 500;
-  transition: background 180ms ease, border-color 180ms ease;
+  transition: background 180ms ease, border-color 180ms ease, color 180ms ease, transform 180ms ease;
   cursor: pointer;
 }
 
 .shellAdvisorTrigger:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(45, 107, 228, 0.18);
+  border-color: rgba(126, 184, 247, 0.46);
+  color: #b9dbff;
+  transform: translateY(-1px);
+}
+
+.shellAdvisorTriggerIcon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
 }
 
 .shellDropdownPanel {
   overflow: hidden;
-  border-radius: 20px;
+  border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: linear-gradient(160deg, rgba(20, 31, 47, 0.98) 0%, rgba(13, 24, 37, 0.98) 100%);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
@@ -82,18 +108,18 @@
   width: 100%;
   align-items: flex-start;
   gap: 12px;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.05);
-  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 11px;
   text-align: left;
   cursor: pointer;
   transition: background 180ms ease, border-color 180ms ease, transform 180ms ease;
 }
 
 .shellAdvisorItem:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(45, 107, 228, 0.18);
   transform: translateY(-1px);
 }
 
@@ -136,14 +162,14 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   border-radius: 9999px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 2px solid rgba(255, 255, 255, 0.18);
   background: #2d5a8e;
   color: #fff;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
   transition: transform 180ms ease, border-color 180ms ease;
 }
@@ -180,7 +206,7 @@
 
 .shellWorkspace {
   display: flex;
-  min-height: calc(100vh - 56px);
+  min-height: calc(100vh - 52px);
 }
 
 .shellSidebar {
@@ -189,8 +215,8 @@
   flex-direction: column;
   flex-shrink: 0;
   width: 48px;
-  background: var(--panel-bg);
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--app-bg);
+  border-right: 1px solid var(--separator);
   transition: width 220ms ease, transform 220ms ease;
   overflow: hidden;
 }
@@ -203,50 +229,74 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 56px;
-  padding: 12px;
+  min-height: 44px;
+  padding: 10px 10px 8px;
 }
 
 .shellSidebarTitle {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.25);
 }
 
 .shellSidebarToggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 56px;
+  width: 28px;
+  height: 44px;
   border-radius: 9999px;
-  border: 1px solid var(--btn-secondary-border);
-  background: var(--btn-secondary-bg);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #0f1e30;
   color: var(--text-secondary);
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
   cursor: pointer;
+}
+
+.shellSidebarChevron {
+  width: 14px;
+  height: 14px;
+  transition: transform 180ms ease;
+}
+
+.shellSidebarChevronOpen {
+  transform: rotate(180deg);
 }
 
 .shellSidebarRail {
   display: flex;
   justify-content: center;
-  padding-top: 16px;
+  padding-top: 12px;
 }
 
 .shellSessionList {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 0 12px 12px;
+  gap: 2px;
+  padding: 0 0 12px;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+}
+
+.shellSessionList::-webkit-scrollbar {
+  width: 6px;
+}
+
+.shellSessionList::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .shellSessionItem {
-  border-radius: 14px;
+  margin: 2px 8px;
+  border-radius: 8px;
   border: 1px solid transparent;
   background: transparent;
-  padding: 12px;
+  padding: 9px 12px;
   text-align: left;
   cursor: pointer;
   transition: background 180ms ease, border-color 180ms ease;
@@ -254,35 +304,47 @@
 
 .shellSessionItem:hover {
   background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.08);
+  border-color: transparent;
 }
 
 .shellSessionActive {
-  border-color: rgba(45, 107, 228, 0.45);
   background: rgba(45, 107, 228, 0.14);
+  border-left: 2px solid #2d6be4;
+  padding-left: 10px;
 }
 
 .shellSessionTitle {
   font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.shellSessionActive .shellSessionTitle {
+  color: rgba(255, 255, 255, 0.92);
 }
 
 .shellSessionMeta {
   margin-top: 4px;
-  font-size: 12px;
-  color: var(--text-secondary);
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.32);
+}
+
+.shellSessionActive .shellSessionMeta {
+  color: rgba(126, 184, 247, 0.74);
 }
 
 .shellSidebarFooter {
-  padding: 12px;
+  padding: 10px 8px 12px;
 }
 
 .shellNewConversation {
   width: 100%;
-  border-radius: 12px;
-  border: 1px solid var(--btn-secondary-border);
-  background: var(--btn-secondary-bg);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(45, 107, 228, 0.28);
+  background: rgba(45, 107, 228, 0.1);
   color: var(--text-primary);
   padding: 10px 12px;
   font-size: 13px;
@@ -293,8 +355,22 @@
 }
 
 .shellNewConversation:hover {
-  background: rgba(255, 255, 255, 0.11);
-  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(45, 107, 228, 0.16);
+  border-color: rgba(45, 107, 228, 0.4);
+}
+
+.shellNewConversationIcon {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #7eb8f7;
+  font-size: 14px;
+  line-height: 1;
+  flex-shrink: 0;
 }
 
 .shellContent {
@@ -302,12 +378,12 @@
   min-width: 0;
   min-height: 0;
   flex: 1;
-  padding: 18px;
+  padding: 20px;
 }
 
 .shellMobileBackdrop {
   position: fixed;
-  inset: 56px 0 0 0;
+  inset: 52px 0 0 0;
   background: rgba(10, 17, 24, 0.58);
   z-index: 19;
 }
@@ -321,10 +397,10 @@
   flex-direction: column;
   gap: 14px;
   overflow: hidden;
-  border: 1px solid var(--panel-border);
+  border: 1px solid rgba(45, 107, 228, 0.3);
   border-radius: 16px;
   background: var(--panel-bg);
-  padding: 14px;
+  padding: 24px;
   box-shadow: 0 20px 48px rgba(0, 0, 0, 0.26);
 }
 
@@ -333,7 +409,7 @@
   align-items: center;
   gap: 10px;
   overflow: hidden;
-  padding: 4px 2px 10px;
+  padding: 0 0 10px;
 }
 
 .wizardStepItem {
@@ -352,11 +428,11 @@
 }
 
 .wizardStepCircle {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   flex-shrink: 0;
   border-radius: 9999px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -371,19 +447,19 @@
 }
 
 .wizardStepComplete {
-  background: #1a7a5e;
-  border-color: #1a7a5e;
+  background: var(--positive);
+  border-color: var(--positive);
   color: #fff;
 }
 
 .wizardStepPending {
-  background: rgba(255, 255, 255, 0.04);
+  background: transparent;
   color: var(--text-secondary);
 }
 
 .wizardStepLabel {
   min-width: 0;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-primary);
   white-space: nowrap;
@@ -399,11 +475,11 @@
   height: 1px;
   min-width: 12px;
   flex: 1;
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--separator);
 }
 
 .wizardStepConnectorComplete {
-  background: #1a7a5e;
+  background: var(--positive);
 }
 
 .wizardStepIntroTitle {
@@ -930,7 +1006,7 @@
 
   .shellSidebar {
     position: fixed;
-    top: 56px;
+    top: 52px;
     left: 0;
     bottom: 0;
     z-index: 20;

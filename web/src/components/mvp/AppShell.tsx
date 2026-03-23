@@ -231,7 +231,10 @@ export function AppShell({ children }: AppShellProps) {
   return (
     <main className={styles.shellRoot}>
       <header className={styles.shellTopbar}>
-        <div className={styles.shellBrand}>ExReply</div>
+        <div className={styles.shellBrand}>
+          <span className={styles.shellBrandAccent} aria-hidden="true" />
+          <span>ExReply</span>
+        </div>
         <div className={styles.shellActions}>
           <div ref={advisorDropdownRef} className="relative">
             <button
@@ -241,6 +244,15 @@ export function AppShell({ children }: AppShellProps) {
               aria-expanded={advisorMenuOpen}
               className={styles.shellAdvisorTrigger}
             >
+              <svg aria-hidden="true" viewBox="0 0 20 20" className={styles.shellAdvisorTriggerIcon} fill="none">
+                <path
+                  d="M10 3.5a4.5 4.5 0 0 0-4.5 4.5v1.25A3.25 3.25 0 0 1 4 12v.5h12V12a3.25 3.25 0 0 1-1.5-2.75V8A4.5 4.5 0 0 0 10 3.5Zm0 12.75a2.2 2.2 0 0 0 2.02-1.33H7.98A2.2 2.2 0 0 0 10 16.25Z"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="1.4"
+                />
+              </svg>
               Hablar con un advisor
             </button>
             {advisorMenuOpen ? (
@@ -351,7 +363,20 @@ export function AppShell({ children }: AppShellProps) {
               aria-label={sidebarOpen ? "Colapsar sidebar" : "Expandir sidebar"}
               aria-expanded={sidebarOpen}
             >
-              {sidebarOpen ? "‹" : "›"}
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 20 20"
+                className={`${styles.shellSidebarChevron} ${sidebarOpen ? styles.shellSidebarChevronOpen : ""}`}
+                fill="none"
+              >
+                <path
+                  d="m7 4 6 6-6 6"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="1.8"
+                />
+              </svg>
             </button>
           </div>
 
@@ -385,6 +410,9 @@ export function AppShell({ children }: AppShellProps) {
                     if (!isDesktop) setSidebarOpen(false);
                   }}
                 >
+                  <span className={styles.shellNewConversationIcon} aria-hidden="true">
+                    +
+                  </span>
                   Nueva conversacion
                 </button>
               </div>
