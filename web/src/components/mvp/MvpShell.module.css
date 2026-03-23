@@ -501,9 +501,10 @@
 
 .wizardSection {
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #0f1e30;
   padding: 14px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
 }
 
 .wizardSectionTitle {
@@ -543,6 +544,8 @@
   flex: 1;
   gap: 16px;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: stretch;
+  overflow: hidden;
 }
 
 .wizardStepPanel {
@@ -555,6 +558,7 @@
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(10, 21, 32, 0.92);
   padding: 14px;
+  overflow: hidden;
 }
 
 .wizardPanelTitleRow {
@@ -587,6 +591,8 @@
   background: var(--input-bg);
   color: var(--text-primary);
   padding: 14px;
+  line-height: 1.6;
+  font-size: 14px;
 }
 
 .wizardPrimaryTextarea::placeholder {
@@ -676,15 +682,17 @@
   flex: 1;
   flex-direction: column;
   gap: 10px;
+  overflow: hidden;
 }
 
 .wizardConversationList {
   display: flex;
-  min-height: 320px;
+  min-height: 0;
   flex: 1;
   flex-direction: column;
   gap: 10px;
   overflow-y: auto;
+  max-height: 100%;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(7, 14, 24, 0.88);
@@ -712,7 +720,8 @@
 .wizardBubbleOutgoing {
   margin-left: auto;
   background: var(--bubble-user-bg);
-  color: var(--bubble-user-text);
+  color: #0f2d1a;
+  font-weight: 500;
   border-color: rgba(200, 240, 212, 0.18);
 }
 
@@ -850,6 +859,45 @@
   color: #ffe0e0;
 }
 
+.wizardRiskMeter {
+  display: grid;
+  gap: 8px;
+}
+
+.wizardRiskMeterLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.wizardRiskMeterTrack {
+  height: 8px;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.wizardRiskMeterFill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 240ms ease;
+}
+
+.wizardRiskMeterLow {
+  background: linear-gradient(90deg, #059669 0%, #10b981 100%);
+}
+
+.wizardRiskMeterMedium {
+  background: linear-gradient(90deg, #d97706 0%, #f59e0b 100%);
+}
+
+.wizardRiskMeterHigh {
+  background: linear-gradient(90deg, #dc2626 0%, #ef4444 100%);
+}
+
 .wizardAnalysisIcon {
   flex-shrink: 0;
   margin-top: 2px;
@@ -882,7 +930,8 @@
 }
 
 .wizardAdvisorCardRecommended {
-  border: 2px solid #2d6be4;
+  border: 2px solid #10b981;
+  box-shadow: 0 18px 36px rgba(16, 185, 129, 0.14);
 }
 
 .wizardAdvisorHeader {
@@ -892,6 +941,10 @@
   background: #1c2b3a;
   padding: 12px;
   color: #fff;
+}
+
+.wizardAdvisorHeaderRecommended {
+  padding-top: 34px;
 }
 
 .wizardAdvisorBadge {
@@ -908,14 +961,15 @@
 
 .wizardAdvisorRecommendedTag {
   position: absolute;
-  top: -1px;
+  top: 10px;
   left: 12px;
-  border-radius: 0 0 8px 8px;
-  background: #2d6be4;
+  border-radius: 999px;
+  background: #059669;
   color: #fff;
   padding: 4px 10px;
   font-size: 10px;
   font-weight: 600;
+  box-shadow: 0 10px 18px rgba(5, 150, 105, 0.24);
 }
 
 .wizardAdvisorHeaderRow {
@@ -976,6 +1030,7 @@
   margin-top: 14px;
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
   gap: 8px;
 }

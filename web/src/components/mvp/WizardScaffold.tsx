@@ -294,6 +294,18 @@ function getAnalysisStatus(analysisResult: AnalysisResponse): {
   };
 }
 
+function getRiskMeter(analysisResult: AnalysisResponse): {
+  level: "low" | "medium" | "high";
+  value: number;
+} {
+  const severities = analysisResult.risk_flags.map((flag) => flag.severity);
+  if (severities.includes("high")) return { level: "high", value: 88 };
+  if (severities.includes("medium")) return { level: "medium", value: 58 };
+  if (severities.includes("low")) return { level: "low", value: 32 };
+  if (analysisResult.ui_alerts.length > 0) return { level: "medium", value: 48 };
+  return { level: "low", value: 16 };
+}
+
 function humanizeFlag(flag: AnalysisRiskFlag) {
   const label =
     RISK_LABELS[flag.code] ??
@@ -518,6 +530,7 @@ export function WizardScaffold() {
   const [speakingResponseIndex, setSpeakingResponseIndex] = useState<number | null>(null);
   const selectedCaseId = activeCase?.id ?? null;
   const manualInterpretTimerRef = useRef<number | null>(null);
+  const conversationListRef = useRef<HTMLDivElement | null>(null);
   const contextVoice = useSpeechToText({
     lang: "es-ES",
     continuous: false,
@@ -611,11 +624,18 @@ export function WizardScaffold() {
       }, 850);
     }
     window.setTimeout(() => {
-      const input = document.getElementById("wizard-context-optional") as HTMLTextAreaElement | null;
+      const input = document.getElementById("wizard-context-optional") as HTMLInputElement | null;
       input?.focus();
     }, 30);
     contextVoice.resetTranscript();
   }, [contextVoice]);
+
+  useEffect(() => {
+    if (currentStep !== 1) return;
+    const container = conversationListRef.current;
+    if (!container) return;
+    container.scrollTop = container.scrollHeight;
+  }, [conversationBlocks, currentStep]);
 
   useEffect(() => {
     if (!speechSynthesis.speaking && speakingResponseIndex !== null) {
@@ -1197,6 +1217,7 @@ export function WizardScaffold() {
   }
 
   const analysisStatus = analysisResult ? getAnalysisStatus(analysisResult) : null;
+  const riskMeter = analysisResult ? getRiskMeter(analysisResult) : null;
   const hasConversationInput = messageText.trim().length > 0 || conversationBlocks.length > 0;
 
   return (
@@ -1363,7 +1384,7 @@ export function WizardScaffold() {
                   </div>
                 </div>
 
-                <div className={styles.wizardConversationList}>
+                <div ref={conversationListRef} className={styles.wizardConversationList}>
                   {conversationBlocks.length === 0 ? (
                     <p className={styles.wizardEmptyState}>
                       Cuando detectemos una conversacion, aparecera aqui en bloques editables.
@@ -1538,6 +1559,24 @@ export function WizardScaffold() {
                 </div>
               </div>
 
+              {riskMeter ? (
+                <div className={styles.wizardRiskMeter}>
+                  <p className={styles.wizardRiskMeterLabel}>Nivel de riesgo</p>
+                  <div className={styles.wizardRiskMeterTrack}>
+                    <div
+                      className={`${styles.wizardRiskMeterFill} ${
+                        riskMeter.level === "high"
+                          ? styles.wizardRiskMeterHigh
+                          : riskMeter.level === "medium"
+                            ? styles.wizardRiskMeterMedium
+                            : styles.wizardRiskMeterLow
+                      }`}
+                      style={{ width: `${riskMeter.value}%` }}
+                    />
+                  </div>
+                </div>
+              ) : null}
+
               <div className={`${styles.wizardCardsGrid} md:grid-cols-2`}>
                 <ShellStepSection title="Resumen">
                   <p>{analysisResult.summary}</p>
@@ -1590,6 +1629,15 @@ export function WizardScaffold() {
                   variant="secondary"
                   className={`${styles.wizardSecondaryButton} h-10 text-[13px] hover:bg-[rgba(255,255,255,0.12)]`}
                 >
+                  <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
+                    <path
+                      d="M16 10H4m6 6-6-6 6-6"
+                      stroke="currentColor"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="1.8"
+                    />
+                  </svg>
                   Volver
                 </Button>
                 <Button
@@ -1599,6 +1647,15 @@ export function WizardScaffold() {
                   variant="primary"
                   className={`${styles.wizardPrimaryButton} h-10 min-w-[150px] text-[13px] hover:bg-[#265cc7]`}
                 >
+                  <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
+                    <path
+                      d="M4 10h12M10 4l6 6-6 6"
+                      stroke="currentColor"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="1.8"
+                    />
+                  </svg>
                   {loadingAdvisor ? t("wizard.button.generating") : t("wizard.button.continue")}
                 </Button>
               </div>
@@ -1646,7 +1703,11 @@ export function WizardScaffold() {
                       : ""
                   }`}
                 >
-                  <header className={styles.wizardAdvisorHeader}>
+                  <header
+                    className={`${styles.wizardAdvisorHeader} ${
+                      isRecommended ? styles.wizardAdvisorHeaderRecommended : ""
+                    }`}
+                  >
                     {isRecommended ? (
                       <span className={styles.wizardAdvisorRecommendedTag}>
                         Recomendada
