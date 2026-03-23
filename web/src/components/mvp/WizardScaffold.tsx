@@ -6,8 +6,8 @@ import Image from "next/image";
 import { AdvisorChatModal } from "@/components/mvp/AdvisorChatModal";
 import { AdvisorProfileModal } from "@/components/mvp/AdvisorProfileModal";
 import styles from "@/components/mvp/MvpShell.module.css";
-import { VoiceListeningBadge, VoiceMicButton, VoicePlaybackButton } from "@/components/mvp/VoiceControls";
-import { Button, Panel, Select, Textarea } from "@/components/mvp/ui";
+import { VoicePlaybackButton } from "@/components/mvp/VoiceControls";
+import { Button, Panel, Textarea } from "@/components/mvp/ui";
 import { ADVISOR_PROFILES } from "@/data/advisors";
 import { authFetch } from "@/lib/auth/client";
 import { hasStoredSession } from "@/lib/auth/client";
@@ -50,13 +50,7 @@ const ADVISOR_FALLBACK_VISUAL = {
 };
 
 const responseStyleBadgeByIndex = ["Empatica", "Estrategica", "Directa"] as const;
-const responseStyleOptions = [
-  { value: "cordial", label: "Cordial" },
-  { value: "firme_respetuoso", label: "Firme pero respetuoso" },
-  { value: "amigable", label: "Amigable" },
-] as const;
-
-type ResponseTone = (typeof responseStyleOptions)[number]["value"];
+type ResponseTone = "cordial" | "firme_respetuoso" | "amigable";
 
 type ConversationBlock = {
   id: string;
@@ -82,15 +76,6 @@ const SEVERITY_LABELS: Record<AnalysisRiskFlag["severity"], string> = {
   medium: "gravedad media",
   high: "gravedad alta",
 };
-
-const INCIDENT_TYPE_OPTIONS: Array<{ value: IncidentType; label: string }> = [
-  { value: "schedule_change", label: "Cambio de horario" },
-  { value: "cancellation", label: "Cancelacion" },
-  { value: "payment_issue", label: "Tema de pago" },
-  { value: "hostile_message", label: "Mensaje hostil" },
-  { value: "documentation", label: "Documentacion" },
-  { value: "other", label: "Otro evento" },
-];
 
 const OCR_EXTRACT_URL = `${API_URL}/v1/ocr/extract`;
 const OCR_CAPABILITIES_URL = `${API_URL}/v1/ocr/capabilities`;
@@ -487,7 +472,6 @@ function ShellStepSection({
  * Client-side wizard that orchestrates analysis and advisor response calls.
  */
 export function WizardScaffold() {
-  const isDevelopment = process.env.NODE_ENV !== "production";
   const locale = resolveRuntimeLocale();
   const t = (key: string) => tRuntime(key, locale);
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
@@ -519,10 +503,10 @@ export function WizardScaffold() {
   const [incidentType, setIncidentType] = useState<IncidentType>("other");
   const [incidentTitle, setIncidentTitle] = useState("");
   const [incidentDescription, setIncidentDescription] = useState("");
-  const [incidentDate, setIncidentDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [incidentVisible, setIncidentVisible] = useState(false);
+  const [incidentDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [, setIncidentVisible] = useState(false);
   const [incidentSaving, setIncidentSaving] = useState(false);
-  const [incidentNotice, setIncidentNotice] = useState<string | null>(null);
+  const [, setIncidentNotice] = useState<string | null>(null);
   const [advisorChatOpen, setAdvisorChatOpen] = useState(false);
   const [advisorChatIndex, setAdvisorChatIndex] = useState<number | null>(null);
   const [advisorChatInput, setAdvisorChatInput] = useState("");
@@ -995,6 +979,7 @@ export function WizardScaffold() {
     return "other";
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   function openIncidentCapture() {
     setIncidentVisible(true);
     setIncidentNotice(null);
@@ -1008,6 +993,7 @@ export function WizardScaffold() {
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async function handleRegisterIncident() {
     if (!selectedCaseId) {
       setIncidentNotice("Necesitas contexto de caso para registrar el evento.");
@@ -1225,29 +1211,44 @@ export function WizardScaffold() {
       />
 
       {currentStep === 1 ? (
-        <div className="flex min-h-0 flex-1 flex-col space-y-3">
-          <div>
+        <div className={styles.wizardStepBody}>
+          <div className={styles.wizardStepHeader}>
             <h3 className={styles.wizardStepIntroTitle}>Sube, pega o escribe la conversacion.</h3>
-            <p className={styles.wizardStepIntroCopy}>
-              ExReply detecta participantes y prepara los bloques automaticamente.
-            </p>
             {caseError ? <p className="mt-2 text-xs text-red-700">{caseError}</p> : null}
           </div>
 
-          <div className="grid min-h-0 flex-1 items-start gap-6 xl:grid-cols-2">
-            <section
-              className="min-h-0 min-w-0 space-y-3 overflow-y-auto rounded-xl border border-[#e5e5e5] bg-white p-3 xl:max-h-[calc(100vh-320px)]"
-              onPaste={handleStepOnePaste}
-            >
-              <div className="space-y-2">
-                <label className="block text-[14px] font-semibold text-[#111]">Conversacion</label>
+          <div className={styles.wizardStepOneGrid}>
+            <section className={styles.wizardStepPanel} onPaste={handleStepOnePaste}>
+              <div className={styles.wizardInputGroup}>
+                <div className={styles.wizardPanelTitleRow}>
+                  <h4 className={styles.wizardPanelTitle}>Conversacion</h4>
+                  {hasConversationInput ? (
+                    <button
+                      type="button"
+                      onClick={handleStartNewConversation}
+                      title="Limpiar conversacion"
+                      aria-label="Limpiar conversacion"
+                      className={styles.wizardIconButton}
+                    >
+                      <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
+                        <path
+                          d="M6 6l8 8M14 6l-8 8"
+                          stroke="currentColor"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="1.8"
+                        />
+                      </svg>
+                    </button>
+                  ) : null}
+                </div>
                 <Textarea
                   value={messageText}
                   onChange={(event) => handleMessageTextChange(event.target.value)}
                   rows={6}
                   placeholder="Pega aqui el mensaje que recibiste o copia la conversacion de WhatsApp"
                   spellCheck={false}
-                  className="min-h-[170px] whitespace-pre-wrap break-words rounded-[10px] border border-[#ddd] bg-white p-4 text-[15px] leading-[1.5] text-[#111]"
+                  className={styles.wizardPrimaryTextarea}
                 />
                 <input
                   type="file"
@@ -1264,9 +1265,18 @@ export function WizardScaffold() {
                     input?.click();
                   }}
                   disabled={ocrCapabilities?.available === false || ocrCapabilitiesLoading}
-                  className="rounded-[6px] border border-[#ddd] bg-white px-[10px] py-[6px] text-[13px] text-[#111] hover:bg-[#fafafa] disabled:cursor-not-allowed disabled:opacity-60"
+                  className={styles.wizardAttachButton}
                 >
-                  Seleccionar archivo
+                  <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
+                    <path
+                      d="M7.5 10.5 11 7a2.5 2.5 0 1 1 3.536 3.536l-5.657 5.657A4 4 0 1 1 3.222 10.536L9.586 4.17"
+                      stroke="currentColor"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="1.7"
+                    />
+                  </svg>
+                  Adjuntar conversacion
                 </button>
                 {ocrCapabilities?.available === false ? (
                   <p className="text-xs text-amber-700">
@@ -1277,7 +1287,7 @@ export function WizardScaffold() {
                   <p className={styles.wizardStepStatus}>Detectando participantes e interpretando contexto...</p>
                 ) : null}
                 {ocrStatusMessage ? (
-                  <p className="text-xs text-[#334155]">
+                  <p className={styles.wizardPanelHint}>
                     {ocrStatusMessage}
                     {ocrInfo?.provider ? ` (${ocrInfo.provider})` : ""}
                   </p>
@@ -1286,188 +1296,189 @@ export function WizardScaffold() {
                 {autoParseError ? <p className="text-xs text-amber-700">{autoParseError}</p> : null}
               </div>
 
-              <div className="space-y-2">
-                <label className="block text-[13px] font-medium text-[#666]">Contexto adicional (opcional)</label>
+              <div className={styles.wizardInputGroup}>
                 <div id="wizard-context-optional-wrap" className="rounded-xl transition-all duration-200">
-                  <Textarea
-                    id="wizard-context-optional"
-                    value={contextOptional}
-                    onChange={(event) => setContextOptional(event.target.value)}
-                    rows={3}
-                    placeholder="Escribe lo que creas necesario para entender mejor la conversacion"
-                    spellCheck={false}
-                    className="rounded-[10px] border border-[#ddd] bg-[#fafafa] p-3 text-[14px] text-[#1F2937]"
-                  />
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <VoiceMicButton
-                    listening={contextVoice.listening}
-                    disabled={contextVoice.microphoneStatus === "requesting"}
-                    onClick={() => {
-                      if (contextVoice.listening) {
-                        contextVoice.stopListening();
-                      } else {
-                        contextVoice.startListening();
-                      }
-                    }}
-                    idleLabel="Hablar en vez de escribir"
-                    listeningLabel="Escuchando..."
-                  />
-                  <VoiceListeningBadge listening={contextVoice.listening} />
+                  <div className={styles.wizardContextRow}>
+                    <input
+                      id="wizard-context-optional"
+                      type="text"
+                      value={contextOptional}
+                      onChange={(event) => setContextOptional(event.target.value)}
+                      placeholder="Contanos el contexto para entender mejor"
+                      spellCheck={false}
+                      className={styles.wizardContextInput}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (contextVoice.listening) {
+                          contextVoice.stopListening();
+                        } else {
+                          contextVoice.startListening();
+                        }
+                      }}
+                      disabled={contextVoice.microphoneStatus === "requesting"}
+                      className={`${styles.wizardVoiceMic} ${
+                        contextVoice.listening ? styles.wizardVoiceMicActive : ""
+                      }`}
+                      aria-label={contextVoice.listening ? "Escuchando contexto" : "Dictar contexto"}
+                      title={contextVoice.listening ? "Escuchando contexto" : "Dictar contexto"}
+                    >
+                      <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none">
+                        <path
+                          d="M12 3.75a2.75 2.75 0 0 0-2.75 2.75v4.75a2.75 2.75 0 1 0 5.5 0V6.5A2.75 2.75 0 0 0 12 3.75Z"
+                          stroke="currentColor"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="1.85"
+                        />
+                        <path
+                          d="M6.75 10.75a5.25 5.25 0 1 0 10.5 0M12 16v4.25M9.25 20.25h5.5"
+                          stroke="currentColor"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="1.85"
+                        />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
                 {contextMicrophoneStatusMessage ? (
-                  <p className="text-[12px] text-[#666]">{contextMicrophoneStatusMessage}</p>
+                  <p className={styles.wizardPanelHint}>{contextMicrophoneStatusMessage}</p>
                 ) : null}
                 {contextVoice.error ? (
                   <p className="text-[12px] text-[#92400e]">{getSpeechToTextErrorMessage(contextVoice.error)}</p>
                 ) : null}
-                {isDevelopment ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void contextVoice.requestMicrophonePermission();
-                    }}
-                    disabled={contextVoice.microphoneStatus === "requesting"}
-                    className="inline-flex h-8 items-center rounded-full border border-[#d7d7d7] bg-white px-3 text-[12px] text-[#334155] hover:bg-[#fafafa] disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    Probar microfono
-                  </button>
-                ) : null}
               </div>
             </section>
 
-            <section className="min-h-0 min-w-0 space-y-3 overflow-y-auto rounded-xl border border-[#e5e5e5] bg-[#fafafa] p-3 xl:max-h-[calc(100vh-320px)]">
-              <h4 className="text-[14px] font-semibold text-[#111]">Conversacion interpretada</h4>
-              <p className="text-[12px] text-[#666]">
-                Revisa quien dijo cada mensaje antes de generar la respuesta.
-              </p>
-
-              <div className="max-h-[calc(100vh-360px)] min-h-[320px] space-y-2 overflow-y-auto rounded-xl border border-[#e5e5e5] bg-white p-3 pr-2">
-                {conversationBlocks.length === 0 ? (
-                  <p className="text-xs text-[#64748B]">
-                    Cuando detectemos una conversacion, aparecera aqui en bloques editables.
-                  </p>
-                ) : null}
-                {conversationBlocks.map((item) => (
-                  <div
-                    key={item.id}
-                    className={`max-w-[96%] break-words rounded-[10px] border p-3 text-sm leading-6 transition-colors hover:border-[#d4d4d4] ${
-                      item.speaker === "ex_partner"
-                        ? "mr-auto border-[#f2d675] bg-[#fff7cc] text-[#3f3a23]"
-                        : item.speaker === "user"
-                          ? "ml-auto border-[#bcd4ff] bg-[#eaf3ff] text-[#213d6a]"
-                          : "mr-auto border-[#f5b6c8] bg-[#fde7ef] text-[#5f3343]"
-                    }`}
-                  >
-                    <div className="mb-2 inline-flex rounded-[14px] border border-[#ddd] bg-white p-0.5 text-[12px]">
-                      <button
-                        type="button"
-                        onClick={() => updateConversationBlockSpeaker(item.id, "ex_partner")}
-                        className={`inline-block rounded-[14px] px-2 py-[3px] ${
-                          item.speaker === "ex_partner"
-                            ? "border border-[#f2d675] bg-[#fff7cc] font-semibold text-[#6b5a26]"
-                            : "text-[#64748B]"
-                        }`}
-                      >
-                        Ex pareja
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => updateConversationBlockSpeaker(item.id, "user")}
-                        className={`inline-block rounded-[14px] px-2 py-[3px] ${
-                          item.speaker === "user"
-                            ? "border border-[#bcd4ff] bg-[#eaf3ff] font-semibold text-[#264a87]"
-                            : "text-[#64748B]"
-                        }`}
-                      >
-                        Yo
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => updateConversationBlockSpeaker(item.id, "unknown")}
-                        className={`inline-block rounded-[14px] px-2 py-[3px] ${
-                          item.speaker === "unknown"
-                            ? "border border-[#f5b6c8] bg-[#fde7ef] font-semibold text-[#7d3d52]"
-                            : "text-[#64748B]"
-                        }`}
-                      >
-                        Sin identificar
-                      </button>
-                    </div>
-                    <Textarea
-                      value={item.content}
-                      onChange={(event) => updateConversationBlockText(item.id, event.target.value)}
-                      rows={Math.max(2, Math.ceil(item.content.length / 42))}
-                      spellCheck={false}
-                      className="w-full resize-none overflow-hidden whitespace-pre-wrap break-words [overflow-wrap:anywhere] border-0 bg-transparent p-0 text-sm leading-[1.6] focus-visible:ring-0"
-                    />
+            <section className={styles.wizardStepPanel}>
+              <div className={styles.wizardInterpretedFrame}>
+                <div className={styles.wizardPanelTitleRow}>
+                  <div>
+                    <h4 className={styles.wizardPanelTitle}>Conversacion interpretada</h4>
+                    <p className={styles.wizardPanelHint}>
+                      Revisa quien dijo cada mensaje antes de generar la respuesta.
+                    </p>
                   </div>
-                ))}
-              </div>
-            </section>
-          </div>
+                </div>
 
-          <div className="sticky bottom-0 z-10 mt-auto rounded-b-xl border-t border-[#eee] bg-white px-4 py-3 shadow-[0_-2px_12px_rgba(15,23,42,0.04)]">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-[#1f2937]">Modo de respuesta</label>
-                <div className="flex flex-wrap gap-2">
-                  {responseStyleOptions.map((item) => (
-                    <button
-                      key={item.value}
-                      type="button"
-                      onClick={() => setResponseTone(item.value)}
-                      className={`rounded-full border px-3 py-1.5 text-[13px] font-medium transition ${
-                        responseTone === item.value
-                          ? "border-[#bbb] bg-[#f3f4f6] text-[#111]"
-                          : "border-[#ddd] bg-white text-[#666] hover:bg-[#fafafa]"
+                <div className={styles.wizardConversationList}>
+                  {conversationBlocks.length === 0 ? (
+                    <p className={styles.wizardEmptyState}>
+                      Cuando detectemos una conversacion, aparecera aqui en bloques editables.
+                    </p>
+                  ) : null}
+                  {conversationBlocks.map((item) => (
+                    <div
+                      key={item.id}
+                      className={`${styles.wizardBubble} ${
+                        item.speaker === "ex_partner"
+                          ? styles.wizardBubbleIncoming
+                          : item.speaker === "user"
+                            ? styles.wizardBubbleOutgoing
+                            : styles.wizardBubbleUnknown
                       }`}
                     >
-                      {item.value === "firme_respetuoso" ? "Firme" : item.label}
-                    </button>
+                      <div className={`${styles.wizardSpeakerSwitch} mb-2`}>
+                        <button
+                          type="button"
+                          onClick={() => updateConversationBlockSpeaker(item.id, "ex_partner")}
+                          className={`${styles.wizardSpeakerOption} ${
+                            item.speaker === "ex_partner"
+                              ? styles.wizardSpeakerOptionActiveIncoming
+                              : ""
+                          }`}
+                        >
+                          Ex pareja
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updateConversationBlockSpeaker(item.id, "unknown")}
+                          className={`${styles.wizardSpeakerOption} ${
+                            item.speaker === "unknown"
+                              ? styles.wizardSpeakerOptionActiveUnknown
+                              : ""
+                          }`}
+                        >
+                          Sin identificar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updateConversationBlockSpeaker(item.id, "user")}
+                          className={`${styles.wizardSpeakerOption} ${
+                            item.speaker === "user"
+                              ? styles.wizardSpeakerOptionActiveOutgoing
+                              : ""
+                          }`}
+                        >
+                          Yo
+                        </button>
+                      </div>
+                      <Textarea
+                        value={item.content}
+                        onChange={(event) => updateConversationBlockText(item.id, event.target.value)}
+                        rows={Math.max(2, Math.ceil(item.content.length / 42))}
+                        spellCheck={false}
+                        className={styles.wizardBubbleTextarea}
+                      />
+                    </div>
                   ))}
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {hasConversationInput ? (
-                  <button
-                    type="button"
-                    onClick={handleStartNewConversation}
-                    className="h-9 rounded-[8px] border border-[#ddd] bg-transparent px-4 text-[13px] text-[#111] hover:bg-[#fafafa]"
-                  >
-                    Limpiar
-                  </button>
-                ) : null}
-                <Button
-                  type="button"
-                  onClick={handleContinueFromStep1}
-                  disabled={(!messageText.trim() && conversationBlocks.length === 0) || loadingAnalysis}
-                  variant="primary"
-                  className="h-9 rounded-[8px] bg-[#111] px-4 text-[13px] text-white hover:bg-[#222]"
-                >
-                  {loadingAnalysis ? t("wizard.button.analyzing") : "Generar respuestas"}
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() => {
-                    setQuickMode(true);
-                    void handleQuickResponse();
-                  }}
-                  disabled={(!messageText.trim() && conversationBlocks.length === 0) || loadingAdvisor}
-                  variant="secondary"
-                  className="h-9 border-[#ddd] bg-transparent px-3 text-[13px] text-[#666] hover:bg-[#fafafa]"
-                >
-                  {loadingAdvisor ? t("wizard.button.generating") : "Rapida"}
-                </Button>
-              </div>
-            </div>
-            {advisorError ? <p className="mt-2 text-sm text-red-700">{advisorError}</p> : null}
+            </section>
           </div>
+
+          <div className={styles.wizardStepActions}>
+            <div className={styles.wizardActionGroup} />
+            <div className={styles.wizardActionGroup}>
+              <Button
+                type="button"
+                onClick={handleContinueFromStep1}
+                disabled={(!messageText.trim() && conversationBlocks.length === 0) || loadingAnalysis}
+                variant="primary"
+                className={`${styles.wizardPrimaryButton} h-10 text-[13px] hover:bg-[#265cc7]`}
+              >
+                <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
+                  <path
+                    d="M4 10h12M10 4l6 6-6 6"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="1.8"
+                  />
+                </svg>
+                {loadingAnalysis ? t("wizard.button.analyzing") : "Ver Analisis"}
+              </Button>
+              <Button
+                type="button"
+                onClick={() => {
+                  setQuickMode(true);
+                  void handleQuickResponse();
+                }}
+                disabled={(!messageText.trim() && conversationBlocks.length === 0) || loadingAdvisor}
+                variant="secondary"
+                className={`${styles.wizardSecondaryButton} h-10 text-[13px] hover:bg-[rgba(255,255,255,0.12)]`}
+              >
+                <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
+                  <path
+                    d="m10 3 1.8 4.7L17 9l-4 3.2L14.3 17 10 14.2 5.7 17 7 12.2 3 9l5.2-1.3L10 3Z"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="1.4"
+                  />
+                </svg>
+                {loadingAdvisor ? t("wizard.button.generating") : "Ver Sugerencias"}
+              </Button>
+            </div>
+          </div>
+          {advisorError ? <p className="mt-2 text-sm text-red-700">{advisorError}</p> : null}
         </div>
       ) : null}
       {currentStep === 2 ? (
-        <div className="space-y-4">
-          <div>
+        <div className={styles.wizardStepBody}>
+          <div className={styles.wizardStepHeader}>
             <h3 className={styles.wizardStepIntroTitle}>Paso 2: Analisis</h3>
             <p className={styles.wizardStepIntroCopy}>
               Revisamos el tono general antes de generar las respuestas.
@@ -1485,31 +1496,60 @@ export function WizardScaffold() {
           {analysisResult ? (
             <>
               <div
-                className={`rounded-2xl border px-4 py-4 ${analysisStatus?.className ?? ""}`}
+                className={`${styles.wizardAnalysisBanner} ${
+                  analysisStatus?.kind === "ok"
+                    ? styles.wizardAnalysisBannerOk
+                    : styles.wizardAnalysisBannerRisk
+                }`}
               >
-                <p className="text-sm font-semibold">
-                  {analysisStatus?.kind === "risk"
-                    ? "Atencion: "
-                    : analysisStatus?.kind === "observation"
-                      ? "Observacion: "
-                      : ""}
-                  {analysisStatus?.title}
-                </p>
-                <p className="mt-1 text-sm">{analysisStatus?.description}</p>
+                <span className={styles.wizardAnalysisIcon}>
+                  {analysisStatus?.kind === "ok" ? (
+                    <svg aria-hidden="true" viewBox="0 0 20 20" className="h-5 w-5" fill="none">
+                      <path
+                        d="M4.5 10.5 8 14l7.5-8"
+                        stroke="currentColor"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                      />
+                    </svg>
+                  ) : (
+                    <svg aria-hidden="true" viewBox="0 0 20 20" className="h-5 w-5" fill="none">
+                      <path
+                        d="M10 3.5 17 16.5H3L10 3.5Zm0 4v4m0 2.5h.01"
+                        stroke="currentColor"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="1.8"
+                      />
+                    </svg>
+                  )}
+                </span>
+                <div>
+                  <p className="text-sm font-semibold">
+                    {analysisStatus?.kind === "risk"
+                      ? "Atencion: "
+                      : analysisStatus?.kind === "observation"
+                        ? "Observacion: "
+                        : ""}
+                    {analysisStatus?.title}
+                  </p>
+                  <p className="mt-1 text-sm">{analysisStatus?.description}</p>
+                </div>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className={`${styles.wizardCardsGrid} md:grid-cols-2`}>
                 <ShellStepSection title="Resumen">
                   <p>{analysisResult.summary}</p>
                 </ShellStepSection>
 
                 <ShellStepSection title="Contexto emocional">
                   <p>
-                    <span className="font-medium text-[#1f2937]">Tono detectado:</span>{" "}
+                    <span className="font-medium text-white/85">Tono detectado:</span>{" "}
                     {analysisResult.emotional_context.tone || "no disponible"}.
                   </p>
                   <p>
-                    <span className="font-medium text-[#1f2937]">Objetivo sugerido:</span>{" "}
+                    <span className="font-medium text-white/85">Objetivo sugerido:</span>{" "}
                     {analysisResult.emotional_context.intent_guess || "sin sugerencia clara"}.
                   </p>
                 </ShellStepSection>
@@ -1548,7 +1588,7 @@ export function WizardScaffold() {
                   type="button"
                   onClick={() => setCurrentStep(1)}
                   variant="secondary"
-                  className="border-[#cbd5e1] bg-white text-[#334155] hover:bg-[#f8fafc]"
+                  className={`${styles.wizardSecondaryButton} h-10 text-[13px] hover:bg-[rgba(255,255,255,0.12)]`}
                 >
                   Volver
                 </Button>
@@ -1557,75 +1597,10 @@ export function WizardScaffold() {
                   onClick={handleContinueToStep3}
                   disabled={!analysisId || loadingAdvisor}
                   variant="primary"
-                  className="min-w-[150px] bg-[#1f2937] hover:bg-[#111827]"
+                  className={`${styles.wizardPrimaryButton} h-10 min-w-[150px] text-[13px] hover:bg-[#265cc7]`}
                 >
                   {loadingAdvisor ? t("wizard.button.generating") : t("wizard.button.continue")}
                 </Button>
-              </div>
-
-              <div className="rounded-2xl border border-[#dbe3ec] bg-[#f8fafc] p-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-[#1f2937]">Hecho relevante</p>
-                  <Button
-                    type="button"
-                    onClick={openIncidentCapture}
-                    variant="secondary"
-                    className="border-[#cbd5e1] bg-white text-[#334155]"
-                  >
-                    Registrar incidente
-                  </Button>
-                </div>
-                <p className="mt-1 text-xs text-[#475569]">
-                  Si corresponde, guarda este evento para revisar el historial del caso.
-                </p>
-                {incidentVisible ? (
-                  <div className="mt-3 grid gap-2 md:grid-cols-2">
-                    <Select
-                      value={incidentType}
-                      onChange={(event) => setIncidentType(event.target.value as IncidentType)}
-                      className="border-[#e5e7eb] bg-white text-[#1f2937]"
-                    >
-                      {INCIDENT_TYPE_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </Select>
-                    <input
-                      type="date"
-                      value={incidentDate}
-                      onChange={(event) => setIncidentDate(event.target.value)}
-                      className="rounded-lg border border-[#e5e7eb] bg-white px-3 py-2 text-sm text-[#1f2937]"
-                    />
-                    <input
-                      type="text"
-                      value={incidentTitle}
-                      onChange={(event) => setIncidentTitle(event.target.value)}
-                      placeholder="Titulo breve del evento"
-                      className="rounded-lg border border-[#e5e7eb] bg-white px-3 py-2 text-sm text-[#1f2937] md:col-span-2"
-                    />
-                    <Textarea
-                      value={incidentDescription}
-                      onChange={(event) => setIncidentDescription(event.target.value)}
-                      rows={2}
-                      spellCheck={false}
-                      placeholder="Detalle opcional para contexto futuro"
-                      className="border-[#e5e7eb] bg-white text-[#1f2937] md:col-span-2"
-                    />
-                    <div className="md:col-span-2">
-                      <Button
-                        type="button"
-                        onClick={() => void handleRegisterIncident()}
-                        disabled={incidentSaving || !incidentTitle.trim()}
-                        variant="secondary"
-                        className="border-[#cbd5e1] bg-white text-[#334155]"
-                      >
-                        {incidentSaving ? "Guardando..." : "Guardar evento"}
-                      </Button>
-                    </div>
-                  </div>
-                ) : null}
-                {incidentNotice ? <p className="mt-2 text-xs text-[#334155]">{incidentNotice}</p> : null}
               </div>
             </>
           ) : null}
@@ -1633,8 +1608,8 @@ export function WizardScaffold() {
       ) : null}
 
       {currentStep === 3 ? (
-        <div className="space-y-4">
-          <div>
+        <div className={styles.wizardStepBody}>
+          <div className={styles.wizardStepHeader}>
             <h3 className={styles.wizardStepIntroTitle}>Paso 3: Respuestas</h3>
             <p className={styles.wizardStepIntroCopy}>
               Elige la variante que mejor encaja con tu objetivo.
@@ -1648,7 +1623,7 @@ export function WizardScaffold() {
             ) : null}
           </div>
 
-          <div className="grid gap-3 lg:grid-cols-3">
+          <div className={`${styles.wizardCardsGrid} ${styles.wizardAdvisorCards}`}>
             {Array.from({ length: 3 }).map((_, index) => {
               const advisorVisual = getAdvisorVisualByIndex(index);
               const advisorAvatar64 = getAdvisorAvatar(advisorVisual, "64");
@@ -1665,59 +1640,59 @@ export function WizardScaffold() {
                 <article
                   key={`${advisorVisual.id}-${index}`}
                   onClick={() => openAdvisorChat(index)}
-                  className={`relative mb-3 flex min-w-0 cursor-pointer flex-col rounded-[12px] bg-white p-4 transition-all duration-150 ease-in-out hover:shadow-[0_6px_18px_rgba(15,23,42,0.08)] ${
+                  className={`${styles.wizardAdvisorCard} ${
                     isRecommended
-                      ? "border-2 border-[#1a7a5e]"
-                      : "border-[0.5px] border-[var(--color-border-tertiary)]"
+                      ? styles.wizardAdvisorCardRecommended
+                      : ""
                   }`}
                 >
-                  <header className="relative rounded-[10px] bg-[#1a2744] px-3 py-2.5 text-white">
+                  <header className={styles.wizardAdvisorHeader}>
                     {isRecommended ? (
-                      <span className="absolute -top-px right-3 rounded-b-[6px] bg-[#1a7a5e] px-2.5 py-[3px] text-[10px] font-medium text-white">
+                      <span className={styles.wizardAdvisorRecommendedTag}>
                         Recomendada
                       </span>
                     ) : null}
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex min-w-0 items-center gap-2.5">
+                    <span className={styles.wizardAdvisorBadge}>
+                      {responseStyleBadgeByIndex[index]}
+                    </span>
+                    <div className={styles.wizardAdvisorHeaderRow}>
+                      <div className="flex min-w-0 items-center gap-3">
                         <button
                           type="button"
                           onClick={(event) => {
                             event.stopPropagation();
                             openAdvisorProfileById(advisorVisual.id);
                           }}
-                          className="rounded-full transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-white/40"
+                          className={styles.wizardAdvisorAvatarButton}
                           aria-label={`Abrir perfil de ${advisorVisual.name}`}
                         >
                           {advisorAvatar64 ? (
                             <Image
                               src={advisorAvatar64}
                               alt={advisorVisual.name}
-                              width={44}
-                              height={44}
-                              className="h-11 w-11 rounded-full border-2 border-white/25 object-cover"
+                              width={46}
+                              height={46}
+                              className={styles.wizardAdvisorAvatar}
                             />
                           ) : (
-                            <span className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-white/25 bg-[#2d3f6b] text-[12px] font-semibold text-white">
+                            <span className={styles.wizardAdvisorAvatarFallback}>
                               {advisorInitials || "AD"}
                             </span>
                           )}
                         </button>
                         <div className="min-w-0">
-                          <p className="truncate text-[13px] font-medium text-white">{advisorVisual.name}</p>
-                          <p className="truncate text-[11px] text-white/60">{advisorVisual.role}</p>
+                          <p className={`${styles.wizardAdvisorName} truncate`}>{advisorVisual.name}</p>
+                          <p className={`${styles.wizardAdvisorRole} truncate`}>{advisorVisual.role}</p>
                         </div>
                       </div>
-                      <span className="shrink-0 rounded-full bg-white/12 px-2 py-[3px] text-[10px] font-medium text-white/85">
-                        {responseStyleBadgeByIndex[index]}
-                      </span>
                     </div>
                   </header>
 
-                  <p className="mt-4 flex-1 whitespace-pre-wrap break-words text-[14px] leading-[1.6] text-[#222]">
+                  <p className={styles.wizardAdvisorResponse}>
                     {responseText || "Sin respuesta disponible."}
                   </p>
 
-                  <div className="mt-4 flex flex-wrap justify-end gap-2">
+                  <div className={styles.wizardAdvisorActions}>
                     {speechSynthesis.supported ? (
                       <VoicePlaybackButton
                         onClick={(event) => {
@@ -1736,7 +1711,7 @@ export function WizardScaffold() {
                       }}
                       disabled={!responseText}
                       variant="secondary"
-                      className="h-9 border-[#ddd] bg-transparent px-3 text-[13px] text-[#111] hover:bg-[#fafafa]"
+                      className={`${styles.wizardSecondaryButton} h-9 text-[13px] hover:bg-[rgba(255,255,255,0.12)]`}
                     >
                       Refinar
                     </Button>
@@ -1751,7 +1726,7 @@ export function WizardScaffold() {
                       className={`h-9 rounded-[8px] px-4 text-[13px] ${
                         copiedIndex === index
                           ? "bg-[#16A34A] text-white hover:bg-[#15803d]"
-                          : "bg-[#111] text-white hover:bg-[#222]"
+                          : `${styles.wizardPrimaryButton} hover:bg-[#265cc7]`
                       }`}
                     >
                       {copiedIndex === index ? "Respuesta copiada" : "Usar esta respuesta"}
@@ -1762,32 +1737,24 @@ export function WizardScaffold() {
             })}
           </div>
 
-          <div className="mt-6 flex flex-wrap items-center gap-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                onClick={openIncidentCapture}
-                variant="secondary"
-                className="border-[0.5px] border-[var(--color-border-secondary)] bg-white text-[#334155] hover:bg-[#f8fafc]"
-              >
-                Registrar incidente
-              </Button>
+          <div className={styles.wizardFooterRow}>
+            <div className={styles.wizardActionGroup}>
               <Button
                 type="button"
                 onClick={() => setCurrentStep(2)}
                 variant="secondary"
-                className="border-[0.5px] border-[var(--color-border-secondary)] bg-white text-[#334155] hover:bg-[#f8fafc]"
+                className={`${styles.wizardSecondaryButton} h-10 text-[13px] hover:bg-[rgba(255,255,255,0.12)]`}
               >
                 Volver al paso 2
               </Button>
             </div>
-            <div className="min-w-0 flex-1" />
-            <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className={styles.wizardFooterSpacer} />
+            <div className={styles.wizardActionGroup}>
               <Button
                 type="button"
                 onClick={() => setCurrentStep(1)}
                 variant="secondary"
-                className="border-transparent bg-transparent px-2 py-1 text-[12px] text-[var(--color-text-secondary)] hover:bg-[#f8fafc]"
+                className={`${styles.wizardMutedButton} h-10 px-3 text-[12px] hover:bg-[rgba(255,255,255,0.08)]`}
               >
                 Ninguna me sirve / quiero agregar mas contexto
               </Button>
@@ -1795,66 +1762,12 @@ export function WizardScaffold() {
                 type="button"
                 onClick={handleStartNewConversation}
                 variant="primary"
-                className="bg-[#1a2744] text-white hover:bg-[#14203a]"
+                className={`${styles.wizardPrimaryButton} h-10 text-[13px] hover:bg-[#265cc7]`}
               >
                 Iniciar nueva conversacion
               </Button>
             </div>
           </div>
-          {incidentVisible ? (
-            <div className="rounded-2xl border border-[#dbe3ec] bg-[#f8fafc] p-3">
-              <p className="text-sm font-semibold text-[#1f2937]">Registrar evento del caso</p>
-              <p className="mt-1 text-xs text-[#475569]">
-                Guarda este hecho para mantener contexto cronologico del caso.
-              </p>
-              <div className="mt-3 grid gap-2 md:grid-cols-2">
-                <Select
-                  value={incidentType}
-                  onChange={(event) => setIncidentType(event.target.value as IncidentType)}
-                  className="border-[#e5e7eb] bg-white text-[#1f2937]"
-                >
-                  {INCIDENT_TYPE_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </Select>
-                <input
-                  type="date"
-                  value={incidentDate}
-                  onChange={(event) => setIncidentDate(event.target.value)}
-                  className="rounded-lg border border-[#e5e7eb] bg-white px-3 py-2 text-sm text-[#1f2937]"
-                />
-                <input
-                  type="text"
-                  value={incidentTitle}
-                  onChange={(event) => setIncidentTitle(event.target.value)}
-                  placeholder="Titulo breve del evento"
-                  className="rounded-lg border border-[#e5e7eb] bg-white px-3 py-2 text-sm text-[#1f2937] md:col-span-2"
-                />
-                <Textarea
-                  value={incidentDescription}
-                  onChange={(event) => setIncidentDescription(event.target.value)}
-                  rows={2}
-                  spellCheck={false}
-                  placeholder="Detalle opcional para contexto futuro"
-                  className="border-[#e5e7eb] bg-white text-[#1f2937] md:col-span-2"
-                />
-                <div className="md:col-span-2">
-                  <Button
-                    type="button"
-                    onClick={() => void handleRegisterIncident()}
-                    disabled={incidentSaving || !incidentTitle.trim()}
-                    variant="secondary"
-                    className="border-[#cbd5e1] bg-white text-[#334155]"
-                  >
-                    {incidentSaving ? "Guardando..." : "Guardar evento"}
-                  </Button>
-                </div>
-              </div>
-              {incidentNotice ? <p className="mt-2 text-xs text-[#334155]">{incidentNotice}</p> : null}
-            </div>
-          ) : null}
         </div>
       ) : null}
 

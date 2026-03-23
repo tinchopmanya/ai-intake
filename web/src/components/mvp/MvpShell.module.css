@@ -7,9 +7,15 @@
   --text-primary: rgba(255, 255, 255, 0.9);
   --text-secondary: rgba(255, 255, 255, 0.55);
   --text-muted: rgba(255, 255, 255, 0.35);
+  --bubble-user-bg: #c8f0d4;
+  --bubble-user-text: #1a4a2a;
+  --bubble-adv-bg: #162032;
+  --bubble-adv-text: rgba(255, 255, 255, 0.88);
   --btn-primary: #2d6be4;
   --btn-secondary-bg: rgba(255, 255, 255, 0.07);
   --btn-secondary-border: rgba(255, 255, 255, 0.14);
+  --input-bg: #162032;
+  --input-border: rgba(255, 255, 255, 0.1);
   min-height: 100vh;
   width: 100%;
   background: var(--app-bg);
@@ -401,7 +407,7 @@
 }
 
 .wizardStepIntroTitle {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -425,8 +431,10 @@
 }
 
 .wizardSectionTitle {
-  font-size: 14px;
+  font-size: 11px;
   font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   color: var(--text-primary);
 }
 
@@ -437,6 +445,481 @@
   font-size: 14px;
   line-height: 1.6;
   color: var(--text-secondary);
+}
+
+.wizardStepBody {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.wizardStepHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wizardStepOneGrid {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.wizardStepPanel {
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+  flex-direction: column;
+  gap: 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(10, 21, 32, 0.92);
+  padding: 14px;
+}
+
+.wizardPanelTitleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.wizardPanelTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.wizardPanelHint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.wizardInputGroup {
+  display: grid;
+  gap: 10px;
+}
+
+.wizardPrimaryTextarea {
+  min-height: 220px;
+  border-radius: 12px;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--text-primary);
+  padding: 14px;
+}
+
+.wizardPrimaryTextarea::placeholder {
+  color: var(--text-muted);
+}
+
+.wizardAttachButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 9999px;
+  border: 1px solid var(--btn-secondary-border);
+  background: var(--btn-secondary-bg);
+  color: var(--text-primary);
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 180ms ease, border-color 180ms ease, transform 180ms ease;
+}
+
+.wizardAttachButton:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.22);
+  transform: translateY(-1px);
+}
+
+.wizardContextRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.wizardContextInput {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--text-primary);
+  padding: 0 14px;
+  font-size: 14px;
+}
+
+.wizardContextInput::placeholder {
+  color: var(--text-muted);
+}
+
+.wizardVoiceMic {
+  display: inline-flex;
+  width: 42px;
+  height: 42px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  border: 0;
+  background: #dc2626;
+  color: #fff;
+  box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.45);
+  cursor: pointer;
+  transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+.wizardVoiceMic:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(220, 38, 38, 0.24);
+}
+
+.wizardVoiceMicActive {
+  animation: wizardMicPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes wizardMicPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.48);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(220, 38, 38, 0);
+  }
+}
+
+.wizardInterpretedFrame {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.wizardConversationList {
+  display: flex;
+  min-height: 320px;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(7, 14, 24, 0.88);
+  padding: 12px;
+}
+
+.wizardEmptyState {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.wizardBubble {
+  max-width: 96%;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 10px 12px;
+}
+
+.wizardBubbleIncoming {
+  margin-right: auto;
+  background: var(--bubble-adv-bg);
+  color: var(--bubble-adv-text);
+}
+
+.wizardBubbleOutgoing {
+  margin-left: auto;
+  background: var(--bubble-user-bg);
+  color: var(--bubble-user-text);
+  border-color: rgba(200, 240, 212, 0.18);
+}
+
+.wizardBubbleUnknown {
+  margin-right: auto;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.wizardSpeakerSwitch {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 3px;
+}
+
+.wizardSpeakerOption {
+  border-radius: 9999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  transition: background 180ms ease, color 180ms ease;
+}
+
+.wizardSpeakerOptionActiveIncoming {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.wizardSpeakerOptionActiveUnknown {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-primary);
+}
+
+.wizardSpeakerOptionActiveOutgoing {
+  background: rgba(26, 74, 42, 0.18);
+  color: #10331d;
+}
+
+.wizardBubbleTextarea {
+  width: 100%;
+  resize: none;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+
+.wizardBubbleTextarea:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.wizardStepActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 12px;
+}
+
+.wizardActionGroup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.wizardIconButton {
+  display: inline-flex;
+  width: 38px;
+  height: 38px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  border: 1px solid var(--btn-secondary-border);
+  background: var(--btn-secondary-bg);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.wizardPrimaryButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 12px;
+  background: var(--btn-primary);
+  color: #fff;
+  border: 1px solid transparent;
+  padding: 0 16px;
+}
+
+.wizardSecondaryButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 12px;
+  border: 1px solid var(--btn-secondary-border);
+  background: var(--btn-secondary-bg);
+  color: var(--text-primary);
+  padding: 0 16px;
+}
+
+.wizardMutedButton {
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+}
+
+.wizardAnalysisBanner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 14px 16px;
+}
+
+.wizardAnalysisBannerOk {
+  background: rgba(26, 122, 94, 0.14);
+  border-color: rgba(26, 122, 94, 0.35);
+  color: #d3f6eb;
+}
+
+.wizardAnalysisBannerRisk {
+  background: rgba(185, 28, 28, 0.14);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #ffe0e0;
+}
+
+.wizardAnalysisIcon {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.wizardCardsGrid {
+  display: grid;
+  gap: 12px;
+}
+
+.wizardAdvisorCards {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.wizardAdvisorCard {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(9, 17, 27, 0.84);
+  padding: 14px;
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.wizardAdvisorCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 34px rgba(0, 0, 0, 0.28);
+}
+
+.wizardAdvisorCardRecommended {
+  border: 2px solid #2d6be4;
+}
+
+.wizardAdvisorHeader {
+  position: relative;
+  border-radius: 12px;
+  border-bottom: 2px solid #2d6be4;
+  background: #1c2b3a;
+  padding: 12px;
+  color: #fff;
+}
+
+.wizardAdvisorBadge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  border-radius: 9999px;
+  background: rgba(45, 107, 228, 0.18);
+  color: rgba(255, 255, 255, 0.88);
+  padding: 4px 8px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.wizardAdvisorRecommendedTag {
+  position: absolute;
+  top: -1px;
+  left: 12px;
+  border-radius: 0 0 8px 8px;
+  background: #2d6be4;
+  color: #fff;
+  padding: 4px 10px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.wizardAdvisorHeaderRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.wizardAdvisorAvatarButton {
+  border-radius: 9999px;
+}
+
+.wizardAdvisorAvatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 9999px;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  object-fit: cover;
+}
+
+.wizardAdvisorAvatarFallback {
+  display: inline-flex;
+  width: 46px;
+  height: 46px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  background: #2d5a8e;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.wizardAdvisorName {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.wizardAdvisorRole {
+  margin-top: 2px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.wizardAdvisorResponse {
+  margin-top: 14px;
+  flex: 1;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.wizardAdvisorActions {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.wizardFooterRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 12px;
+}
+
+.wizardFooterSpacer {
+  min-width: 0;
+  flex: 1;
+}
+
+.wizardHiddenUi {
+  display: none;
 }
 
 @media (max-width: 1023px) {
@@ -461,5 +944,10 @@
 
   .shellContent {
     padding: 14px;
+  }
+
+  .wizardStepOneGrid,
+  .wizardAdvisorCards {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
