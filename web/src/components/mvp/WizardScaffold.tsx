@@ -306,6 +306,32 @@ function getRiskMeter(analysisResult: AnalysisResponse): {
   return { level: "low", value: 16 };
 }
 
+function getAnalysisQuickChips(analysisResult: AnalysisResponse) {
+  const tone = analysisResult.emotional_context.tone || "Neutro";
+  const friction =
+    analysisResult.risk_flags.length === 0
+      ? "Baja"
+      : analysisResult.risk_flags.some((flag) => flag.severity === "high")
+        ? "Alta"
+        : analysisResult.risk_flags.some((flag) => flag.severity === "medium")
+          ? "Media"
+          : "Moderada";
+  const urgency =
+    analysisResult.ui_alerts.some((alert) => /urg/i.test(alert.message)) ||
+    analysisResult.risk_flags.some((flag) => /urgency/i.test(flag.code))
+      ? "Alta"
+      : "Normal";
+  const clarity =
+    analysisResult.summary.length > 180 || analysisResult.ui_alerts.length > 2 ? "Media" : "Alta";
+
+  return [
+    { label: "Tono", value: tone },
+    { label: "Friccion", value: friction },
+    { label: "Urgencia", value: urgency },
+    { label: "Claridad", value: clarity },
+  ];
+}
+
 function humanizeFlag(flag: AnalysisRiskFlag) {
   const label =
     RISK_LABELS[flag.code] ??
@@ -1218,6 +1244,7 @@ export function WizardScaffold() {
 
   const analysisStatus = analysisResult ? getAnalysisStatus(analysisResult) : null;
   const riskMeter = analysisResult ? getRiskMeter(analysisResult) : null;
+  const analysisQuickChips = analysisResult ? getAnalysisQuickChips(analysisResult) : [];
   const hasConversationInput = messageText.trim().length > 0 || conversationBlocks.length > 0;
 
   return (
@@ -1561,7 +1588,16 @@ export function WizardScaffold() {
 
               {riskMeter ? (
                 <div className={styles.wizardRiskMeter}>
-                  <p className={styles.wizardRiskMeterLabel}>Nivel de riesgo</p>
+                  <div className={styles.wizardRiskMeterHead}>
+                    <p className={styles.wizardRiskMeterLabel}>Nivel de riesgo</p>
+                    <span className={styles.wizardRiskMeterValue}>
+                      {riskMeter.level === "high"
+                        ? "Alto"
+                        : riskMeter.level === "medium"
+                          ? "Medio"
+                          : "Bajo"}
+                    </span>
+                  </div>
                   <div className={styles.wizardRiskMeterTrack}>
                     <div
                       className={`${styles.wizardRiskMeterFill} ${
@@ -1574,6 +1610,36 @@ export function WizardScaffold() {
                       style={{ width: `${riskMeter.value}%` }}
                     />
                   </div>
+                </div>
+              ) : null}
+
+              {analysisQuickChips.length > 0 ? (
+                <div className={styles.wizardAnalysisQuickChips}>
+                  {analysisQuickChips.map((chip) => (
+                    <span key={chip.label} className={styles.wizardAnalysisChip}>
+                      <span className={styles.wizardAnalysisChipLabel}>{chip.label}</span>
+                      <span>{chip.value}</span>
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+
+              {analysisResult.emotional_context.intent_guess ? (
+                <div className={styles.wizardInsightRow}>
+                  <span className={styles.wizardInsightIcon}>
+                    <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
+                      <path
+                        d="M10 3.75a6.25 6.25 0 1 0 0 12.5 6.25 6.25 0 0 0 0-12.5Zm0 4v.25m0 1.75v3.5"
+                        stroke="currentColor"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="1.7"
+                      />
+                    </svg>
+                  </span>
+                  <p>
+                    Objetivo sugerido: <strong>{analysisResult.emotional_context.intent_guess}</strong>
+                  </p>
                 </div>
               ) : null}
 
@@ -1710,6 +1776,15 @@ export function WizardScaffold() {
                   >
                     {isRecommended ? (
                       <span className={styles.wizardAdvisorRecommendedTag}>
+                        <svg aria-hidden="true" viewBox="0 0 16 16" className="h-3 w-3" fill="none">
+                          <path
+                            d="m8 2 1.55 3.49L13 6l-2.6 2.28.73 3.22L8 9.9l-3.13 1.6.73-3.22L3 6l3.45-.51L8 2Z"
+                            stroke="currentColor"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="1.3"
+                          />
+                        </svg>
                         Recomendada
                       </span>
                     ) : null}
@@ -1755,14 +1830,27 @@ export function WizardScaffold() {
 
                   <div className={styles.wizardAdvisorActions}>
                     {speechSynthesis.supported ? (
-                      <VoicePlaybackButton
+                      <Button
+                        type="button"
                         onClick={(event) => {
                           event.stopPropagation();
                           handleToggleSpeakResponse(index, responseText);
                         }}
-                        speaking={speechSynthesis.speaking && speakingResponseIndex === index}
                         disabled={!responseText}
-                      />
+                        variant="secondary"
+                        className={`${styles.wizardTertiaryButton} h-9 text-[13px] hover:bg-[rgba(255,255,255,0.1)]`}
+                      >
+                        <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
+                          <path
+                            d="M4.5 11.5h2.75L11 14.5v-9L7.25 8.5H4.5v3Zm9.75-3.75a4.25 4.25 0 0 1 0 4.5m1.75-6.5a6.75 6.75 0 0 1 0 8.5"
+                            stroke="currentColor"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="1.6"
+                          />
+                        </svg>
+                        {speechSynthesis.speaking && speakingResponseIndex === index ? "Detener" : "Escuchar"}
+                      </Button>
                     ) : null}
                     <Button
                       type="button"
@@ -1774,7 +1862,16 @@ export function WizardScaffold() {
                       variant="secondary"
                       className={`${styles.wizardSecondaryButton} h-9 text-[13px] hover:bg-[rgba(255,255,255,0.12)]`}
                     >
-                      Refinar
+                      <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4 text-[#ef4444]" fill="none">
+                        <path
+                          d="M10 3.75a2.5 2.5 0 0 0-2.5 2.5v4.25a2.5 2.5 0 1 0 5 0V6.25A2.5 2.5 0 0 0 10 3.75Zm-4.25 6.5a4.25 4.25 0 1 0 8.5 0M10 14.5v2.25m-2 0h4"
+                          stroke="currentColor"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="1.6"
+                        />
+                      </svg>
+                      Conversar
                     </Button>
                     <Button
                       type="button"
@@ -1790,6 +1887,17 @@ export function WizardScaffold() {
                           : `${styles.wizardPrimaryButton} hover:bg-[#265cc7]`
                       }`}
                     >
+                      {copiedIndex !== index ? (
+                        <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
+                          <path
+                            d="M4 10h12M10 4l6 6-6 6"
+                            stroke="currentColor"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="1.8"
+                          />
+                        </svg>
+                      ) : null}
                       {copiedIndex === index ? "Respuesta copiada" : "Usar esta respuesta"}
                     </Button>
                   </div>
