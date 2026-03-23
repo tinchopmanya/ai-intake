@@ -1,0 +1,555 @@
+.vpOverlay,
+.cpOverlay {
+  --popup-bg: #0d1825;
+  --popup-header-bg: #1a3a5c;
+  --popup-header-text: #ffffff;
+  --popup-header-sub: rgba(255, 255, 255, 0.55);
+  --popup-header-desc: rgba(255, 255, 255, 0.4);
+  --bubble-user-bg: #c8f0d4;
+  --bubble-user-text: #1a4a2a;
+  --bubble-advisor-bg: #162032;
+  --bubble-advisor-text: rgba(255, 255, 255, 0.9);
+  --bubble-advisor-border: rgba(255, 255, 255, 0.08);
+  --conv-bg: #0a1520;
+  --conv-label: #4a9eff;
+  --input-bg: #162032;
+  --input-border: rgba(255, 255, 255, 0.1);
+  --input-text: rgba(255, 255, 255, 0.85);
+  --input-placeholder: rgba(255, 255, 255, 0.3);
+  --btn-primary-bg: #2d6be4;
+  --btn-primary-text: #ffffff;
+  --btn-secondary-bg: rgba(255, 255, 255, 0.08);
+  --btn-secondary-border: rgba(255, 255, 255, 0.14);
+  --btn-secondary-text: rgba(255, 255, 255, 0.6);
+  --close-btn-bg: #1a3a5c;
+  --close-btn-border: rgba(255, 255, 255, 0.2);
+  --close-btn-color: #ffffff;
+  --backdrop: rgba(10, 18, 35, 0.75);
+  --vp-ring-idle-1: rgba(74, 158, 255, 0.35);
+  --vp-ring-idle-2: rgba(74, 158, 255, 0.25);
+  --vp-ring-idle-3: rgba(74, 158, 255, 0.15);
+  --vp-ring-rec-1: rgba(239, 68, 68, 0.7);
+  --vp-ring-rec-2: rgba(248, 113, 113, 0.45);
+  --vp-ring-rec-3: rgba(252, 165, 165, 0.25);
+  --vp-ring-speak-1: rgba(234, 179, 8, 0.7);
+  --vp-ring-speak-2: rgba(250, 204, 21, 0.45);
+  --vp-ring-speak-3: rgba(253, 224, 71, 0.25);
+  --popup-shadow: rgba(0, 0, 0, 0.34);
+  --popup-shadow-soft: rgba(0, 0, 0, 0.3);
+  --avatar-border: rgba(255, 255, 255, 0.15);
+  --status-recording: rgba(239, 68, 68, 0.92);
+  --status-paused: rgba(248, 200, 90, 0.88);
+  --status-speaking: rgba(157, 199, 255, 0.95);
+  --error-text: rgba(252, 165, 165, 0.95);
+  --live-bubble-border-accent: #f59e0b;
+  --live-bubble-bg-accent: #facc15;
+  --live-bubble-text: #1f2937;
+  --live-caret: #1f2937;
+  --mic-bg: #dc2626;
+  --mic-text: #ffffff;
+  --mic-pulse: rgba(220, 38, 38, 0.5);
+  --mic-pulse-fade: rgba(220, 38, 38, 0);
+}
+
+.vpOverlay,
+.cpOverlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem;
+  background: var(--backdrop);
+}
+
+.cpPanel,
+.vpCard {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--bubble-advisor-border);
+  border-radius: 20px;
+  background: var(--popup-bg);
+  box-shadow: 0 24px 60px var(--popup-shadow);
+}
+
+.vpHeader,
+.cpHeader {
+  background: var(--popup-header-bg);
+  color: var(--popup-header-text);
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.vpAvatar,
+.cpAvatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 9999px;
+  border: 2px solid var(--avatar-border);
+  object-fit: cover;
+}
+
+.vpAvatarFallback,
+.cpAvatarFallback {
+  width: 48px;
+  height: 48px;
+  border-radius: 9999px;
+  border: 2px solid var(--avatar-border);
+  color: var(--popup-header-text);
+  background: var(--conv-label);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.vpHeadText,
+.cpHeadText {
+  min-width: 0;
+  flex: 1;
+}
+
+.vpName,
+.cpName {
+  color: var(--popup-header-text);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vpSub,
+.cpSub {
+  margin-top: 2px;
+  color: var(--popup-header-sub);
+  font-size: 12px;
+}
+
+.vpDesc,
+.cpDesc {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--popup-header-desc);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.vpClose,
+.cpClose {
+  position: absolute;
+  top: -14px;
+  right: -14px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--close-btn-bg);
+  border: 2px solid var(--close-btn-border);
+  color: var(--close-btn-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px var(--popup-shadow-soft);
+  z-index: 30;
+}
+
+.vpBody {
+  background: var(--popup-bg);
+}
+
+.vpBodySplit {
+  border-right: 1px solid var(--bubble-advisor-border);
+}
+
+.vpToggle {
+  border-radius: 9999px;
+  border: 1px solid var(--btn-secondary-border);
+  background: var(--btn-secondary-bg);
+  color: var(--popup-header-sub);
+  box-shadow: 0 8px 18px var(--popup-shadow);
+}
+
+.vpAvatarHero {
+  width: 168px;
+  height: 168px;
+  border-radius: 9999px;
+  border: 3px solid var(--avatar-border);
+  object-fit: cover;
+}
+
+.vpAvatarHeroFallback {
+  width: 168px;
+  height: 168px;
+  border-radius: 9999px;
+  border: 3px solid var(--avatar-border);
+  background: var(--conv-label);
+  color: var(--popup-header-text);
+  font-size: 52px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vpCountdown {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 4;
+  width: 44px;
+  height: 44px;
+  border-radius: 9999px;
+  border: 3px solid var(--popup-bg);
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.vpNameSmall {
+  color: var(--popup-header-text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.vpStatus {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--popup-header-sub);
+}
+
+.vpStatusRecording {
+  color: var(--status-recording);
+}
+
+.vpStatusPaused {
+  color: var(--status-paused);
+}
+
+.vpStatusSending {
+  color: var(--conv-label);
+}
+
+.vpStatusSpeaking {
+  color: var(--status-speaking);
+}
+
+.vpRing {
+  position: absolute;
+  border: 2px solid transparent;
+  border-radius: 9999px;
+  animation: vpPulseRing 2s ease-out infinite;
+  transition: border-color 0.4s ease;
+}
+
+.vpRing1 {
+  width: 256px;
+  height: 256px;
+  border-color: var(--vp-ring-idle-1);
+  animation-delay: 0s;
+}
+
+.vpRing2 {
+  width: 220px;
+  height: 220px;
+  border-color: var(--vp-ring-idle-2);
+  animation-delay: 0.4s;
+}
+
+.vpRing3 {
+  width: 186px;
+  height: 186px;
+  border-color: var(--vp-ring-idle-3);
+  animation-delay: 0.8s;
+}
+
+.vpRingListening.vpRing1 {
+  border-color: var(--vp-ring-rec-1);
+}
+
+.vpRingListening.vpRing2 {
+  border-color: var(--vp-ring-rec-2);
+}
+
+.vpRingListening.vpRing3 {
+  border-color: var(--vp-ring-rec-3);
+}
+
+.vpRingSpeaking {
+  animation-duration: 1.05s;
+}
+
+.vpRingSpeaking.vpRing1 {
+  border-color: var(--vp-ring-speak-1);
+}
+
+.vpRingSpeaking.vpRing2 {
+  border-color: var(--vp-ring-speak-2);
+}
+
+.vpRingSpeaking.vpRing3 {
+  border-color: var(--vp-ring-speak-3);
+}
+
+.vpWaveBar {
+  width: 4px;
+  height: 24px;
+  border-radius: 2px;
+  transform-origin: center bottom;
+  background: color-mix(in srgb, var(--conv-label) 55%, transparent);
+  animation: vpWaveBar 1.2s ease-in-out infinite;
+}
+
+.vpWavePaused {
+  animation-play-state: paused;
+  height: 8px;
+  opacity: 0.3;
+}
+
+.vpWaveActive {
+  animation-play-state: running;
+}
+
+.vpHintBtn {
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  font-size: 12px;
+  color: var(--popup-header-desc);
+}
+
+.vpHintBox {
+  width: 100%;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--btn-secondary-bg);
+  padding-inline: 14px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--popup-header-sub);
+  transition: max-height 0.3s ease, padding 0.3s ease, margin 0.3s ease;
+}
+
+.vpHintOpen {
+  margin-bottom: 12px;
+  max-height: 44px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.vpHintClosed {
+  margin-bottom: 0;
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.vpError {
+  margin-bottom: 8px;
+  width: 100%;
+  text-align: center;
+  font-size: 12px;
+  color: var(--error-text);
+}
+
+.vpPrimaryBtn {
+  flex: 1;
+  border: 0;
+  border-radius: 12px;
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 11px 16px;
+}
+
+.vpSecondaryBtn {
+  border-radius: 12px;
+  border: 1px solid var(--btn-secondary-border);
+  background: var(--btn-secondary-bg);
+  color: var(--btn-secondary-text);
+  font-size: 13px;
+  padding: 11px 16px;
+}
+
+.vpChatAside {
+  background: var(--conv-bg);
+}
+
+.vpChatHead {
+  border-bottom: 1px solid var(--bubble-advisor-border);
+  padding: 12px 16px;
+}
+
+.vpChatHeadText {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--popup-header-sub);
+}
+
+.vpChatList {
+  background: var(--conv-bg);
+}
+
+.vpLabelAdvisor,
+.cpLabelAdvisor {
+  margin-bottom: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--conv-label);
+}
+
+.vpLabelUser,
+.cpLabelUser {
+  margin-bottom: 4px;
+  text-align: right;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: color-mix(in srgb, var(--bubble-user-text) 72%, white);
+}
+
+.vpBubbleAdvisor,
+.cpBubbleAdvisor {
+  border-radius: 4px 16px 16px 16px;
+  border: 1px solid var(--bubble-advisor-border);
+  background: var(--bubble-advisor-bg);
+  color: var(--bubble-advisor-text);
+}
+
+.vpBubbleUser,
+.cpBubbleUser {
+  border-radius: 16px 16px 4px 16px;
+  background: var(--bubble-user-bg);
+  color: var(--bubble-user-text);
+}
+
+.vpBubbleLive {
+  border-radius: 16px 16px 4px 16px;
+  border: 1px solid color-mix(in srgb, var(--bubble-user-bg) 74%, var(--live-bubble-border-accent));
+  background: color-mix(in srgb, var(--bubble-user-bg) 45%, var(--live-bubble-bg-accent));
+  color: var(--live-bubble-text);
+}
+
+.vpLiveCaret {
+  margin-left: 2px;
+  display: inline-block;
+  width: 1px;
+  height: 15px;
+  background: var(--live-caret);
+  vertical-align: -2px;
+  animation: vpCaretBlink 1s steps(1, end) infinite;
+}
+
+.cpBody {
+  background: var(--conv-bg);
+}
+
+.cpConversation {
+  background: var(--conv-bg);
+}
+
+.cpFooter {
+  border-top: 1px solid var(--bubble-advisor-border);
+  background: var(--popup-bg);
+}
+
+.cpTextarea {
+  border-radius: 12px !important;
+  border: 1px solid var(--input-border) !important;
+  background: var(--input-bg) !important;
+  color: var(--input-text) !important;
+}
+
+.cpTextarea::placeholder {
+  color: var(--input-placeholder) !important;
+}
+
+.cpMicBtn {
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 9999px;
+  background: var(--mic-bg);
+  color: var(--mic-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  animation: cpMicPulse 1.5s ease-in-out infinite;
+}
+
+.cpSendBtn {
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: var(--btn-primary-bg) !important;
+  color: var(--btn-primary-text) !important;
+}
+
+.cpUseBtn {
+  border: 1px solid var(--btn-secondary-border) !important;
+  border-radius: 10px !important;
+  background: var(--btn-secondary-bg) !important;
+  color: var(--btn-secondary-text) !important;
+}
+
+@keyframes vpPulseRing {
+  0% {
+    transform: scale(0.92);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1);
+    opacity: 0.32;
+  }
+  100% {
+    transform: scale(0.92);
+    opacity: 0.8;
+  }
+}
+
+@keyframes vpWaveBar {
+  0%,
+  100% {
+    transform: scaleY(0.5);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+@keyframes vpCaretBlink {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes cpMicPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 var(--mic-pulse);
+  }
+  50% {
+    box-shadow: 0 0 0 8px var(--mic-pulse-fade);
+  }
+}

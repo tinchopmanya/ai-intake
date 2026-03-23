@@ -4,14 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent }
 import { createPortal } from "react-dom";
 import Image from "next/image";
 
-import {
-  advisorPanelShellClass,
-  advisorVoiceBodyClass,
-  advisorVoiceHeaderClass,
-} from "@/components/mvp/advisorUiStyles";
 import { Button, Textarea } from "@/components/mvp/ui";
 import { postAdvisorVoice } from "@/lib/api/client";
 import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
+import styles from "@/components/mvp/AdvisorPopups.module.css";
 
 export type AdvisorChatMessage = {
   id: string;
@@ -430,8 +426,6 @@ export function AdvisorChatModal({
       : "Contame que queres ajustar y lo mejoramos juntos.");
   const inputPlaceholder =
     entryMode === "advisor_conversation" ? "Escribi tu mensaje..." : "Escribi como queres ajustarlo...";
-  const floatingCloseButtonClass =
-    "absolute -right-[14px] -top-[14px] z-20 inline-flex h-8 w-8 items-center justify-center rounded-full border-2 border-white/20 bg-[#1e2a3a] text-white shadow-[0_2px_8px_rgba(0,0,0,0.3)] transition hover:bg-[#243449]";
 
   const openVoice = () => {
     setVoiceTranscriptOpen(false);
@@ -450,36 +444,45 @@ export function AdvisorChatModal({
   const voiceOverlay =
     typeof document !== "undefined" && voiceOpen
       ? createPortal(
-          <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[rgba(226,232,240,0.85)] p-3 backdrop-blur-[2px]">
-            <div className={`relative h-[min(88vh,760px)] w-full transition-all duration-300 ${voiceChatExpanded ? "max-w-[780px]" : "max-w-[420px]"}`}>
-              <button type="button" onClick={() => closeVoice()} className={floatingCloseButtonClass} aria-label="Cerrar">
-                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.1" className="h-4 w-4">
-                  <path d="M5 5l10 10M15 5 5 15" />
+          <div className={styles.vpOverlay}>
+            <div
+              className={`relative h-[min(88vh,760px)] w-full transition-all duration-300 ${voiceChatExpanded ? "max-w-[780px]" : "max-w-[420px]"}`}
+            >
+              <button type="button" onClick={() => closeVoice()} className={styles.vpClose} aria-label="Cerrar">
+                <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M2 2 12 12M12 2 2 12" />
                 </svg>
               </button>
-              <div className={`h-full overflow-hidden rounded-[20px] border border-[#1c2a3d] bg-[#0d1520] shadow-[0_24px_60px_rgba(0,0,0,0.34)]`}>
+              <div className={styles.vpCard}>
                 <div className="relative flex h-full flex-col lg:flex-row">
-                  <section className={`${advisorVoiceBodyClass} relative flex h-full min-h-0 flex-col items-center px-6 pb-5 pt-4 ${voiceChatExpanded ? "lg:w-[380px] lg:shrink-0 lg:border-r lg:border-[#1f2b3d]" : "lg:w-full"}`}>
-                    <header className={`${advisorVoiceHeaderClass} absolute inset-x-0 top-0 flex items-center gap-3 px-5 py-3.5`}>
+                  <section className={`${styles.vpBody} ${voiceChatExpanded ? styles.vpBodySplit : ""} relative flex h-full min-h-0 flex-col items-center px-6 pb-5 pt-4 ${voiceChatExpanded ? "lg:w-[380px] lg:shrink-0" : "lg:w-full"}`}>
+                    <header className={`${styles.vpHeader} absolute inset-x-0 top-0`}>
                       {headerAvatar ? (
-                        <Image src={headerAvatar} alt={advisorName} width={48} height={48} priority className="h-12 w-12 rounded-full border-2 border-white/18 object-cover" />
+                        <Image src={headerAvatar} alt={advisorName} width={48} height={48} priority className={styles.vpAvatar} />
                       ) : (
-                        <span className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-white/18 bg-[#4a9eff] text-[18px] font-bold text-white">{(getInitials(advisorName) || "A")[0]}</span>
+                        <span className={styles.vpAvatarFallback}>{(getInitials(advisorName) || "A")[0]}</span>
                       )}
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-[16px] font-semibold text-white">{advisorName}</p>
-                        {advisorRole ? <p className="mt-0.5 text-[11px] text-white/45">{advisorRole}</p> : null}
+                      <div className={styles.vpHeadText}>
+                        <p className={styles.vpName}>{advisorName}</p>
+                        {advisorRole ? <p className={styles.vpSub}>{advisorRole}</p> : null}
                       </div>
                     </header>
 
-                    <button type="button" onClick={() => setVoiceChatExpanded((prev) => !prev)} className="absolute -right-3 top-1/2 z-10 hidden -translate-y-1/2 rounded-full border border-white/20 bg-[#17253a]/95 px-2 py-6 text-white/80 shadow-[0_8px_18px_rgba(0,0,0,0.32)] transition hover:bg-[#1f3554] lg:inline-flex" aria-label={voiceChatExpanded ? "Contraer chat" : "Expandir chat"}>
-                      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" className={`h-4 w-4 transition-transform ${voiceChatExpanded ? "rotate-180" : ""}`}><path d="m7 4 6 6-6 6" /></svg>
+                    <button
+                      type="button"
+                      onClick={() => setVoiceChatExpanded((prev) => !prev)}
+                      className={`${styles.vpToggle} absolute -right-3 top-1/2 z-10 hidden -translate-y-1/2 px-2 py-6 lg:inline-flex`}
+                      aria-label={voiceChatExpanded ? "Contraer chat" : "Expandir chat"}
+                    >
+                      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" className={`h-4 w-4 transition-transform ${voiceChatExpanded ? "rotate-180" : ""}`}>
+                        <path d="m7 4 6 6-6 6" />
+                      </svg>
                     </button>
 
                     <div className="relative mt-12 flex h-[256px] w-[256px] items-center justify-center">
-                      <span className={`voice-pulse-ring voice-pulse-ring-1 ${voiceSpeaking ? "is-speaking" : ""} ${(flowPhase === "user_recording" || flowPhase === "user_paused") ? "is-listening" : ""}`} />
-                      <span className={`voice-pulse-ring voice-pulse-ring-2 ${voiceSpeaking ? "is-speaking" : ""} ${(flowPhase === "user_recording" || flowPhase === "user_paused") ? "is-listening" : ""}`} />
-                      <span className={`voice-pulse-ring voice-pulse-ring-3 ${voiceSpeaking ? "is-speaking" : ""} ${(flowPhase === "user_recording" || flowPhase === "user_paused") ? "is-listening" : ""}`} />
+                      <span className={`${styles.vpRing} ${styles.vpRing1} ${voiceSpeaking ? styles.vpRingSpeaking : ""} ${(flowPhase === "user_recording" || flowPhase === "user_paused") ? styles.vpRingListening : ""}`} />
+                      <span className={`${styles.vpRing} ${styles.vpRing2} ${voiceSpeaking ? styles.vpRingSpeaking : ""} ${(flowPhase === "user_recording" || flowPhase === "user_paused") ? styles.vpRingListening : ""}`} />
+                      <span className={`${styles.vpRing} ${styles.vpRing3} ${voiceSpeaking ? styles.vpRingSpeaking : ""} ${(flowPhase === "user_recording" || flowPhase === "user_paused") ? styles.vpRingListening : ""}`} />
                       {heroAvatar ? (
                         <button
                           type="button"
@@ -490,7 +493,7 @@ export function AdvisorChatModal({
                           className={`relative z-[2] rounded-full ${voiceSpeaking ? "cursor-pointer" : "cursor-default"}`}
                           aria-label={voiceSpeaking ? "Detener voz del advisor" : "Avatar del advisor"}
                         >
-                          <Image src={heroAvatar} alt={advisorName} width={168} height={168} priority className={`h-[168px] w-[168px] rounded-full border-[3px] object-cover ${flowPhase === "user_recording" ? "border-[#ef4444]/80 shadow-[0_0_0_8px_rgba(239,68,68,0.18)]" : "border-white/12"}`} />
+                          <Image src={heroAvatar} alt={advisorName} width={168} height={168} priority className={styles.vpAvatarHero} />
                         </button>
                       ) : (
                         <button
@@ -502,68 +505,79 @@ export function AdvisorChatModal({
                           className={`relative z-[2] rounded-full ${voiceSpeaking ? "cursor-pointer" : "cursor-default"}`}
                           aria-label={voiceSpeaking ? "Detener voz del advisor" : "Avatar del advisor"}
                         >
-                          <span className={`flex h-[168px] w-[168px] items-center justify-center rounded-full border-[3px] bg-[#4a9eff] text-[52px] font-bold text-white ${flowPhase === "user_recording" ? "border-[#ef4444]/80 shadow-[0_0_0_8px_rgba(239,68,68,0.18)]" : "border-white/15"}`}>{(getInitials(advisorName) || "A")[0]}</span>
+                          <span className={styles.vpAvatarHeroFallback}>{(getInitials(advisorName) || "A")[0]}</span>
                         </button>
                       )}
-                      {recorder.status === "countdown" ? <span className="absolute bottom-2 right-2 z-[4] flex h-11 w-11 items-center justify-center rounded-full border-[3px] border-[#0d1520] bg-[#2d6be4] text-[22px] font-bold text-white">{recorder.countdown}</span> : null}
+                      {recorder.status === "countdown" ? <span className={styles.vpCountdown}>{recorder.countdown}</span> : null}
                     </div>
 
                     <div className="mb-3 mt-2 text-center">
-                      <p className="text-[14px] font-semibold text-white">{advisorName}</p>
-                      {advisorRole ? <p className="text-[11px] text-white/55">{advisorRole}</p> : null}
-                      {advisorDescription ? (
-                        <p className="mx-auto mt-1.5 max-w-[280px] text-center text-[12px] leading-[1.5] text-white/45">
-                          {advisorDescription}
-                        </p>
-                      ) : null}
-                      <p className={`mt-1 text-[13px] ${flowPhase === "user_recording" ? "text-[#ff6b6b]" : flowPhase === "user_paused" ? "text-[#fbbf24]" : flowPhase === "advisor_speaking" ? "text-[#9dc7ff]" : flowPhase === "sending" ? "text-[#4a9eff]" : "text-white/70"}`}>{statusText}</p>
+                      <p className={styles.vpNameSmall}>{advisorName}</p>
+                      {advisorRole ? <p className={styles.vpSub}>{advisorRole}</p> : null}
+                      {advisorDescription ? <p className={styles.vpDesc}>{advisorDescription}</p> : null}
+                      <p className={`${styles.vpStatus} ${flowPhase === "user_recording" ? styles.vpStatusRecording : ""} ${flowPhase === "user_paused" ? styles.vpStatusPaused : ""} ${flowPhase === "advisor_speaking" ? styles.vpStatusSpeaking : ""} ${flowPhase === "sending" ? styles.vpStatusSending : ""}`}>{statusText}</p>
                     </div>
 
-                    <div className="mb-3 flex h-9 items-center gap-[3px]">{Array.from({ length: 12 }).map((_, index) => <span key={`wave-${index}`} className={`voice-wave-bar ${flowPhase === "user_recording" || flowPhase === "advisor_speaking" ? "is-active" : "is-paused"}`} style={{ animationDelay: `${index * 0.1}s` }} />)}</div>
-                    <button type="button" onClick={() => setVoiceTranscriptOpen((prev) => !prev)} className="mb-1 flex items-center gap-2 bg-transparent text-[12px] text-white/40 transition-colors hover:text-white/65"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" className={`h-3 w-3 transition-transform ${voiceTranscriptOpen ? "rotate-90" : ""}`}><path d="M4 2l4 4-4 4" /></svg>lo que se escucho</button>
-                    <div className={`w-full overflow-hidden rounded-[10px] bg-white/6 px-3.5 text-[12px] leading-5 text-white/60 transition-all duration-300 ${voiceTranscriptOpen ? "mb-3 max-h-[44px] py-2" : "mb-0 max-h-0 py-0"}`}>El transcript en vivo se muestra en el chat lateral.</div>
-                    {voiceSendError || recorder.errorMessage ? <p className="mb-2 w-full text-center text-[12px] text-[#fca5a5]">{voiceSendError ?? recorder.errorMessage}</p> : null}
+                    <div className="mb-3 flex h-9 items-center gap-[3px]">
+                      {Array.from({ length: 12 }).map((_, index) => (
+                        <span
+                          key={`wave-${index}`}
+                          className={`${styles.vpWaveBar} ${flowPhase === "user_recording" || flowPhase === "advisor_speaking" ? styles.vpWaveActive : styles.vpWavePaused}`}
+                          style={{ animationDelay: `${index * 0.1}s` }}
+                        />
+                      ))}
+                    </div>
+                    <button type="button" onClick={() => setVoiceTranscriptOpen((prev) => !prev)} className={styles.vpHintBtn}>
+                      <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" className={`h-3 w-3 transition-transform ${voiceTranscriptOpen ? "rotate-90" : ""}`}>
+                        <path d="M4 2l4 4-4 4" />
+                      </svg>
+                      lo que se escucho
+                    </button>
+                    <div className={`${styles.vpHintBox} ${voiceTranscriptOpen ? styles.vpHintOpen : styles.vpHintClosed}`}>
+                      El transcript en vivo se muestra en el chat lateral.
+                    </div>
+                    {voiceSendError || recorder.errorMessage ? <p className={styles.vpError}>{voiceSendError ?? recorder.errorMessage}</p> : null}
                     <div className="mt-auto flex w-full gap-2.5">
-                      <button type="button" onClick={() => void handlePrimaryVoiceAction()} disabled={finalizeInFlight || flowPhase === "countdown" || flowPhase === "initializing_media" || flowPhase === "sending"} className="flex-1 rounded-xl border-0 bg-[#2d6be4] px-4 py-[11px] text-[14px] font-semibold text-white transition-all hover:bg-[#1d5bcd] disabled:cursor-not-allowed disabled:opacity-45">
-                        {flowPhase === "advisor_speaking"
-                          ? "Detener"
-                          : flowPhase === "ready_for_next_turn" || flowPhase === "error"
-                            ? "Responder"
-                            : "Enviar mensaje"}
+                      <button
+                        type="button"
+                        onClick={() => void handlePrimaryVoiceAction()}
+                        disabled={finalizeInFlight || flowPhase === "countdown" || flowPhase === "initializing_media" || flowPhase === "sending"}
+                        className={styles.vpPrimaryBtn}
+                      >
+                        {flowPhase === "advisor_speaking" ? "Detener" : flowPhase === "ready_for_next_turn" || flowPhase === "error" ? "Responder" : "Enviar mensaje"}
                       </button>
-                      <button type="button" onClick={() => closeVoice()} className="rounded-xl border border-white/12 bg-white/[0.06] px-4 py-[11px] text-[13px] text-white/70 transition-all hover:bg-white/[0.1] hover:text-white">Cancelar</button>
+                      <button type="button" onClick={() => closeVoice()} className={styles.vpSecondaryBtn}>
+                        Cancelar
+                      </button>
                     </div>
                   </section>
 
                   {voiceChatExpanded ? (
-                    <aside className="hidden h-full min-h-0 w-[360px] shrink-0 bg-[#0f1826] lg:flex lg:flex-col">
-                      <div className="shrink-0 border-b border-[#1f2b3d] px-4 py-3">
-                        <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-white/55">Conversacion</p>
+                    <aside className={`${styles.vpChatAside} hidden h-full min-h-0 w-[360px] shrink-0 lg:flex lg:flex-col`}>
+                      <div className={styles.vpChatHead}>
+                        <p className={styles.vpChatHeadText}>Conversacion</p>
                       </div>
-                      <div ref={chatScrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-[#0f1826] px-4 py-3">
+                      <div ref={chatScrollRef} className={`${styles.vpChatList} min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3`}>
                         {voiceTurns.map((turn, index) => (
                           <div key={`turn-${index}-${turn.role}`} className={`flex ${turn.role === "user" ? "justify-end" : "justify-start"}`}>
                             <div className={turn.role === "user" ? "max-w-[76%]" : "max-w-[82%]"}>
-                              <p className={`mb-1 text-[10px] font-bold tracking-[0.08em] ${turn.role === "user" ? "text-right text-[#2d8a50]" : "text-[#2d6be4]"}`}>{turn.role === "user" ? "TU VOZ" : advisorName.toUpperCase()}</p>
-                              <div className={`whitespace-pre-wrap break-words px-[12px] py-[9px] text-[13px] leading-[1.55] ${turn.role === "user" ? "rounded-[16px_16px_4px_16px] bg-[#d4edda] text-[#1a4a2a]" : "rounded-[4px_16px_16px_16px] border border-[#e8ecf2] bg-white text-[#2c3e50]"}`}>{turn.text}</div>
+                              <p className={turn.role === "user" ? styles.vpLabelUser : styles.vpLabelAdvisor}>
+                                {turn.role === "user" ? "TU VOZ" : advisorName.toUpperCase()}
+                              </p>
+                              <div className={`whitespace-pre-wrap break-words px-[12px] py-[9px] text-[13px] leading-[1.55] ${turn.role === "user" ? styles.vpBubbleUser : styles.vpBubbleAdvisor}`}>
+                                {turn.text}
+                              </div>
                             </div>
                           </div>
                         ))}
 
-                        {(flowPhase === "user_recording" ||
-                          flowPhase === "user_paused" ||
-                          recorder.status === "stopping" ||
-                          flowPhase === "sending" ||
-                          finalizeInFlight) &&
-                        voiceLiveTranscript ? (
+                        {(flowPhase === "user_recording" || flowPhase === "user_paused" || recorder.status === "stopping" || flowPhase === "sending" || finalizeInFlight) && voiceLiveTranscript ? (
                           <div className="flex justify-end">
                             <div className="max-w-[76%]">
-                              <p className="mb-1 text-right text-[10px] font-bold tracking-[0.08em] text-[#a16207]">TU VOZ</p>
-                              <div className="rounded-[16px_16px_4px_16px] border border-amber-300/60 bg-amber-100 px-[12px] py-[9px] text-[13px] leading-[1.55] text-amber-950">
+                              <p className={styles.vpLabelUser}>TU VOZ</p>
+                              <div className={`px-[12px] py-[9px] text-[13px] leading-[1.55] ${styles.vpBubbleLive}`}>
                                 {voiceLiveTranscript}
-                                {flowPhase === "user_recording" && recorder.transcribing ? (
-                                  <span className="voice-live-caret ml-0.5 inline-block h-[15px] w-[1px] bg-amber-900 align-[-2px]" />
-                                ) : null}
+                                {flowPhase === "user_recording" && recorder.transcribing ? <span className={styles.vpLiveCaret} /> : null}
                               </div>
                             </div>
                           </div>
@@ -581,7 +595,7 @@ export function AdvisorChatModal({
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-[2px]">
+      <div className={`${styles.cpOverlay} z-50 backdrop-blur-[2px]`}>
         <div className="relative w-full max-w-[560px]">
           <button
             type="button"
@@ -589,36 +603,64 @@ export function AdvisorChatModal({
               if (voiceOpen) closeVoice();
               onClose();
             }}
-            className={floatingCloseButtonClass}
+            className={styles.cpClose}
             aria-label="Cerrar"
           >
-            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.1" className="h-4 w-4">
-              <path d="M5 5l10 10M15 5 5 15" />
+            <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M2 2 12 12M12 2 2 12" />
             </svg>
           </button>
-          <div className={`relative flex h-[min(92vh,760px)] w-full flex-col overflow-hidden ${advisorPanelShellClass}`}>
-          <header className="flex items-center gap-3 bg-[#0d1520] px-5 py-4">
-            {headerAvatar ? <Image src={headerAvatar} alt={advisorName} width={48} height={48} className="h-12 w-12 rounded-full border-2 border-white/20 object-cover" /> : <span className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-white/20 bg-[#4a9eff] text-[18px] font-bold text-white">{(getInitials(advisorName) || "A")[0]}</span>}
-            <div className="min-w-0 flex-1"><p className="truncate text-[17px] font-semibold text-white">{advisorName}</p>{advisorRole ? <p className="mt-0.5 text-[12px] text-white/55">{advisorRole}</p> : null}{advisorDescription ? <p className="mt-1 line-clamp-2 text-[11px] text-white/70">{advisorDescription}</p> : null}</div>
-          </header>
+          <div className={`${styles.cpPanel} relative flex h-[min(92vh,760px)] w-full flex-col`}>
+            <header className={styles.cpHeader}>
+              {headerAvatar ? (
+                <Image src={headerAvatar} alt={advisorName} width={48} height={48} className={styles.cpAvatar} />
+              ) : (
+                <span className={styles.cpAvatarFallback}>{(getInitials(advisorName) || "A")[0]}</span>
+              )}
+              <div className={styles.cpHeadText}>
+                <p className={styles.cpName}>{advisorName}</p>
+                {advisorRole ? <p className={styles.cpSub}>{advisorRole}</p> : null}
+                {advisorDescription ? <p className={styles.cpDesc}>{advisorDescription}</p> : null}
+              </div>
+            </header>
 
-          <div className="flex min-h-0 flex-1 flex-col bg-[#f4f6fa]">
-            <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-3 pt-5">
-              {messages.length === 0 ? <div className="max-w-[80%]"><p className="mb-1 text-[10px] font-bold tracking-[0.08em] text-[#2d6be4]">{advisorName.toUpperCase()}</p><div className="rounded-[4px_16px_16px_16px] border border-[#e8ecf2] bg-white px-4 py-3 text-[14px] leading-[1.55] text-[#2c3e50]">{helperText}</div></div> : <div className="flex flex-col gap-3">{messages.map((message) => <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}><div className={message.role === "user" ? "max-w-[70%]" : "max-w-[80%]"}><p className={`mb-1 text-[10px] font-bold tracking-[0.08em] ${message.role === "user" ? "text-right text-[#2d8a50]" : "text-[#2d6be4]"}`}>{message.role === "user" ? "TU" : advisorName.toUpperCase()}</p><div className={`whitespace-pre-wrap break-words px-[14px] py-[10px] text-[14px] leading-[1.55] ${message.role === "user" ? "rounded-[16px_16px_4px_16px] bg-[#d4edda] text-[#1a4a2a]" : "rounded-[4px_16px_16px_16px] border border-[#e8ecf2] bg-white text-[#2c3e50]"}`}>{message.text}</div></div></div>)}</div>}
-            </div>
+            <div className={`${styles.cpBody} flex min-h-0 flex-1 flex-col`}>
+              <div className={`${styles.cpConversation} min-h-0 flex-1 overflow-y-auto px-5 pb-3 pt-5`}>
+                {messages.length === 0 ? (
+                  <div className="max-w-[80%]">
+                    <p className={styles.cpLabelAdvisor}>{advisorName.toUpperCase()}</p>
+                    <div className={`${styles.cpBubbleAdvisor} px-4 py-3 text-[14px] leading-[1.55]`}>{helperText}</div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    {messages.map((message) => (
+                      <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
+                        <div className={message.role === "user" ? "max-w-[70%]" : "max-w-[80%]"}>
+                          <p className={message.role === "user" ? styles.cpLabelUser : styles.cpLabelAdvisor}>
+                            {message.role === "user" ? "TU" : advisorName.toUpperCase()}
+                          </p>
+                          <div className={`whitespace-pre-wrap break-words px-[14px] py-[10px] text-[14px] leading-[1.55] ${message.role === "user" ? styles.cpBubbleUser : styles.cpBubbleAdvisor}`}>
+                            {message.text}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
 
-            <footer className="border-t border-[#e8ecf2] bg-white px-4 py-3">
+              <footer className={`${styles.cpFooter} px-4 py-3`}>
               <div className="mb-2 flex items-end gap-2">
-                <Textarea id="advisor-chat-draft" value={draft} onChange={(event) => onDraftChange(event.target.value)} rows={1} spellCheck={false} placeholder={inputPlaceholder} onKeyDown={(event: KeyboardEvent<HTMLTextAreaElement>) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); if (!sending && draft.trim()) onSend(); } }} className="min-h-[42px] max-h-[120px] flex-1 rounded-xl border-[1.5px] border-[#dde3ef] px-[14px] py-[10px] text-[14px] text-[#2c3e50] placeholder:text-[#aab3c5] focus:border-[#4a9eff] focus:ring-0" />
-                <button type="button" onClick={openVoice} className="voice-mic-pulse inline-flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full border-0 bg-[#dc2626] text-white transition-all hover:bg-[#b91c1c]" aria-label="Hablar con el advisor"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10a7 7 0 0 0 14 0" /><path d="M12 19v3" /><path d="M8 22h8" /></svg></button>
-                <Button type="button" variant="primary" disabled={sending || !draft.trim()} onClick={onSend} className="h-[42px] rounded-xl border-0 bg-[#2d6be4] px-[18px] text-[14px] font-semibold text-white hover:bg-[#1d5bcd]">{sending ? "Enviando..." : "Enviar"}</Button>
+                <Textarea id="advisor-chat-draft" value={draft} onChange={(event) => onDraftChange(event.target.value)} rows={1} spellCheck={false} placeholder={inputPlaceholder} onKeyDown={(event: KeyboardEvent<HTMLTextAreaElement>) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); if (!sending && draft.trim()) onSend(); } }} className={`${styles.cpTextarea} min-h-[42px] max-h-[120px] flex-1 px-[14px] py-[10px] text-[14px] focus:ring-0`} />
+                <button type="button" onClick={openVoice} className={styles.cpMicBtn} aria-label="Hablar con el advisor"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10a7 7 0 0 0 14 0" /><path d="M12 19v3" /><path d="M8 22h8" /></svg></button>
+                <Button type="button" variant="primary" disabled={sending || !draft.trim()} onClick={onSend} className={`${styles.cpSendBtn} h-[42px] px-[18px] text-[14px] font-semibold`}>{sending ? "Enviando..." : "Enviar"}</Button>
               </div>
               <div className="flex items-center justify-between gap-2">
-                <Button type="button" variant="secondary" onClick={onUseResponse} className="rounded-[10px] border-[1.5px] border-[#dde3ef] bg-transparent px-[14px] py-[7px] text-[13px] text-[#6b7a99] hover:border-[#4a9eff] hover:text-[#2d6be4]">Usar esta respuesta</Button>
-                {isDevelopment && debugPayload ? <details className="text-right"><summary className="cursor-pointer text-[11px] text-[#aab3c5]">Debug prompt (solo desarrollo)</summary><pre className="mt-2 max-h-40 overflow-auto rounded-lg border border-[#e8ecf2] bg-[#f8fafc] p-2 text-left text-[11px] text-[#334155]">{JSON.stringify(debugPayload, null, 2)}</pre></details> : null}
+                <Button type="button" variant="secondary" onClick={onUseResponse} className={`${styles.cpUseBtn} px-[14px] py-[7px] text-[13px]`}>Usar esta respuesta</Button>
+                {isDevelopment && debugPayload ? <details className="text-right"><summary className="cursor-pointer text-[11px]">Debug prompt (solo desarrollo)</summary><pre className="mt-2 max-h-40 overflow-auto rounded-lg p-2 text-left text-[11px]">{JSON.stringify(debugPayload, null, 2)}</pre></details> : null}
               </div>
             </footer>
-          </div>
+            </div>
           </div>
         </div>
       </div>
