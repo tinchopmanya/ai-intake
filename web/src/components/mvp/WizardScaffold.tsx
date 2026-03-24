@@ -633,6 +633,17 @@ export function WizardScaffold() {
   }, []);
 
   useEffect(() => {
+    function handleExternalNewConversation() {
+      handleStartNewConversation();
+    }
+
+    window.addEventListener("mvp:new-conversation", handleExternalNewConversation);
+    return () => {
+      window.removeEventListener("mvp:new-conversation", handleExternalNewConversation);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!contextVoice.transcript.trim()) return;
     setContextOptional((previous) =>
       previous.trim()

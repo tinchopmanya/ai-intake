@@ -273,72 +273,44 @@
   padding-top: 12px;
 }
 
-.shellSessionList {
+.shellSidebarBody {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 0 0 12px;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+  padding: 4px 8px 12px;
 }
 
-.shellSessionList::-webkit-scrollbar {
-  width: 4px;
+.shellSidebarStatusCard {
+  display: grid;
+  gap: 10px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(45, 107, 228, 0.12) 0%, rgba(13, 24, 37, 0.9) 58%),
+    rgba(255, 255, 255, 0.03);
+  padding: 16px 14px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
-.shellSessionList::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.1);
+.shellSidebarEyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(126, 184, 247, 0.76);
 }
 
-.shellSessionItem {
-  margin: 2px 8px;
-  border-radius: 8px;
-  border: 1px solid transparent;
-  background: transparent;
-  padding: 9px 12px;
-  text-align: left;
-  cursor: pointer;
-  transition: background 180ms ease, border-color 180ms ease;
+.shellSidebarCardTitle {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.9);
 }
 
-.shellSessionItem:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: transparent;
-}
-
-.shellSessionActive {
-  background: rgba(45, 107, 228, 0.14);
-  border-left: 2px solid #2d6be4;
-  padding-left: 10px;
-}
-
-.shellSessionTitle {
+.shellSidebarCardCopy {
   font-size: 13px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.7);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.shellSessionActive .shellSessionTitle {
-  color: rgba(255, 255, 255, 0.92);
-}
-
-.shellSessionMeta {
-  margin-top: 4px;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.32);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.shellSessionActive .shellSessionMeta {
-  color: rgba(126, 184, 247, 0.74);
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.54);
 }
 
 .shellSidebarFooter {

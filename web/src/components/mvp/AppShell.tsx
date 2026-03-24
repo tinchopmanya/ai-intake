@@ -33,7 +33,6 @@ export function AppShell({ children }: AppShellProps) {
   const [advisorMenuOpen, setAdvisorMenuOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
-  const [activeConversationId, setActiveConversationId] = useState("current");
   const [displayName, setDisplayName] = useState("Usuario");
   const [advisorChatOpen, setAdvisorChatOpen] = useState(false);
   const [advisorChatIndex, setAdvisorChatIndex] = useState<number | null>(null);
@@ -104,15 +103,6 @@ export function AppShell({ children }: AppShellProps) {
     if (parts.length === 0) return "U";
     return parts.map((part) => part[0]!.toUpperCase()).join("");
   }, [displayName]);
-
-  const conversationSessions = useMemo(
-    () => [
-      { id: "current", title: "Conversacion actual", meta: "Flujo MVP activo" },
-      { id: "recent-1", title: "Sesion reciente", meta: "Ultima respuesta generada" },
-      { id: "recent-2", title: "Borrador anterior", meta: "Contexto guardado localmente" },
-    ],
-    [],
-  );
 
   async function handleLogout() {
     await logoutSession();
@@ -382,31 +372,23 @@ export function AppShell({ children }: AppShellProps) {
 
           {sidebarOpen ? (
             <>
-              <div className={styles.shellSessionList}>
-                {conversationSessions.map((session) => {
-                  const isActive = activeConversationId === session.id;
-                  return (
-                    <button
-                      key={session.id}
-                      type="button"
-                      className={`${styles.shellSessionItem} ${isActive ? styles.shellSessionActive : ""}`}
-                      onClick={() => {
-                        setActiveConversationId(session.id);
-                        if (!isDesktop) setSidebarOpen(false);
-                      }}
-                    >
-                      <p className={styles.shellSessionTitle}>{session.title}</p>
-                      <p className={styles.shellSessionMeta}>{session.meta}</p>
-                    </button>
-                  );
-                })}
+              <div className={styles.shellSidebarBody}>
+                <div className={styles.shellSidebarStatusCard}>
+                  <p className={styles.shellSidebarEyebrow}>Conversacion actual</p>
+                  <p className={styles.shellSidebarCardTitle}>Sin historial disponible todavia</p>
+                  <p className={styles.shellSidebarCardCopy}>
+                    Las sesiones guardadas estaran disponibles proximamente.
+                  </p>
+                </div>
               </div>
               <div className={styles.shellSidebarFooter}>
                 <button
                   type="button"
                   className={styles.shellNewConversation}
                   onClick={() => {
-                    setActiveConversationId("current");
+                    if (typeof window !== "undefined") {
+                      window.dispatchEvent(new Event("mvp:new-conversation"));
+                    }
                     if (!isDesktop) setSidebarOpen(false);
                   }}
                 >
