@@ -49,7 +49,6 @@ const ADVISOR_FALLBACK_VISUAL = {
   avatar128: "/advisors/generic.svg",
 };
 
-const responseStyleBadgeByIndex = ["Empatica", "Estrategica", "Directa"] as const;
 type ResponseTone = "cordial" | "firme_respetuoso" | "amigable";
 
 type ConversationBlock = {
@@ -341,6 +340,24 @@ function humanizeFlag(flag: AnalysisRiskFlag) {
   return `${label} (${SEVERITY_LABELS[flag.severity]})`;
 }
 
+function getResponseBadgeLabel(emotionLabel: AdvisorResponse["responses"][number]["emotion_label"] | undefined) {
+  switch (emotionLabel) {
+    case "empathetic":
+      return "Empatica";
+    case "assertive":
+      return "Firme";
+    case "calm":
+      return "Calma";
+    case "friendly":
+      return "Amable";
+    case "apologetic":
+      return "Cuidadosa";
+    case "neutral":
+    default:
+      return "Neutral";
+  }
+}
+
 /**
  * Visual step indicator for intake, analysis and response stages.
  */
@@ -536,6 +553,7 @@ export function WizardScaffold() {
   const [autoParseError, setAutoParseError] = useState<string | null>(null);
   const [ocrCapabilities, setOcrCapabilities] = useState<OcrCapabilitiesResponse | null>(null);
   const [ocrCapabilitiesLoading, setOcrCapabilitiesLoading] = useState(true);
+  const [availableCases, setAvailableCases] = useState<CaseSummary[]>([]);
   const [activeCase, setActiveCase] = useState<CaseSummary | null>(null);
   const [caseError, setCaseError] = useState<string | null>(null);
   const [incidentType, setIncidentType] = useState<IncidentType>("other");
@@ -608,6 +626,7 @@ export function WizardScaffold() {
       try {
         const response = await getCases();
         if (!mounted) return;
+        setAvailableCases(response.cases);
         const defaultCase = response.cases[0] ?? null;
         setActiveCase(defaultCase);
         if (!defaultCase) {
@@ -1269,6 +1288,38 @@ export function WizardScaffold() {
         ]}
       />
 
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-white/10 bg-[#0f1e30] px-4 py-3 text-sm text-white/75">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/45">Caso activo</span>
+        {availableCases.length > 1 ? (
+          <label className="flex min-w-[220px] flex-1 items-center gap-3">
+            <span className="text-xs text-white/55">Seleccionado</span>
+            <select
+              value={selectedCaseId ?? ""}
+              onChange={(event) => {
+                const nextCase = availableCases.find((item) => item.id === event.target.value) ?? null;
+                setActiveCase(nextCase);
+              }}
+              className="min-w-0 flex-1 rounded-xl border border-white/10 bg-[#08111a] px-3 py-2 text-sm text-white outline-none"
+            >
+              {availableCases.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.title}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : activeCase ? (
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-medium text-white/88">{activeCase.title}</p>
+            {activeCase.contact_name ? (
+              <p className="truncate text-xs text-white/55">Contacto: {activeCase.contact_name}</p>
+            ) : null}
+          </div>
+        ) : (
+          <p className="text-sm text-white/60">Sin caso cargado.</p>
+        )}
+      </div>
+
       {currentStep === 1 ? (
         <div className={styles.wizardStepBody}>
           <div className={styles.wizardStepHeader}>
@@ -1761,8 +1812,8 @@ export function WizardScaffold() {
             {Array.from({ length: 3 }).map((_, index) => {
               const advisorVisual = getAdvisorVisualByIndex(index);
               const advisorAvatar64 = getAdvisorAvatar(advisorVisual, "64");
-              const responseText = advisorResult?.responses[index]?.text ?? "";
-              const isRecommended = index === 0;
+              const response = advisorResult?.responses[index];
+              const responseText = response?.text ?? "";
               const advisorInitials = advisorVisual.name
                 .split(" ")
                 .filter((part) => part.trim().length > 0)
@@ -1774,33 +1825,11 @@ export function WizardScaffold() {
                 <article
                   key={`${advisorVisual.id}-${index}`}
                   onClick={() => openAdvisorChat(index)}
-                  className={`${styles.wizardAdvisorCard} ${
-                    isRecommended
-                      ? styles.wizardAdvisorCardRecommended
-                      : ""
-                  }`}
+                  className={styles.wizardAdvisorCard}
                 >
-                  <header
-                    className={`${styles.wizardAdvisorHeader} ${
-                      isRecommended ? styles.wizardAdvisorHeaderRecommended : ""
-                    }`}
-                  >
-                    {isRecommended ? (
-                      <span className={styles.wizardAdvisorRecommendedTag}>
-                        <svg aria-hidden="true" viewBox="0 0 16 16" className="h-3 w-3" fill="none">
-                          <path
-                            d="m8 2 1.55 3.49L13 6l-2.6 2.28.73 3.22L8 9.9l-3.13 1.6.73-3.22L3 6l3.45-.51L8 2Z"
-                            stroke="currentColor"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth="1.3"
-                          />
-                        </svg>
-                        Recomendada
-                      </span>
-                    ) : null}
+                  <header className={styles.wizardAdvisorHeader}>
                     <span className={styles.wizardAdvisorBadge}>
-                      {responseStyleBadgeByIndex[index]}
+                      {getResponseBadgeLabel(response?.emotion_label)}
                     </span>
                     <div className={styles.wizardAdvisorHeaderRow}>
                       <div className="flex min-w-0 items-center gap-3">

@@ -10,6 +10,7 @@ import styles from "@/components/mvp/MvpShell.module.css";
 import { ADVISOR_PROFILES } from "@/data/advisors";
 import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
 import { postAdvisorChat } from "@/lib/api/client";
+import { toUiErrorMessage } from "@/lib/api/errors";
 import { getCurrentUser, logoutSession } from "@/lib/auth/client";
 
 type AppShellProps = {
@@ -178,13 +179,15 @@ export function AppShell({ children }: AppShellProps) {
           response_preview: reply.slice(0, 500),
         }));
       }
-    } catch {
+    } catch (error) {
+      const reply = toUiErrorMessage(error, "No pude responder ahora. Intenta nuevamente.");
       setAdvisorChatMessages((prev) => [
         ...prev,
+        { id: `u-${Date.now()}`, role: "user", text: userInput },
         {
           id: `a-err-${Date.now()}`,
           role: "advisor",
-          text: "No pude responder ahora. Intenta nuevamente.",
+          text: reply,
         },
       ]);
     } finally {

@@ -185,6 +185,7 @@ export function AdvisorChatModal({
   }, [recorder, voiceOpen, voiceSpeaking]);
 
   const voiceLiveTranscript = recorder.transcript.trim();
+  const canUseSuggestedReply = entryMode === "advisor_refine_response";
   const flowPhase: VoiceFlowPhase =
     voiceSpeaking
       ? "advisor_speaking"
@@ -208,19 +209,19 @@ export function AdvisorChatModal({
     flowPhase === "countdown"
       ? `Iniciando en ${recorder.countdown} segundo${recorder.countdown === 1 ? "" : "s"}...`
       : flowPhase === "initializing_media"
-        ? "Iniciando grabacion..."
+        ? "Preparando dictado..."
       : flowPhase === "user_recording"
-        ? "Escuchando..."
+        ? "Escuchando tu dictado..."
         : flowPhase === "user_paused"
-          ? "Grabando audio, sin transcripcion en vivo."
+          ? "Grabando audio. Si el navegador transcribe, veras el dictado en vivo."
           : flowPhase === "sending" || recorder.status === "stopping"
-            ? "Finalizando grabacion..."
+            ? "Enviando dictado..."
             : flowPhase === "advisor_speaking"
-              ? "El advisor esta respondiendo..."
+              ? "Respondiendo a partir del dictado..."
               : flowPhase === "ready_for_next_turn"
-                ? "Listo para hablar de nuevo."
+                ? "Listo para dictar de nuevo."
                 : flowPhase === "error"
-                ? "No pudimos grabar el audio."
+                ? "No pudimos procesar el dictado."
                 : "Preparando...";
 
   const stopTts = useCallback(() => {
@@ -535,10 +536,10 @@ export function AdvisorChatModal({
                       <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" className={`h-3 w-3 transition-transform ${voiceTranscriptOpen ? "rotate-90" : ""}`}>
                         <path d="M4 2l4 4-4 4" />
                       </svg>
-                      lo que se escucho
+                      ver dictado
                     </button>
                     <div className={`${styles.vpHintBox} ${voiceTranscriptOpen ? styles.vpHintOpen : styles.vpHintClosed}`}>
-                      El transcript en vivo se muestra en el chat lateral.
+                      Esta experiencia usa el dictado del navegador. El advisor responde a partir de la transcripcion.
                     </div>
                     {voiceSendError || recorder.errorMessage ? <p className={styles.vpError}>{voiceSendError ?? recorder.errorMessage}</p> : null}
                     <div className="mt-auto flex w-full gap-2.5">
@@ -548,7 +549,7 @@ export function AdvisorChatModal({
                         disabled={finalizeInFlight || flowPhase === "countdown" || flowPhase === "initializing_media" || flowPhase === "sending"}
                         className={styles.vpPrimaryBtn}
                       >
-                        {flowPhase === "advisor_speaking" ? "Detener" : flowPhase === "ready_for_next_turn" || flowPhase === "error" ? "Responder" : "Enviar mensaje"}
+                        {flowPhase === "advisor_speaking" ? "Detener" : flowPhase === "ready_for_next_turn" || flowPhase === "error" ? "Volver a dictar" : "Enviar dictado"}
                       </button>
                       <button type="button" onClick={() => closeVoice()} className={styles.vpSecondaryBtn}>
                         Cancelar
@@ -656,11 +657,13 @@ export function AdvisorChatModal({
               <footer className={`${styles.cpFooter} px-4 py-3`}>
               <div className="mb-2 flex items-end gap-2">
                 <Textarea id="advisor-chat-draft" value={draft} onChange={(event) => onDraftChange(event.target.value)} rows={1} spellCheck={false} placeholder={inputPlaceholder} onKeyDown={(event: KeyboardEvent<HTMLTextAreaElement>) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); if (!sending && draft.trim()) onSend(); } }} className={`${styles.cpTextarea} min-h-[42px] max-h-[120px] flex-1 px-[14px] py-[10px] text-[14px] focus:ring-0`} />
-                <button type="button" onClick={openVoice} className={styles.cpMicBtn} aria-label="Hablar con el advisor"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10a7 7 0 0 0 14 0" /><path d="M12 19v3" /><path d="M8 22h8" /></svg></button>
+                <button type="button" onClick={openVoice} className={styles.cpMicBtn} aria-label="Dictar para el advisor"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10a7 7 0 0 0 14 0" /><path d="M12 19v3" /><path d="M8 22h8" /></svg></button>
                 <Button type="button" variant="primary" disabled={sending || !draft.trim()} onClick={onSend} className={`${styles.cpSendBtn} h-[42px] px-[18px] text-[14px] font-semibold`}>{sending ? "Enviando..." : "Enviar"}</Button>
               </div>
               <div className="flex items-center justify-between gap-2">
-                <Button type="button" variant="secondary" onClick={onUseResponse} className={`${styles.cpUseBtn} px-[14px] py-[7px] text-[13px]`}>Usar esta respuesta</Button>
+                {canUseSuggestedReply ? (
+                  <Button type="button" variant="secondary" onClick={onUseResponse} className={`${styles.cpUseBtn} px-[14px] py-[7px] text-[13px]`}>Usar respuesta sugerida</Button>
+                ) : <span />}
                 {isDevelopment && debugPayload ? <details className="text-right"><summary className="cursor-pointer text-[11px]">Debug prompt (solo desarrollo)</summary><pre className="mt-2 max-h-40 overflow-auto rounded-lg p-2 text-left text-[11px]">{JSON.stringify(debugPayload, null, 2)}</pre></details> : null}
               </div>
             </footer>
