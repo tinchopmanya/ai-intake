@@ -1793,9 +1793,9 @@ export function WizardScaffold() {
                       stroke="currentColor"
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                    strokeWidth="1.8"
-                  />
-                </svg>
+                      strokeWidth="1.8"
+                    />
+                  </svg>
                   Volver
                 </Button>
                 <div className={styles.wizardFooterSpacer} />
@@ -1973,7 +1973,7 @@ export function WizardScaffold() {
                       }}
                       disabled={!responseText}
                       variant="primary"
-                      className={`h-9 rounded-[8px] px-4 text-[13px] ${
+                      className={`h-9 rounded-[12px] px-4 text-[13px] ${
                         copiedIndex === index
                           ? "bg-[#16A34A] text-white hover:bg-[#15803d]"
                           : `${styles.wizardPrimaryButton} hover:bg-[#265cc7]`

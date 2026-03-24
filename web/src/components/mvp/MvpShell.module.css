@@ -65,15 +65,21 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  height: 36px;
-  border-radius: 10px;
+  height: 38px;
+  border-radius: 12px;
   border: 1px solid rgba(45, 107, 228, 0.35);
   background: rgba(45, 107, 228, 0.12);
   color: #7eb8f7;
-  padding: 0 15px;
+  padding: 0 16px;
   font-size: 13px;
-  font-weight: 500;
-  transition: background 180ms ease, border-color 180ms ease, color 180ms ease, transform 180ms ease;
+  font-weight: 600;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  transition:
+    background 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    transform 180ms ease,
+    box-shadow 180ms ease;
   cursor: pointer;
 }
 
@@ -164,21 +170,23 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   border-radius: 9999px;
-  border: 2px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.18);
   background: linear-gradient(135deg, #2d6be4, #1a4a9e);
   color: #fff;
   font-size: 12px;
   font-weight: 600;
+  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.16);
   cursor: pointer;
-  transition: transform 180ms ease, border-color 180ms ease;
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
 }
 
 .shellUserButton:hover {
   transform: translateY(-1px);
   border-color: rgba(255, 255, 255, 0.24);
+  box-shadow: 0 12px 22px rgba(0, 0, 0, 0.2);
 }
 
 .shellUserMenu {
@@ -242,7 +250,7 @@
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.3);
 }
 
 .shellSidebarToggle {
@@ -287,7 +295,7 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  padding: 4px 8px 12px;
+  padding: 4px 10px 14px;
 }
 
 .shellSidebarPrimaryAction {
@@ -315,7 +323,7 @@
 .shellSessionActive {
   background: linear-gradient(180deg, rgba(45, 107, 228, 0.18) 0%, rgba(13, 24, 37, 0.98) 100%);
   border-color: rgba(45, 107, 228, 0.3);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 18px 30px rgba(0, 0, 0, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 22px rgba(0, 0, 0, 0.1);
 }
 
 .shellSessionTitle {
@@ -362,14 +370,14 @@
 
 .shellNewConversationIcon {
   display: inline-flex;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
   color: #7eb8f7;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1;
   flex-shrink: 0;
 }
@@ -396,7 +404,7 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
   overflow: hidden;
   border: 1px solid var(--panel-border);
   border-radius: 22px;
@@ -413,7 +421,7 @@
   width: 100%;
   gap: 0;
   overflow: hidden;
-  margin-bottom: 18px;
+  margin-bottom: 16px;
   padding: 0;
 }
 
@@ -467,7 +475,7 @@
 .wizardStepLabel {
   min-width: 0;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
@@ -526,7 +534,7 @@
 .wizardSectionBody {
   margin-top: 8px;
   display: grid;
-  gap: 8px;
+  gap: 10px;
   font-size: 14px;
   line-height: 1.6;
   color: var(--text-secondary);
@@ -617,7 +625,7 @@
   line-height: 1.6;
   font-size: 14px;
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+  scrollbar-color: rgba(45, 107, 228, 0.28) transparent;
 }
 
 .wizardPrimaryTextarea::placeholder {
@@ -648,7 +656,7 @@
 .wizardContextRow {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .wizardContextInput {
@@ -784,7 +792,7 @@
   border-radius: 9999px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.04);
-  padding: 3px;
+  padding: 4px;
 }
 
 .wizardSpeakerOption {
@@ -800,11 +808,13 @@
 .wizardSpeakerOptionActiveIncoming {
   background: rgba(255, 255, 255, 0.1);
   color: rgba(255, 255, 255, 0.9);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
 }
 
 .wizardSpeakerOptionActiveUnknown {
   background: rgba(255, 255, 255, 0.12);
   color: rgba(255, 255, 255, 0.9);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
 }
 
 .wizardSpeakerOptionActiveOutgoing {
@@ -833,7 +843,7 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 14px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   padding-top: 14px;
 }
@@ -901,20 +911,56 @@
   color: var(--text-secondary);
 }
 
+.wizardPrimaryButton,
+.wizardSecondaryButton,
+.wizardMutedButton,
+.wizardTertiaryButton,
+.wizardAttachButton,
+.wizardContextInput,
+.wizardPrimaryTextarea,
+.wizardIconButton,
+.shellAdvisorTrigger,
+.shellSidebarToggle,
+.shellNewConversation,
+.shellUserButton {
+  outline: none;
+}
+
+.wizardPrimaryButton:focus-visible,
+.wizardSecondaryButton:focus-visible,
+.wizardMutedButton:focus-visible,
+.wizardTertiaryButton:focus-visible,
+.wizardAttachButton:focus-visible,
+.wizardContextInput:focus-visible,
+.wizardPrimaryTextarea:focus-visible,
+.wizardIconButton:focus-visible,
+.shellAdvisorTrigger:focus-visible,
+.shellSidebarToggle:focus-visible,
+.shellNewConversation:focus-visible,
+.shellUserButton:focus-visible {
+  box-shadow: 0 0 0 3px rgba(45, 107, 228, 0.18);
+}
+
+.wizardSecondaryButton:hover,
+.wizardTertiaryButton:hover,
+.wizardMutedButton:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
 .wizardAnalysisHero {
   display: grid;
-  gap: 14px;
+  gap: 16px;
   grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.85fr);
 }
 
 .wizardAnalysisHeroCard,
 .wizardAnalysisMetaCard {
   display: grid;
-  gap: 14px;
+  gap: 16px;
   border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: linear-gradient(180deg, rgba(17, 32, 51, 0.92) 0%, rgba(10, 21, 32, 0.96) 100%);
-  padding: 18px;
+  padding: 19px;
   box-shadow: 0 16px 34px rgba(0, 0, 0, 0.14);
 }
 
@@ -1033,7 +1079,7 @@
 .wizardAnalysisQuickChips {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px;
 }
 
 .wizardAnalysisChip {
@@ -1042,7 +1088,7 @@
   gap: 6px;
   border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: #112033;
+  background: rgba(17, 32, 51, 0.96);
   padding: 5px 12px;
   font-size: 12px;
   color: var(--text-primary);
@@ -1082,7 +1128,7 @@
   border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: linear-gradient(180deg, rgba(9, 17, 27, 0.88) 0%, rgba(13, 24, 37, 0.98) 100%);
-  padding: 16px;
+  padding: 17px;
   transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
   box-shadow: 0 18px 36px rgba(0, 0, 0, 0.14);
 }
@@ -1145,6 +1191,7 @@
 .wizardAdvisorHeaderRow {
   display: flex;
   align-items: center;
+  min-width: 0;
   gap: 12px;
 }
 
@@ -1184,6 +1231,7 @@
 .wizardAdvisorRole {
   margin-top: 2px;
   font-size: 11px;
+  line-height: 1.45;
   color: rgba(255, 255, 255, 0.56);
 }
 
@@ -1204,6 +1252,7 @@
   align-items: center;
   justify-content: flex-start;
   gap: 8px;
+  padding-top: 2px;
 }
 
 .wizardTertiaryButton {
@@ -1222,7 +1271,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   padding-top: 14px;
 }
