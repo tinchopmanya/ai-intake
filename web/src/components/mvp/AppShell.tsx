@@ -17,6 +17,11 @@ type AppShellProps = {
   children: ReactNode;
 };
 
+type SidebarConversationSummary = {
+  title: string;
+  startedAt: string;
+};
+
 function getAdvisorAvatar(
   advisor: (typeof ADVISOR_PROFILES)[number] | undefined,
   variant: "64" | "128",
@@ -43,6 +48,7 @@ export function AppShell({ children }: AppShellProps) {
   const [advisorChatMessages, setAdvisorChatMessages] = useState<
     Array<{ id: string; role: "user" | "advisor"; text: string }>
   >([]);
+  const [sidebarConversation, setSidebarConversation] = useState<SidebarConversationSummary | null>(null);
   const speechSynthesis = useSpeechSynthesis({ lang: "es-ES" });
 
   useEffect(() => {
@@ -96,6 +102,30 @@ export function AppShell({ children }: AppShellProps) {
     };
   }, []);
 
+  useEffect(() => {
+    function handleConversationSummary(event: Event) {
+      const customEvent = event as CustomEvent<{
+        title?: string;
+        startedAt?: string;
+        visible?: boolean;
+      }>;
+      const detail = customEvent.detail;
+      if (!detail || detail.visible === false || !detail.title || !detail.startedAt) {
+        setSidebarConversation(null);
+        return;
+      }
+      setSidebarConversation({
+        title: detail.title,
+        startedAt: detail.startedAt,
+      });
+    }
+
+    window.addEventListener("mvp:conversation-summary", handleConversationSummary as EventListener);
+    return () => {
+      window.removeEventListener("mvp:conversation-summary", handleConversationSummary as EventListener);
+    };
+  }, []);
+
   const initials = useMemo(() => {
     const parts = displayName
       .split(" ")
@@ -104,6 +134,18 @@ export function AppShell({ children }: AppShellProps) {
     if (parts.length === 0) return "U";
     return parts.map((part) => part[0]!.toUpperCase()).join("");
   }, [displayName]);
+
+  const sidebarConversationMeta = useMemo(() => {
+    if (!sidebarConversation?.startedAt) return "";
+    const parsed = new Date(sidebarConversation.startedAt);
+    if (Number.isNaN(parsed.getTime())) return "";
+    return new Intl.DateTimeFormat("es-UY", {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(parsed);
+  }, [sidebarConversation]);
 
   async function handleLogout() {
     await logoutSession();
@@ -375,20 +417,12 @@ export function AppShell({ children }: AppShellProps) {
 
           {sidebarOpen ? (
             <>
-              <div className={styles.shellSidebarBody}>
-                <div className={styles.shellSidebarStatusCard}>
-                  <p className={styles.shellSidebarEyebrow}>Conversacion actual</p>
-                  <p className={styles.shellSidebarCardTitle}>Sin historial disponible todavia</p>
-                  <p className={styles.shellSidebarCardCopy}>
-                    Las sesiones guardadas estaran disponibles proximamente.
-                  </p>
-                </div>
-              </div>
-              <div className={styles.shellSidebarFooter}>
+              <div className={styles.shellSidebarPrimaryAction}>
                 <button
                   type="button"
                   className={styles.shellNewConversation}
                   onClick={() => {
+                    setSidebarConversation(null);
                     if (typeof window !== "undefined") {
                       window.dispatchEvent(new Event("mvp:new-conversation"));
                     }
@@ -400,6 +434,16 @@ export function AppShell({ children }: AppShellProps) {
                   </span>
                   Nueva conversacion
                 </button>
+              </div>
+              <div className={styles.shellSidebarBody}>
+                {sidebarConversation ? (
+                  <div className={styles.shellSessionList}>
+                    <button type="button" className={`${styles.shellSessionItem} ${styles.shellSessionActive}`}>
+                      <p className={styles.shellSessionTitle}>{sidebarConversation.title}</p>
+                      <p className={styles.shellSessionMeta}>{sidebarConversationMeta}</p>
+                    </button>
+                  </div>
+                ) : null}
               </div>
             </>
           ) : (

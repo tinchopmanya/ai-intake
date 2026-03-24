@@ -358,6 +358,34 @@ function getResponseBadgeLabel(emotionLabel: AdvisorResponse["responses"][number
   }
 }
 
+function buildSidebarConversationTitle(
+  blocks: ConversationBlock[],
+  fallbackText: string,
+): string {
+  const source = getConversationSubmissionText(blocks, fallbackText).toLowerCase();
+
+  if (!source.trim()) return "Conversacion reciente";
+  if (/(gasto|gastos|pago|pagos|dinero|plata|transferencia|cuota|reintegro|deuda)/.test(source)) {
+    return "Diferencia por gastos";
+  }
+  if (/(visita|visitas|retiro|retiro|entrega|buscar|llevar|pasar|fin de semana)/.test(source)) {
+    return "Coordinacion sobre visita";
+  }
+  if (/(horario|horarios|hora|horas|turno|turnos|agenda|calendario)/.test(source)) {
+    return "No acuerdo sobre horarios";
+  }
+  if (/(colegio|escuela|medico|doctor|vacuna|rutina|hijo|hija|hijos|familia)/.test(source)) {
+    return "Consulta sobre organizacion familiar";
+  }
+  if (/(documento|documentos|permiso|papeles|firma|formulario)/.test(source)) {
+    return "Consulta sobre documentacion";
+  }
+  if (/(vacaciones|viaje|viajes)/.test(source)) {
+    return "Coordinacion de vacaciones";
+  }
+  return "Tema en revision";
+}
+
 /**
  * Visual step indicator for intake, analysis and response stages.
  */
@@ -553,7 +581,6 @@ export function WizardScaffold() {
   const [autoParseError, setAutoParseError] = useState<string | null>(null);
   const [ocrCapabilities, setOcrCapabilities] = useState<OcrCapabilitiesResponse | null>(null);
   const [ocrCapabilitiesLoading, setOcrCapabilitiesLoading] = useState(true);
-  const [availableCases, setAvailableCases] = useState<CaseSummary[]>([]);
   const [activeCase, setActiveCase] = useState<CaseSummary | null>(null);
   const [caseError, setCaseError] = useState<string | null>(null);
   const [incidentType, setIncidentType] = useState<IncidentType>("other");
@@ -575,6 +602,7 @@ export function WizardScaffold() {
   const selectedCaseId = activeCase?.id ?? null;
   const manualInterpretTimerRef = useRef<number | null>(null);
   const conversationListRef = useRef<HTMLDivElement | null>(null);
+  const sidebarConversationStartedAtRef = useRef<string | null>(null);
   const contextVoice = useSpeechToText({
     lang: "es-ES",
     continuous: false,
@@ -626,7 +654,6 @@ export function WizardScaffold() {
       try {
         const response = await getCases();
         if (!mounted) return;
-        setAvailableCases(response.cases);
         const defaultCase = response.cases[0] ?? null;
         setActiveCase(defaultCase);
         if (!defaultCase) {
@@ -746,6 +773,22 @@ export function WizardScaffold() {
     if (structuredText) {
       setMessageText(structuredText);
     }
+  }
+
+  function syncSidebarConversationSummary() {
+    if (typeof window === "undefined") return;
+    if (!sidebarConversationStartedAtRef.current) {
+      sidebarConversationStartedAtRef.current = new Date().toISOString();
+    }
+    window.dispatchEvent(
+      new CustomEvent("mvp:conversation-summary", {
+        detail: {
+          visible: true,
+          title: buildSidebarConversationTitle(conversationBlocks, messageText),
+          startedAt: sidebarConversationStartedAtRef.current,
+        },
+      }),
+    );
   }
 
   async function interpretConversationText(
@@ -976,6 +1019,7 @@ export function WizardScaffold() {
     if (!text || loadingAdvisor) return;
     const sourceType = ocrInfo ? "ocr" : "text";
 
+    syncSidebarConversationSummary();
     setLoadingAdvisor(true);
     setAdvisorError(null);
     setAdvisorResult(null);
@@ -1041,6 +1085,14 @@ export function WizardScaffold() {
     setAutoParsing(false);
     setAutoParseError(null);
     setResponseTone("cordial");
+    sidebarConversationStartedAtRef.current = null;
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("mvp:conversation-summary", {
+          detail: { visible: false },
+        }),
+      );
+    }
   }
 
   function suggestIncidentType(): IncidentType {
@@ -1287,38 +1339,6 @@ export function WizardScaffold() {
           t("wizard.step.responses"),
         ]}
       />
-
-      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-white/10 bg-[#0f1e30] px-4 py-3 text-sm text-white/75">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/45">Caso activo</span>
-        {availableCases.length > 1 ? (
-          <label className="flex min-w-[220px] flex-1 items-center gap-3">
-            <span className="text-xs text-white/55">Seleccionado</span>
-            <select
-              value={selectedCaseId ?? ""}
-              onChange={(event) => {
-                const nextCase = availableCases.find((item) => item.id === event.target.value) ?? null;
-                setActiveCase(nextCase);
-              }}
-              className="min-w-0 flex-1 rounded-xl border border-white/10 bg-[#08111a] px-3 py-2 text-sm text-white outline-none"
-            >
-              {availableCases.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.title}
-                </option>
-              ))}
-            </select>
-          </label>
-        ) : activeCase ? (
-          <div className="min-w-0 flex-1">
-            <p className="truncate font-medium text-white/88">{activeCase.title}</p>
-            {activeCase.contact_name ? (
-              <p className="truncate text-xs text-white/55">Contacto: {activeCase.contact_name}</p>
-            ) : null}
-          </div>
-        ) : (
-          <p className="text-sm text-white/60">Sin caso cargado.</p>
-        )}
-      </div>
 
       {currentStep === 1 ? (
         <div className={styles.wizardStepBody}>
@@ -1814,6 +1834,7 @@ export function WizardScaffold() {
               const advisorAvatar64 = getAdvisorAvatar(advisorVisual, "64");
               const response = advisorResult?.responses[index];
               const responseText = response?.text ?? "";
+              const isRecommended = index === 0;
               const advisorInitials = advisorVisual.name
                 .split(" ")
                 .filter((part) => part.trim().length > 0)
@@ -1825,9 +1846,29 @@ export function WizardScaffold() {
                 <article
                   key={`${advisorVisual.id}-${index}`}
                   onClick={() => openAdvisorChat(index)}
-                  className={styles.wizardAdvisorCard}
+                  className={`${styles.wizardAdvisorCard} ${
+                    isRecommended ? styles.wizardAdvisorCardRecommended : ""
+                  }`}
                 >
-                  <header className={styles.wizardAdvisorHeader}>
+                  <header
+                    className={`${styles.wizardAdvisorHeader} ${
+                      isRecommended ? styles.wizardAdvisorHeaderRecommended : ""
+                    }`}
+                  >
+                    {isRecommended ? (
+                      <span className={styles.wizardAdvisorRecommendedTag}>
+                        <svg aria-hidden="true" viewBox="0 0 16 16" className="h-3 w-3" fill="none">
+                          <path
+                            d="m8 2 1.55 3.49L13 6l-2.6 2.28.73 3.22L8 9.9l-3.13 1.6.73-3.22L3 6l3.45-.51L8 2Z"
+                            stroke="currentColor"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="1.3"
+                          />
+                        </svg>
+                        Recomendada
+                      </span>
+                    ) : null}
                     <span className={styles.wizardAdvisorBadge}>
                       {getResponseBadgeLabel(response?.emotion_label)}
                     </span>

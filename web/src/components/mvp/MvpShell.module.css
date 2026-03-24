@@ -277,40 +277,50 @@
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-height: 0;
   padding: 4px 8px 12px;
 }
 
-.shellSidebarStatusCard {
-  display: grid;
-  gap: 10px;
-  border-radius: 16px;
+.shellSidebarPrimaryAction {
+  padding: 4px 8px 10px;
+}
+
+.shellSessionList {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.shellSessionItem {
+  width: 100%;
+  border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background:
-    linear-gradient(180deg, rgba(45, 107, 228, 0.12) 0%, rgba(13, 24, 37, 0.9) 58%),
-    rgba(255, 255, 255, 0.03);
-  padding: 16px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 12px 13px;
+  text-align: left;
+  cursor: default;
+  transition: border-color 180ms ease, background 180ms ease;
+}
+
+.shellSessionActive {
+  background: linear-gradient(180deg, rgba(45, 107, 228, 0.16) 0%, rgba(15, 30, 48, 0.96) 100%);
+  border-color: rgba(45, 107, 228, 0.3);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
-.shellSidebarEyebrow {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: rgba(126, 184, 247, 0.76);
-}
-
-.shellSidebarCardTitle {
-  font-size: 15px;
+.shellSessionTitle {
+  font-size: 13px;
   font-weight: 600;
-  line-height: 1.35;
+  line-height: 1.45;
   color: rgba(255, 255, 255, 0.9);
 }
 
-.shellSidebarCardCopy {
-  font-size: 13px;
-  line-height: 1.6;
-  color: rgba(255, 255, 255, 0.54);
+.shellSessionMeta {
+  margin-top: 6px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: rgba(126, 184, 247, 0.76);
 }
 
 .shellSidebarFooter {
