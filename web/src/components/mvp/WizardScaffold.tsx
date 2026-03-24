@@ -1348,7 +1348,10 @@ export function WizardScaffold() {
           </div>
 
           <div className={styles.wizardStepOneGrid}>
-            <section className={styles.wizardStepPanel} onPaste={handleStepOnePaste}>
+            <section
+              className={`${styles.wizardStepPanel} ${styles.wizardComposerPanel}`}
+              onPaste={handleStepOnePaste}
+            >
               <div className={styles.wizardInputGroup}>
                 <div className={styles.wizardPanelTitleRow}>
                   <h4 className={styles.wizardPanelTitle}>Conversacion</h4>
@@ -1482,7 +1485,7 @@ export function WizardScaffold() {
               </div>
             </section>
 
-            <section className={styles.wizardStepPanel}>
+            <section className={`${styles.wizardStepPanel} ${styles.wizardReviewPanel}`}>
               <div className={styles.wizardInterpretedFrame}>
                 <div className={styles.wizardPanelTitleRow}>
                   <div>
@@ -1625,111 +1628,118 @@ export function WizardScaffold() {
 
           {analysisResult ? (
             <>
-              <div
-                className={`${styles.wizardAnalysisBanner} ${
-                  analysisStatus?.kind === "ok"
-                    ? styles.wizardAnalysisBannerOk
-                    : styles.wizardAnalysisBannerRisk
-                }`}
-              >
-                <span className={styles.wizardAnalysisIcon}>
-                  {analysisStatus?.kind === "ok" ? (
-                    <svg aria-hidden="true" viewBox="0 0 20 20" className="h-5 w-5" fill="none">
-                      <path
-                        d="M4.5 10.5 8 14l7.5-8"
-                        stroke="currentColor"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                      />
-                    </svg>
-                  ) : (
-                    <svg aria-hidden="true" viewBox="0 0 20 20" className="h-5 w-5" fill="none">
-                      <path
-                        d="M10 3.5 17 16.5H3L10 3.5Zm0 4v4m0 2.5h.01"
-                        stroke="currentColor"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="1.8"
-                      />
-                    </svg>
-                  )}
-                </span>
-                <div>
-                  <p className="text-sm font-semibold">
-                    {analysisStatus?.kind === "risk"
-                      ? "Atencion: "
-                      : analysisStatus?.kind === "observation"
-                        ? "Observacion: "
-                        : ""}
-                    {analysisStatus?.title}
-                  </p>
-                  <p className="mt-1 text-sm">{analysisStatus?.description}</p>
-                </div>
+              <div className={styles.wizardAnalysisHero}>
+                <section className={styles.wizardAnalysisHeroCard}>
+                  <div
+                    className={`${styles.wizardAnalysisBanner} ${
+                      analysisStatus?.kind === "ok"
+                        ? styles.wizardAnalysisBannerOk
+                        : styles.wizardAnalysisBannerRisk
+                    }`}
+                  >
+                    <span className={styles.wizardAnalysisIcon}>
+                      {analysisStatus?.kind === "ok" ? (
+                        <svg aria-hidden="true" viewBox="0 0 20 20" className="h-5 w-5" fill="none">
+                          <path
+                            d="M4.5 10.5 8 14l7.5-8"
+                            stroke="currentColor"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                          />
+                        </svg>
+                      ) : (
+                        <svg aria-hidden="true" viewBox="0 0 20 20" className="h-5 w-5" fill="none">
+                          <path
+                            d="M10 3.5 17 16.5H3L10 3.5Zm0 4v4m0 2.5h.01"
+                            stroke="currentColor"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="1.8"
+                          />
+                        </svg>
+                      )}
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold">
+                        {analysisStatus?.kind === "risk"
+                          ? "Atencion: "
+                          : analysisStatus?.kind === "observation"
+                            ? "Observacion: "
+                            : ""}
+                        {analysisStatus?.title}
+                      </p>
+                      <p className="mt-1 text-sm">{analysisStatus?.description}</p>
+                    </div>
+                  </div>
+
+                  <div className={styles.wizardAnalysisSummary}>
+                    <p className={styles.wizardAnalysisSummaryLabel}>Sintesis</p>
+                    <p className={styles.wizardAnalysisSummaryText}>{analysisResult.summary}</p>
+                  </div>
+
+                  {analysisResult.emotional_context.intent_guess ? (
+                    <div className={styles.wizardInsightRow}>
+                      <span className={styles.wizardInsightIcon}>
+                        <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
+                          <path
+                            d="M10 3.75a6.25 6.25 0 1 0 0 12.5 6.25 6.25 0 0 0 0-12.5Zm0 4v.25m0 1.75v3.5"
+                            stroke="currentColor"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="1.7"
+                          />
+                        </svg>
+                      </span>
+                      <p>
+                        Objetivo sugerido: <strong>{analysisResult.emotional_context.intent_guess}</strong>
+                      </p>
+                    </div>
+                  ) : null}
+                </section>
+
+                <aside className={styles.wizardAnalysisMetaCard}>
+                  {riskMeter ? (
+                    <div className={styles.wizardRiskMeter}>
+                      <div className={styles.wizardRiskMeterHead}>
+                        <p className={styles.wizardRiskMeterLabel}>Nivel de riesgo</p>
+                        <span className={styles.wizardRiskMeterValue}>
+                          {riskMeter.level === "high"
+                            ? "Alto"
+                            : riskMeter.level === "medium"
+                              ? "Medio"
+                              : "Bajo"}
+                        </span>
+                      </div>
+                      <div className={styles.wizardRiskMeterTrack}>
+                        <div
+                          className={`${styles.wizardRiskMeterFill} ${
+                            riskMeter.level === "high"
+                              ? styles.wizardRiskMeterHigh
+                              : riskMeter.level === "medium"
+                                ? styles.wizardRiskMeterMedium
+                                : styles.wizardRiskMeterLow
+                          }`}
+                          style={{ width: `${riskMeter.value}%` }}
+                        />
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {analysisQuickChips.length > 0 ? (
+                    <div className={styles.wizardAnalysisQuickChips}>
+                      {analysisQuickChips.map((chip) => (
+                        <span key={chip.label} className={styles.wizardAnalysisChip}>
+                          <span className={styles.wizardAnalysisChipLabel}>{chip.label}</span>
+                          <span>{chip.value}</span>
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                </aside>
               </div>
 
-              {riskMeter ? (
-                <div className={styles.wizardRiskMeter}>
-                  <div className={styles.wizardRiskMeterHead}>
-                    <p className={styles.wizardRiskMeterLabel}>Nivel de riesgo</p>
-                    <span className={styles.wizardRiskMeterValue}>
-                      {riskMeter.level === "high"
-                        ? "Alto"
-                        : riskMeter.level === "medium"
-                          ? "Medio"
-                          : "Bajo"}
-                    </span>
-                  </div>
-                  <div className={styles.wizardRiskMeterTrack}>
-                    <div
-                      className={`${styles.wizardRiskMeterFill} ${
-                        riskMeter.level === "high"
-                          ? styles.wizardRiskMeterHigh
-                          : riskMeter.level === "medium"
-                            ? styles.wizardRiskMeterMedium
-                            : styles.wizardRiskMeterLow
-                      }`}
-                      style={{ width: `${riskMeter.value}%` }}
-                    />
-                  </div>
-                </div>
-              ) : null}
-
-              {analysisQuickChips.length > 0 ? (
-                <div className={styles.wizardAnalysisQuickChips}>
-                  {analysisQuickChips.map((chip) => (
-                    <span key={chip.label} className={styles.wizardAnalysisChip}>
-                      <span className={styles.wizardAnalysisChipLabel}>{chip.label}</span>
-                      <span>{chip.value}</span>
-                    </span>
-                  ))}
-                </div>
-              ) : null}
-
-              {analysisResult.emotional_context.intent_guess ? (
-                <div className={styles.wizardInsightRow}>
-                  <span className={styles.wizardInsightIcon}>
-                    <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
-                      <path
-                        d="M10 3.75a6.25 6.25 0 1 0 0 12.5 6.25 6.25 0 0 0 0-12.5Zm0 4v.25m0 1.75v3.5"
-                        stroke="currentColor"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="1.7"
-                      />
-                    </svg>
-                  </span>
-                  <p>
-                    Objetivo sugerido: <strong>{analysisResult.emotional_context.intent_guess}</strong>
-                  </p>
-                </div>
-              ) : null}
-
-              <div className={`${styles.wizardCardsGrid} md:grid-cols-2`}>
-                <ShellStepSection title="Resumen">
-                  <p>{analysisResult.summary}</p>
-                </ShellStepSection>
-
+              <div className={`${styles.wizardCardsGrid} ${styles.wizardAnalysisGrid}`}>
                 <ShellStepSection title="Contexto emocional">
                   <p>
                     <span className="font-medium text-white/85">Tono detectado:</span>{" "}
@@ -1770,7 +1780,7 @@ export function WizardScaffold() {
                 </ShellStepSection>
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+              <div className={styles.wizardFooterRow}>
                 <Button
                   type="button"
                   onClick={() => setCurrentStep(1)}
@@ -1783,11 +1793,12 @@ export function WizardScaffold() {
                       stroke="currentColor"
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      strokeWidth="1.8"
-                    />
-                  </svg>
+                    strokeWidth="1.8"
+                  />
+                </svg>
                   Volver
                 </Button>
+                <div className={styles.wizardFooterSpacer} />
                 <Button
                   type="button"
                   onClick={handleContinueToStep3}
@@ -1971,7 +1982,7 @@ export function WizardScaffold() {
                       {copiedIndex !== index ? (
                         <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
                           <path
-                            d="M4 10h12M10 4l6 6-6 6"
+                            d="M7.5 6.5h6a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-6a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1Zm-2 3h-1a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1"
                             stroke="currentColor"
                             strokeLinecap="round"
                             strokeLinejoin="round"
@@ -1995,6 +2006,15 @@ export function WizardScaffold() {
                 variant="secondary"
                 className={`${styles.wizardSecondaryButton} h-10 text-[13px] hover:bg-[rgba(255,255,255,0.12)]`}
               >
+                <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
+                  <path
+                    d="M16 10H4m6 6-6-6 6-6"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="1.8"
+                  />
+                </svg>
                 Volver al paso 2
               </Button>
             </div>
@@ -2006,6 +2026,15 @@ export function WizardScaffold() {
                 variant="secondary"
                 className={`${styles.wizardMutedButton} h-10 px-3 text-[12px] hover:bg-[rgba(255,255,255,0.08)]`}
               >
+                <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
+                  <path
+                    d="M10 5.5v4.5m0 0 3 3m-3-3-3 3M4.75 10a5.25 5.25 0 1 1 10.5 0 5.25 5.25 0 0 1-10.5 0Z"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="1.6"
+                  />
+                </svg>
                 Ninguna me sirve / quiero agregar mas contexto
               </Button>
               <Button
@@ -2014,6 +2043,15 @@ export function WizardScaffold() {
                 variant="primary"
                 className={`${styles.wizardPrimaryButton} h-10 text-[13px] hover:bg-[#265cc7]`}
               >
+                <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
+                  <path
+                    d="M10 4v12M4 10h12"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="1.8"
+                  />
+                </svg>
                 Iniciar nueva conversacion
               </Button>
             </div>

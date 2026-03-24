@@ -1,22 +1,22 @@
 .shellRoot {
   --app-bg: #08111a;
   --panel-bg: #0d1825;
-  --panel-border: #2d6be4;
+  --panel-border: rgba(45, 107, 228, 0.18);
   --header-bg: #1c2b3a;
   --header-accent: #2d6be4;
-  --text-primary: rgba(255, 255, 255, 0.88);
-  --text-secondary: rgba(255, 255, 255, 0.5);
-  --text-muted: rgba(255, 255, 255, 0.28);
+  --text-primary: rgba(255, 255, 255, 0.9);
+  --text-secondary: rgba(255, 255, 255, 0.56);
+  --text-muted: rgba(255, 255, 255, 0.32);
   --positive: #059669;
-  --separator: rgba(255, 255, 255, 0.06);
-  --bubble-user-bg: #c8f0d4;
-  --bubble-user-text: #1a4a2a;
-  --bubble-adv-bg: #162032;
+  --separator: rgba(255, 255, 255, 0.08);
+  --bubble-user-bg: linear-gradient(180deg, rgba(45, 107, 228, 0.26) 0%, rgba(17, 42, 74, 0.96) 100%);
+  --bubble-user-text: rgba(255, 255, 255, 0.92);
+  --bubble-adv-bg: #112033;
   --bubble-adv-text: rgba(255, 255, 255, 0.88);
   --btn-primary: #2d6be4;
   --btn-secondary-bg: rgba(255, 255, 255, 0.07);
   --btn-secondary-border: rgba(255, 255, 255, 0.14);
-  --input-bg: #162032;
+  --input-bg: #112033;
   --input-border: rgba(255, 255, 255, 0.1);
   min-height: 100vh;
   width: 100%;
@@ -26,22 +26,24 @@
 
 .shellTopbar {
   display: flex;
-  height: 52px;
+  height: 56px;
   align-items: center;
   justify-content: space-between;
-  padding: 0 20px;
-  background: var(--header-bg);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: inset 0 -2px 0 0 var(--header-accent);
+  padding: 0 22px;
+  background:
+    linear-gradient(180deg, rgba(28, 43, 58, 0.98) 0%, rgba(20, 33, 46, 0.98) 100%),
+    var(--header-bg);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 -1px 0 rgba(45, 107, 228, 0.32), 0 10px 28px rgba(0, 0, 0, 0.18);
 }
 
 .shellBrand {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  font-size: 19px;
+  gap: 12px;
+  font-size: 18px;
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
   color: #fff;
 }
 
@@ -56,7 +58,7 @@
 .shellActions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .shellAdvisorTrigger {
@@ -206,7 +208,7 @@
 
 .shellWorkspace {
   display: flex;
-  min-height: calc(100vh - 52px);
+  min-height: calc(100vh - 56px);
 }
 
 .shellSidebar {
@@ -215,9 +217,9 @@
   flex-direction: column;
   flex-shrink: 0;
   width: 48px;
-  background: var(--app-bg);
+  background: linear-gradient(180deg, rgba(13, 24, 37, 0.98) 0%, rgba(8, 17, 26, 0.98) 100%);
   border-right: 1px solid var(--separator);
-  height: calc(100vh - 52px);
+  height: calc(100vh - 56px);
   transition: width 220ms ease, transform 220ms ease;
   overflow: hidden;
   overscroll-behavior: contain;
@@ -231,8 +233,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 44px;
-  padding: 10px 10px 8px;
+  min-height: 48px;
+  padding: 12px 12px 8px;
 }
 
 .shellSidebarTitle {
@@ -247,14 +249,21 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 44px;
+  width: 30px;
+  height: 30px;
   border-radius: 9999px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: #0f1e30;
+  background: rgba(17, 32, 51, 0.92);
   color: var(--text-secondary);
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18);
   cursor: pointer;
+  transition: background 180ms ease, border-color 180ms ease, color 180ms ease;
+}
+
+.shellSidebarToggle:hover {
+  background: rgba(28, 43, 58, 0.96);
+  border-color: rgba(45, 107, 228, 0.26);
+  color: rgba(255, 255, 255, 0.88);
 }
 
 .shellSidebarChevron {
@@ -282,7 +291,7 @@
 }
 
 .shellSidebarPrimaryAction {
-  padding: 4px 8px 10px;
+  padding: 6px 10px 12px;
 }
 
 .shellSessionList {
@@ -294,19 +303,19 @@
 
 .shellSessionItem {
   width: 100%;
-  border-radius: 14px;
+  border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
-  padding: 12px 13px;
+  background: rgba(255, 255, 255, 0.035);
+  padding: 13px 14px;
   text-align: left;
   cursor: default;
-  transition: border-color 180ms ease, background 180ms ease;
+  transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
 }
 
 .shellSessionActive {
-  background: linear-gradient(180deg, rgba(45, 107, 228, 0.16) 0%, rgba(15, 30, 48, 0.96) 100%);
+  background: linear-gradient(180deg, rgba(45, 107, 228, 0.18) 0%, rgba(13, 24, 37, 0.98) 100%);
   border-color: rgba(45, 107, 228, 0.3);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 18px 30px rgba(0, 0, 0, 0.12);
 }
 
 .shellSessionTitle {
@@ -332,21 +341,23 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  border-radius: 999px;
+  border-radius: 14px;
   border: 1px solid rgba(45, 107, 228, 0.28);
-  background: rgba(45, 107, 228, 0.1);
-  color: #7eb8f7;
-  padding: 10px 12px;
+  background: linear-gradient(180deg, rgba(45, 107, 228, 0.14) 0%, rgba(19, 39, 67, 0.92) 100%);
+  color: #9dc8ff;
+  padding: 11px 13px;
   font-size: 13px;
   font-weight: 600;
   text-align: left;
   cursor: pointer;
-  transition: background 180ms ease, border-color 180ms ease;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  transition: background 180ms ease, border-color 180ms ease, transform 180ms ease;
 }
 
 .shellNewConversation:hover {
-  background: rgba(45, 107, 228, 0.22);
+  background: linear-gradient(180deg, rgba(45, 107, 228, 0.2) 0%, rgba(23, 48, 82, 0.96) 100%);
   border-color: rgba(45, 107, 228, 0.45);
+  transform: translateY(-1px);
 }
 
 .shellNewConversationIcon {
@@ -368,12 +379,12 @@
   min-width: 0;
   min-height: 0;
   flex: 1;
-  padding: 20px;
+  padding: 22px;
 }
 
 .shellMobileBackdrop {
   position: fixed;
-  inset: 52px 0 0 0;
+  inset: 56px 0 0 0;
   background: rgba(10, 17, 24, 0.58);
   z-index: 19;
 }
@@ -385,13 +396,15 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
   overflow: hidden;
-  border: 1px solid rgba(45, 107, 228, 0.25);
-  border-radius: 16px;
-  background: var(--panel-bg);
-  padding: 24px;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.22);
+  border: 1px solid var(--panel-border);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at top left, rgba(45, 107, 228, 0.07) 0%, transparent 28%),
+    linear-gradient(180deg, rgba(13, 24, 37, 0.98) 0%, rgba(10, 21, 32, 0.98) 100%);
+  padding: 26px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.24);
 }
 
 .wizardStepper {
@@ -400,7 +413,7 @@
   width: 100%;
   gap: 0;
   overflow: hidden;
-  margin-bottom: 24px;
+  margin-bottom: 18px;
   padding: 0;
 }
 
@@ -409,28 +422,29 @@
   min-width: 0;
   flex: 1;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .wizardStepLead {
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .wizardStepCircle {
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
   flex-shrink: 0;
   border-radius: 9999px;
-  border: 2px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .wizardStepActive {
@@ -446,7 +460,7 @@
 }
 
 .wizardStepPending {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.02);
   color: var(--text-secondary);
 }
 
@@ -469,7 +483,7 @@
   min-width: 12px;
   flex: 1;
   margin: 0 10px;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .wizardStepConnectorComplete {
@@ -494,11 +508,11 @@
 }
 
 .wizardSection {
-  border-radius: 14px;
+  border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: #0f1e30;
-  padding: 14px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+  background: linear-gradient(180deg, rgba(17, 32, 51, 0.88) 0%, rgba(10, 21, 32, 0.92) 100%);
+  padding: 16px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02), 0 14px 30px rgba(0, 0, 0, 0.12);
 }
 
 .wizardSectionTitle {
@@ -506,7 +520,7 @@
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--text-primary);
+  color: rgba(255, 255, 255, 0.62);
 }
 
 .wizardSectionBody {
@@ -524,20 +538,22 @@
   flex: 1;
   flex-direction: column;
   gap: 14px;
+  overflow: hidden;
 }
 
 .wizardStepHeader {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .wizardStepOneGrid {
   display: grid;
   min-height: 0;
   flex: 1;
-  gap: 16px;
+  gap: 18px;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-auto-rows: minmax(0, 1fr);
   align-items: stretch;
   overflow: hidden;
 }
@@ -547,12 +563,22 @@
   min-height: 0;
   min-width: 0;
   flex-direction: column;
+  height: 100%;
   gap: 14px;
-  border-radius: 12px;
+  border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(10, 21, 32, 0.92);
-  padding: 14px;
+  background: linear-gradient(180deg, rgba(17, 32, 51, 0.92) 0%, rgba(10, 21, 32, 0.94) 100%);
+  padding: 16px;
   overflow: hidden;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+.wizardComposerPanel {
+  justify-content: space-between;
+}
+
+.wizardReviewPanel {
+  min-height: 0;
 }
 
 .wizardPanelTitleRow {
@@ -570,23 +596,28 @@
 
 .wizardPanelHint {
   font-size: 12px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 .wizardInputGroup {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 .wizardPrimaryTextarea {
-  min-height: 220px;
-  border-radius: 12px;
+  min-height: 232px;
+  max-height: 232px;
+  resize: none;
+  overflow-y: auto;
+  border-radius: 16px;
   border: 1px solid var(--input-border);
-  background: var(--input-bg);
+  background: linear-gradient(180deg, rgba(17, 32, 51, 0.96) 0%, rgba(10, 21, 32, 0.98) 100%);
   color: var(--text-primary);
-  padding: 12px 14px;
+  padding: 14px 15px;
   line-height: 1.6;
   font-size: 14px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
 }
 
 .wizardPrimaryTextarea::placeholder {
@@ -597,11 +628,11 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  border-radius: 10px;
+  border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.6);
-  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.045);
+  color: rgba(255, 255, 255, 0.74);
+  padding: 11px 14px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -624,9 +655,9 @@
   flex: 1;
   min-width: 0;
   height: 44px;
-  border-radius: 12px;
+  border-radius: 14px;
   border: 1px solid var(--input-border);
-  background: var(--input-bg);
+  background: linear-gradient(180deg, rgba(17, 32, 51, 0.96) 0%, rgba(10, 21, 32, 0.98) 100%);
   color: var(--text-primary);
   padding: 0 14px;
   font-size: 14px;
@@ -644,7 +675,7 @@
   justify-content: center;
   border-radius: 9999px;
   border: 0;
-  background: #dc2626;
+  background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
   color: #fff;
   box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.45);
   cursor: pointer;
@@ -675,7 +706,7 @@
   min-height: 0;
   flex: 1;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   overflow: hidden;
 }
 
@@ -684,19 +715,20 @@
   min-height: 0;
   flex: 1;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   overflow-y: auto;
   max-height: 100%;
-  border-radius: 12px;
+  border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(7, 14, 24, 0.88);
-  padding: 12px;
+  background: linear-gradient(180deg, rgba(10, 21, 32, 0.96) 0%, rgba(8, 17, 26, 0.98) 100%);
+  padding: 14px;
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+  scrollbar-color: rgba(45, 107, 228, 0.34) transparent;
+  overscroll-behavior: contain;
 }
 
 .wizardConversationList::-webkit-scrollbar {
-  width: 4px;
+  width: 6px;
 }
 
 .wizardConversationList::-webkit-scrollbar-track {
@@ -704,8 +736,8 @@
 }
 
 .wizardConversationList::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.14);
-  border-radius: 2px;
+  background: rgba(45, 107, 228, 0.34);
+  border-radius: 999px;
 }
 
 .wizardEmptyState {
@@ -715,32 +747,35 @@
 
 .wizardBubble {
   max-width: 96%;
-  border-radius: 14px;
+  border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 10px 12px;
+  padding: 11px 12px;
+  box-shadow: 0 12px 22px rgba(0, 0, 0, 0.12);
 }
 
 .wizardBubbleIncoming {
   margin-right: auto;
   background: var(--bubble-adv-bg);
   color: var(--bubble-adv-text);
-  border-radius: 14px 14px 14px 4px;
+  border-color: rgba(255, 255, 255, 0.06);
+  border-radius: 16px 16px 16px 6px;
 }
 
 .wizardBubbleOutgoing {
   margin-left: auto;
-  background: #1e3a28;
-  color: rgba(255, 255, 255, 0.9);
+  background: var(--bubble-user-bg);
+  color: var(--bubble-user-text);
   font-weight: 500;
-  border-color: rgba(16, 185, 129, 0.25);
-  border-radius: 14px 14px 4px 14px;
+  border-color: rgba(59, 130, 246, 0.34);
+  border-radius: 16px 16px 6px 16px;
 }
 
 .wizardBubbleUnknown {
   margin-right: auto;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.07);
   color: var(--text-primary);
-  border-radius: 14px;
+  border-color: rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
 }
 
 .wizardSpeakerSwitch {
@@ -754,12 +789,12 @@
 
 .wizardSpeakerOption {
   border-radius: 9999px;
-  padding: 4px 10px;
+  padding: 5px 10px;
   font-size: 11px;
   font-weight: 600;
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.45);
-  transition: background 180ms ease, color 180ms ease;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.54);
+  transition: background 180ms ease, color 180ms ease, box-shadow 180ms ease;
 }
 
 .wizardSpeakerOptionActiveIncoming {
@@ -773,8 +808,9 @@
 }
 
 .wizardSpeakerOptionActiveOutgoing {
-  background: rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.9);
+  background: rgba(45, 107, 228, 0.22);
+  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.2);
+  color: rgba(255, 255, 255, 0.96);
 }
 
 .wizardBubbleTextarea {
@@ -799,7 +835,7 @@
   justify-content: space-between;
   gap: 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
-  padding-top: 12px;
+  padding-top: 14px;
 }
 
 .wizardActionGroup {
@@ -820,45 +856,98 @@
   background: var(--btn-secondary-bg);
   color: var(--text-secondary);
   cursor: pointer;
+  transition: border-color 180ms ease, background 180ms ease, color 180ms ease, transform 180ms ease;
+}
+
+.wizardIconButton:hover {
+  border-color: rgba(45, 107, 228, 0.26);
+  background: rgba(45, 107, 228, 0.1);
+  color: rgba(255, 255, 255, 0.88);
+  transform: translateY(-1px);
 }
 
 .wizardPrimaryButton {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  justify-content: center;
   border-radius: 12px;
-  background: var(--btn-primary);
+  background: linear-gradient(180deg, #2d6be4 0%, #275fd0 100%);
   color: #fff;
-  border: 1px solid transparent;
+  border: 1px solid rgba(59, 130, 246, 0.3);
   padding: 0 16px;
+  box-shadow: 0 14px 24px rgba(45, 107, 228, 0.18);
 }
 
 .wizardSecondaryButton {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  justify-content: center;
   border-radius: 12px;
   border: 1px solid var(--btn-secondary-border);
-  background: var(--btn-secondary-bg);
+  background: rgba(255, 255, 255, 0.05);
   color: var(--text-primary);
   padding: 0 16px;
 }
 
 .wizardMutedButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.04);
   color: var(--text-secondary);
 }
 
+.wizardAnalysisHero {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.85fr);
+}
+
+.wizardAnalysisHeroCard,
+.wizardAnalysisMetaCard {
+  display: grid;
+  gap: 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(17, 32, 51, 0.92) 0%, rgba(10, 21, 32, 0.96) 100%);
+  padding: 18px;
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.14);
+}
+
+.wizardAnalysisSummary {
+  display: grid;
+  gap: 8px;
+}
+
+.wizardAnalysisSummaryLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(126, 184, 247, 0.76);
+}
+
+.wizardAnalysisSummaryText {
+  font-size: 16px;
+  line-height: 1.75;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.wizardAnalysisGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .wizardAnalysisBanner {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  border-radius: 12px;
+  border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 16px 20px;
-  border-left-width: 4px;
+  padding: 16px 18px;
 }
 
 .wizardAnalysisBannerOk {
@@ -877,7 +966,11 @@
 
 .wizardRiskMeter {
   display: grid;
-  gap: 8px;
+  gap: 10px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(8, 17, 26, 0.44);
+  padding: 14px;
 }
 
 .wizardRiskMeterLabel {
@@ -902,7 +995,7 @@
 }
 
 .wizardRiskMeterTrack {
-  height: 8px;
+  height: 10px;
   width: 100%;
   overflow: hidden;
   border-radius: 999px;
@@ -963,10 +1056,10 @@
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  border-radius: 10px;
+  border-radius: 14px;
   border: 1px solid rgba(45, 107, 228, 0.14);
   background: rgba(45, 107, 228, 0.06);
-  padding: 12px 16px;
+  padding: 13px 15px;
   color: var(--text-primary);
   font-size: 13px;
   line-height: 1.55;
@@ -986,34 +1079,37 @@
   display: flex;
   min-width: 0;
   flex-direction: column;
-  border-radius: 14px;
+  border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(9, 17, 27, 0.84);
-  padding: 14px;
+  background: linear-gradient(180deg, rgba(9, 17, 27, 0.88) 0%, rgba(13, 24, 37, 0.98) 100%);
+  padding: 16px;
   transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.14);
 }
 
 .wizardAdvisorCard:hover {
   transform: translateY(-2px);
-  box-shadow: 0 18px 34px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 22px 42px rgba(0, 0, 0, 0.22);
 }
 
 .wizardAdvisorCardRecommended {
-  border: 2px solid #10b981;
-  box-shadow: 0 18px 36px rgba(16, 185, 129, 0.14);
+  border: 1px solid rgba(5, 150, 105, 0.54);
+  box-shadow: 0 22px 44px rgba(5, 150, 105, 0.12);
 }
 
 .wizardAdvisorHeader {
   position: relative;
-  border-radius: 12px;
-  border-bottom: 2px solid #2d6be4;
-  background: #1c2b3a;
-  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(45, 107, 228, 0.18);
+  background: linear-gradient(180deg, rgba(28, 43, 58, 0.96) 0%, rgba(17, 32, 51, 0.98) 100%);
+  padding: 14px;
   color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .wizardAdvisorHeaderRecommended {
-  padding-top: 34px;
+  border-color: rgba(5, 150, 105, 0.34);
+  padding-top: 38px;
 }
 
 .wizardAdvisorBadge {
@@ -1021,11 +1117,12 @@
   top: 12px;
   right: 12px;
   border-radius: 9999px;
-  background: rgba(45, 107, 228, 0.18);
+  background: rgba(45, 107, 228, 0.16);
   color: rgba(255, 255, 255, 0.88);
-  padding: 4px 8px;
+  padding: 4px 9px;
   font-size: 10px;
   font-weight: 600;
+  border: 1px solid rgba(45, 107, 228, 0.18);
 }
 
 .wizardAdvisorRecommendedTag {
@@ -1036,12 +1133,13 @@
   align-items: center;
   gap: 5px;
   border-radius: 999px;
-  background: #059669;
-  color: #fff;
+  border: 1px solid rgba(5, 150, 105, 0.28);
+  background: rgba(5, 150, 105, 0.18);
+  color: #8ef0c5;
   padding: 4px 10px;
   font-size: 10px;
   font-weight: 600;
-  box-shadow: 0 10px 18px rgba(5, 150, 105, 0.24);
+  box-shadow: 0 10px 20px rgba(5, 150, 105, 0.14);
 }
 
 .wizardAdvisorHeaderRow {
@@ -1055,18 +1153,18 @@
 }
 
 .wizardAdvisorAvatar {
-  width: 46px;
-  height: 46px;
+  width: 48px;
+  height: 48px;
   border-radius: 9999px;
-  border: 2px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.18);
   box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.03);
   object-fit: cover;
 }
 
 .wizardAdvisorAvatarFallback {
   display: inline-flex;
-  width: 46px;
-  height: 46px;
+  width: 48px;
+  height: 48px;
   align-items: center;
   justify-content: center;
   border-radius: 9999px;
@@ -1078,7 +1176,7 @@
 }
 
 .wizardAdvisorName {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: #fff;
 }
@@ -1086,35 +1184,36 @@
 .wizardAdvisorRole {
   margin-top: 2px;
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.56);
 }
 
 .wizardAdvisorResponse {
-  margin-top: 14px;
+  margin-top: 16px;
   flex: 1;
   white-space: pre-wrap;
   word-break: break-word;
   color: var(--text-primary);
   font-size: 14px;
-  line-height: 1.65;
+  line-height: 1.72;
 }
 
 .wizardAdvisorActions {
-  margin-top: 14px;
+  margin-top: 16px;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 8px;
 }
 
 .wizardTertiaryButton {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.045);
   color: var(--text-primary);
   padding: 0 14px;
 }
@@ -1125,7 +1224,7 @@
   align-items: center;
   gap: 10px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
-  padding-top: 12px;
+  padding-top: 14px;
 }
 
 .wizardFooterSpacer {
@@ -1145,7 +1244,7 @@
 
   .shellSidebar {
     position: fixed;
-    top: 52px;
+    top: 56px;
     left: 0;
     bottom: 0;
     z-index: 20;
@@ -1163,6 +1262,11 @@
 
   .wizardStepOneGrid,
   .wizardAdvisorCards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .wizardAnalysisHero,
+  .wizardAnalysisGrid {
     grid-template-columns: minmax(0, 1fr);
   }
 }
