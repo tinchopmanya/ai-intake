@@ -22,6 +22,8 @@
   "error.empty_file": "Uploaded file is empty.",
   "error.file_too_large": "Uploaded file is too large.",
   "error.python_multipart_not_installed": "Missing python-multipart dependency in backend.",
+  "error.advisor_ai_high_demand": "The AI service is under heavy load. Please try again in a few seconds.",
+  "error.advisor_ai_unavailable": "We could not get a response from the AI service. Please try again.",
   "error.ocr_unavailable": "OCR is not available right now.",
   "error.ocr_internal_error": "Internal OCR processing error.",
   "error.ocr_no_text_detected": "No readable text was detected in the image.",

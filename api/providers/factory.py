@@ -10,5 +10,6 @@ def build_provider() -> AIProvider:
     return GeminiAIProvider(
         api_key=settings.gemini_api_key,
         model=settings.gemini_model,
+        fallback_model=settings.gemini_fallback_model,
         timeout_seconds=settings.gemini_timeout_seconds,
     )

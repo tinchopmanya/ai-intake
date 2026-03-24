@@ -346,9 +346,13 @@ export function AdvisorChatModal({
             window.setTimeout(() => onSend(), 0);
           }
         }
-      } catch {
+      } catch (error) {
         recorder.setStatus("error");
-        setVoiceSendError("No pudimos enviar la grabacion. Intenta de nuevo.");
+        setVoiceSendError(
+          error instanceof Error && error.message.trim()
+            ? error.message
+            : "No pudimos enviar la grabacion. Intenta de nuevo.",
+        );
       } finally {
         setFinalizeInFlight(false);
       }

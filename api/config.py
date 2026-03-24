@@ -67,6 +67,7 @@ class Settings:
     cors_origins: list[str]
     gemini_api_key: str | None
     gemini_model: str
+    gemini_fallback_model: str | None
     gemini_timeout_seconds: float
     google_client_id: str | None
     auth_access_ttl_seconds: int
@@ -131,6 +132,7 @@ def get_settings() -> Settings:
     cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000")
     gemini_api_key = os.getenv("GEMINI_API_KEY")
     gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+    gemini_fallback_model = os.getenv("GEMINI_FALLBACK_MODEL")
     gemini_timeout_seconds = float(os.getenv("GEMINI_TIMEOUT_SECONDS", "20"))
     google_client_id = os.getenv("GOOGLE_CLIENT_ID")
     auth_access_ttl_seconds = int(os.getenv("AUTH_ACCESS_TTL_SECONDS", "900"))
@@ -164,6 +166,11 @@ def get_settings() -> Settings:
         cors_origins=_parse_cors_origins(cors_origins),
         gemini_api_key=gemini_api_key.strip() if gemini_api_key and gemini_api_key.strip() else None,
         gemini_model=gemini_model,
+        gemini_fallback_model=(
+            gemini_fallback_model.strip()
+            if gemini_fallback_model and gemini_fallback_model.strip()
+            else None
+        ),
         gemini_timeout_seconds=gemini_timeout_seconds,
         google_client_id=google_client_id.strip() if google_client_id and google_client_id.strip() else None,
         auth_access_ttl_seconds=auth_access_ttl_seconds,

@@ -22,6 +22,8 @@
   "error.empty_file": "O arquivo esta vazio.",
   "error.file_too_large": "O arquivo e muito grande.",
   "error.python_multipart_not_installed": "Falta python-multipart no backend.",
+  "error.advisor_ai_high_demand": "O servico de IA esta com alta demanda. Tente novamente em alguns segundos.",
+  "error.advisor_ai_unavailable": "Nao foi possivel obter uma resposta do servico de IA. Tente novamente.",
   "error.ocr_unavailable": "OCR indisponivel no momento.",
   "error.ocr_internal_error": "Erro interno ao processar OCR.",
   "error.ocr_no_text_detected": "Nao detectamos texto legivel na imagem.",
