@@ -400,7 +400,7 @@
 .wizardPanel {
   height: 100%;
   min-height: 0;
-  width: 100%;
+  width: min(100%, 880px);
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -411,8 +411,9 @@
   background:
     radial-gradient(circle at top left, rgba(45, 107, 228, 0.07) 0%, transparent 28%),
     linear-gradient(180deg, rgba(13, 24, 37, 0.98) 0%, rgba(10, 21, 32, 0.98) 100%);
-  padding: 26px;
+  padding: 22px;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.24);
+  margin: 0 auto;
 }
 
 .wizardStepper {
@@ -555,6 +556,62 @@
   gap: 6px;
 }
 
+.wizardStepKicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(126, 184, 247, 0.76);
+}
+
+.wizardStepBodyScroll {
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.wizardStepBodyScroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.wizardStepBodyScroll::-webkit-scrollbar-thumb {
+  background: rgba(45, 107, 228, 0.34);
+  border-radius: 999px;
+}
+
+.wizardMobileCard {
+  display: grid;
+  gap: 14px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(17, 32, 51, 0.9) 0%, rgba(10, 21, 32, 0.96) 100%);
+  padding: 16px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.wizardModeTabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.wizardModeTab {
+  min-height: 40px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 180ms ease, border-color 180ms ease, color 180ms ease;
+}
+
+.wizardModeTabActive {
+  border-color: rgba(126, 184, 247, 0.34);
+  background: rgba(45, 107, 228, 0.16);
+  color: rgba(255, 255, 255, 0.94);
+}
+
 .wizardStepOneGrid {
   display: grid;
   min-height: 0;
@@ -613,8 +670,8 @@
 }
 
 .wizardPrimaryTextarea {
-  min-height: 232px;
-  max-height: 232px;
+  min-height: 180px;
+  max-height: 280px;
   resize: none;
   overflow-y: auto;
   border-radius: 16px;
@@ -651,6 +708,49 @@
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.16);
   transform: translateY(-1px);
+}
+
+.wizardUploadCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  border-radius: 16px;
+  border: 1px dashed rgba(126, 184, 247, 0.38);
+  background: rgba(45, 107, 228, 0.06);
+  padding: 14px;
+  text-align: left;
+  color: rgba(255, 255, 255, 0.88);
+  cursor: pointer;
+}
+
+.wizardUploadIcon {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #9dc8ff;
+  flex-shrink: 0;
+}
+
+.wizardUploadTitle,
+.wizardUploadCopy {
+  display: block;
+}
+
+.wizardUploadTitle {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.wizardUploadCopy {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary);
 }
 
 .wizardContextRow {
@@ -699,6 +799,47 @@
   animation: wizardMicPulse 1.8s ease-in-out infinite;
 }
 
+.wizardVoiceCaptureCard {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(239, 68, 68, 0.16);
+  background: rgba(127, 29, 29, 0.12);
+  padding: 14px;
+}
+
+.wizardVoiceCaptureButton {
+  display: inline-flex;
+  width: 52px;
+  height: 52px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 0;
+  background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 14px 24px rgba(220, 38, 38, 0.22);
+}
+
+.wizardVoiceCaptureButtonActive {
+  animation: wizardMicPulse 1.8s ease-in-out infinite;
+}
+
+.wizardVoiceCaptureTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.wizardVoiceCaptureCopy {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
 @keyframes wizardMicPulse {
   0%,
   100% {
@@ -725,7 +866,8 @@
   flex-direction: column;
   gap: 12px;
   overflow-y: auto;
-  max-height: 100%;
+  max-height: min(38vh, 420px);
+  min-height: 180px;
   border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: linear-gradient(180deg, rgba(10, 21, 32, 0.96) 0%, rgba(8, 17, 26, 0.98) 100%);
@@ -947,29 +1089,22 @@
   border-color: rgba(255, 255, 255, 0.18);
 }
 
-.wizardAnalysisHero {
+.wizardAnalysisStack {
   display: grid;
-  gap: 16px;
-  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.85fr);
+  gap: 14px;
 }
 
-.wizardAnalysisHeroCard,
-.wizardAnalysisMetaCard {
+.wizardAnalysisPrimaryCard {
   display: grid;
-  gap: 16px;
-  border-radius: 20px;
+  gap: 14px;
+  border-radius: 22px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: linear-gradient(180deg, rgba(17, 32, 51, 0.92) 0%, rgba(10, 21, 32, 0.96) 100%);
-  padding: 19px;
+  padding: 18px;
   box-shadow: 0 16px 34px rgba(0, 0, 0, 0.14);
 }
 
-.wizardAnalysisSummary {
-  display: grid;
-  gap: 8px;
-}
-
-.wizardAnalysisSummaryLabel {
+.wizardAnalysisBlockLabel {
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.16em;
@@ -977,37 +1112,58 @@
   color: rgba(126, 184, 247, 0.76);
 }
 
-.wizardAnalysisSummaryText {
-  font-size: 16px;
-  line-height: 1.75;
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.wizardAnalysisGrid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.wizardAnalysisBanner {
+.wizardAnalysisDecisionRow {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 16px 18px;
+  justify-content: space-between;
+  gap: 14px;
 }
 
-.wizardAnalysisBannerOk {
-  background: rgba(16, 185, 129, 0.07);
-  border-color: rgba(16, 185, 129, 0.2);
-  border-left-color: #10b981;
-  color: #d3f6eb;
+.wizardAnalysisDecisionTitle {
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: rgba(255, 255, 255, 0.95);
 }
 
-.wizardAnalysisBannerRisk {
-  background: rgba(239, 68, 68, 0.08);
-  border-color: rgba(239, 68, 68, 0.22);
-  border-left-color: #ef4444;
-  color: #ffe0e0;
+.wizardAnalysisDecisionText {
+  margin-top: 6px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.wizardAnalysisDecisionBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 76px;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.wizardAnalysisDecisionBadgeRisk {
+  background: rgba(239, 68, 68, 0.14);
+  color: #fecaca;
+}
+
+.wizardAnalysisDecisionBadgeWarn {
+  background: rgba(245, 158, 11, 0.14);
+  color: #fcd34d;
+}
+
+.wizardAnalysisDecisionBadgeOk {
+  background: rgba(16, 185, 129, 0.14);
+  color: #a7f3d0;
+}
+
+.wizardAnalysisLongform {
+  font-size: 14px;
+  line-height: 1.72;
+  color: rgba(255, 255, 255, 0.86);
 }
 
 .wizardRiskMeter {
@@ -1066,11 +1222,6 @@
   background: linear-gradient(90deg, #dc2626 0%, #ef4444 100%);
 }
 
-.wizardAnalysisIcon {
-  flex-shrink: 0;
-  margin-top: 2px;
-}
-
 .wizardCardsGrid {
   display: grid;
   gap: 12px;
@@ -1114,6 +1265,84 @@
 .wizardInsightIcon {
   flex-shrink: 0;
   color: #7eb8f7;
+}
+
+.wizardDecisionList {
+  display: grid;
+  gap: 10px;
+}
+
+.wizardDecisionOption {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 15px 16px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;
+}
+
+.wizardDecisionOption:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.wizardDecisionOptionActive {
+  border-color: rgba(126, 184, 247, 0.34);
+  background: rgba(45, 107, 228, 0.08);
+}
+
+.wizardDecisionTitle {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.wizardDecisionCopy {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.wizardDecisionPreview {
+  display: grid;
+  gap: 12px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(17, 32, 51, 0.92) 0%, rgba(10, 21, 32, 0.96) 100%);
+  padding: 16px;
+}
+
+.wizardDecisionPreviewTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.wizardDecisionPreviewText {
+  font-size: 14px;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.76);
+  white-space: pre-wrap;
+}
+
+.wizardDecisionPreviewActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.wizardSubsectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .wizardAdvisorCards {
@@ -1314,8 +1543,9 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .wizardAnalysisHero,
-  .wizardAnalysisGrid {
-    grid-template-columns: minmax(0, 1fr);
+  .wizardAnalysisDecisionRow,
+  .wizardSubsectionHeader {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
