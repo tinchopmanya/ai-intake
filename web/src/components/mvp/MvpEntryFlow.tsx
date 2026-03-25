@@ -12,6 +12,7 @@ type SelectorIntent = "vent" | "write_to_ex";
 
 type MoodOption = {
   id: string;
+  icon: string;
   title: string;
   description: string;
 };
@@ -21,23 +22,27 @@ const DEFAULT_ADVISOR_STORAGE_KEY = "exreply-default-advisor-id";
 const MOOD_OPTIONS: MoodOption[] = [
   {
     id: "angry",
+    icon: "😤",
     title: "Enojado/a",
-    description: "Necesito bajar la intensidad antes de responder.",
+    description: "Me sacó algo",
   },
   {
     id: "sad",
+    icon: "😔",
     title: "Triste",
-    description: "Me cuesta sostener esta conversacion ahora.",
+    description: "Sin energía para esto",
   },
   {
     id: "confused",
+    icon: "😕",
     title: "Confundido/a",
-    description: "No tengo claro que hacer con esto.",
+    description: "No sé cómo tomarlo",
   },
   {
     id: "calm",
+    icon: "😌",
     title: "Tranquilo/a",
-    description: "Quiero manejarlo con mas claridad.",
+    description: "Quiero manejarlo bien",
   },
 ];
 
@@ -63,11 +68,24 @@ function getFirstName(displayName: string) {
 function formatLastSession(startedAt: string) {
   const parsed = new Date(startedAt);
   if (Number.isNaN(parsed.getTime())) return null;
+  const now = new Date();
+  const isSameDay =
+    parsed.getFullYear() === now.getFullYear() &&
+    parsed.getMonth() === now.getMonth() &&
+    parsed.getDate() === now.getDate();
+  if (isSameDay) return "hoy";
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday =
+    parsed.getFullYear() === yesterday.getFullYear() &&
+    parsed.getMonth() === yesterday.getMonth() &&
+    parsed.getDate() === yesterday.getDate();
+  if (isYesterday) return "ayer";
+
   return new Intl.DateTimeFormat("es-UY", {
     day: "2-digit",
     month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
   }).format(parsed);
 }
 
@@ -78,7 +96,7 @@ function readStoredAdvisorId() {
 }
 
 export function MvpEntryFlow() {
-  const { displayName, initials, sidebarConversation, openAdvisorConversation } = useMvpShell();
+  const { displayName, sidebarConversation, openAdvisorConversation } = useMvpShell();
   const [view, setView] = useState<FlowView>("entry");
   const [selectedMoodId, setSelectedMoodId] = useState<string>("calm");
   const [selectorIntent, setSelectorIntent] = useState<SelectorIntent | null>(null);
@@ -108,7 +126,7 @@ export function MvpEntryFlow() {
   }, []);
 
   const greeting = useMemo(
-    () => `${getGreetingLabel()}, ${getFirstName(displayName)}`,
+    () => `${getGreetingLabel()}, ${getFirstName(displayName)}`.toLocaleUpperCase("es-UY"),
     [displayName],
   );
 
@@ -169,18 +187,11 @@ export function MvpEntryFlow() {
           <div className={styles.entryShell}>
             <section className={styles.entryPanel}>
               <div className={styles.entryBody}>
-                <header className={styles.entryHeader}>
-                  <span className={styles.entryBrand}>ExReply</span>
-                  <span className={styles.entryAvatar} aria-label={displayName}>
-                    {initials}
-                  </span>
-                </header>
-
                 <div>
                   <p className={styles.eyebrow}>{greeting}</p>
-                  <h1 className={styles.headline}>Como estas ahora?</h1>
+                  <h1 className={styles.headline}>¿Cómo estás ahora?</h1>
                   <p className={styles.subcopy}>
-                    Antes de seguir, elige como te sientes y por donde quieres empezar.
+                    Antes de continuar, contanos cómo te encontrás.
                   </p>
                 </div>
 
@@ -194,6 +205,9 @@ export function MvpEntryFlow() {
                       }`}
                       onClick={() => setSelectedMoodId(mood.id)}
                     >
+                      <span className={styles.moodIcon} aria-hidden="true">
+                        {mood.icon}
+                      </span>
                       <span className={styles.moodTitle}>{mood.title}</span>
                       <span className={styles.moodText}>{mood.description}</span>
                     </button>
@@ -203,29 +217,45 @@ export function MvpEntryFlow() {
                 {sidebarConversation && lastSessionMeta ? (
                   <div className={styles.sessionCard}>
                     <span className={styles.sessionDot} aria-hidden="true" />
-                    <div>
-                      <p className={styles.sessionLabel}>Ultima sesion</p>
-                      <p className={styles.sessionTitle}>{sidebarConversation.title}</p>
-                      <p className={styles.sessionMeta}>{lastSessionMeta}</p>
-                    </div>
+                    <p className={styles.sessionText}>
+                      Última sesión: {lastSessionMeta} · {sidebarConversation.title}
+                    </p>
+                    <span className={styles.sessionArrow} aria-hidden="true">
+                      ›
+                    </span>
                   </div>
                 ) : null}
 
                 <div className={styles.actions}>
                   <button type="button" className={styles.primaryAction} onClick={() => openSelector("vent")}>
+                    <span className={styles.buttonIcon} aria-hidden="true">
+                      💬
+                    </span>
                     Solo quiero desahogarme
                   </button>
                   <button type="button" className={styles.secondaryAction} onClick={handleAnalyzeConversation}>
-                    Tengo una conversacion para analizar
+                    <span className={styles.buttonIcon} aria-hidden="true">
+                      📋
+                    </span>
+                    Tengo una conversación para analizar
                   </button>
                   <button
                     type="button"
                     className={styles.tertiaryAction}
                     onClick={() => openSelector("write_to_ex")}
                   >
+                    <span className={styles.buttonIcon} aria-hidden="true">
+                      ✍️
+                    </span>
                     Quiero escribirle a mi ex
                   </button>
                 </div>
+
+                <p className={styles.disclaimer}>
+                  No guardamos conversaciones por defecto · La IA puede equivocarse
+                  <br />
+                  No reemplaza apoyo <a href="#" className={styles.disclaimerLink}>psicológico</a>, legal ni atención de emergencia
+                </p>
               </div>
             </section>
           </div>
