@@ -62,7 +62,6 @@ type ConversationBlock = {
 
 type AnalysisStatusKind = "ok" | "observation" | "risk";
 type StepOneInputMode = "write" | "capture" | "voice";
-type StepThreeView = "actions" | "advisors";
 type DecisionActionId =
   | "no_reply"
   | "brief_neutral"
@@ -591,8 +590,8 @@ function getDecisionActions(signals: DecisionSignals): DecisionAction[] {
 
   actions.push({
     id: "advisor_help",
-    title: "Obtener ayuda de los consejeros",
-    subtitle: "Te ayudamos a pensarlo antes de contestar",
+    title: "Consultar con un consejero",
+    subtitle: "Laura, Robert o Lidia te ayudan a decidir",
   });
 
   return actions;
@@ -803,7 +802,6 @@ export function WizardScaffold({
   const t = (key: string) => tRuntime(key, locale);
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
   const [stepOneInputMode, setStepOneInputMode] = useState<StepOneInputMode>("write");
-  const [stepThreeView, setStepThreeView] = useState<StepThreeView>("actions");
   const [selectedDecision, setSelectedDecision] = useState<DecisionActionId>("no_reply");
   const [messageText, setMessageText] = useState("");
   const [mode, setMode] = useState<UsageMode>("reactive");
@@ -981,15 +979,13 @@ export function WizardScaffold({
   }, [contextVoice.transcript, stepOneInputMode, contextVoice]);
 
   useEffect(() => {
-    if (currentStep !== 3) {
-      setStepThreeView("actions");
+    if (currentStep !== 2) {
       return;
     }
     const nextPrimaryDecisionId =
       getDecisionActions(getDecisionSignals(analysisResult, conversationBlocks, messageText)).find(
         (action) => action.id !== "advisor_help",
       )?.id ?? "advisor_help";
-    setStepThreeView("actions");
     setSelectedDecision(nextPrimaryDecisionId);
   }, [analysisResult, conversationBlocks, currentStep, advisorResult?.created_at, messageText]);
 
@@ -1007,7 +1003,7 @@ export function WizardScaffold({
   }, [speakingResponseIndex, speechSynthesis.speaking]);
 
   useEffect(() => {
-    if (currentStep !== 3) return;
+    if (currentStep !== 2) return;
     const visibleActions = getDecisionActions(getDecisionSignals(analysisResult, conversationBlocks, messageText));
     const actionStillVisible = visibleActions.some((action) => action.id === selectedDecision);
     if (actionStillVisible) return;
@@ -1354,10 +1350,15 @@ export function WizardScaffold({
     await requestAdvisor({ quickMode: false, analysisId });
   }
 
+  function handleFinishDecision() {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("mvp:new-conversation"));
+    }
+  }
+
   function handleStartNewConversation() {
     setCurrentStep(1);
     setStepOneInputMode("write");
-    setStepThreeView("actions");
     setSelectedDecision("no_reply");
     setMessageText("");
     setContextOptional("");
@@ -1617,37 +1618,22 @@ export function WizardScaffold({
   }
 
   const analysisStatus = analysisResult ? getAnalysisStatus(analysisResult) : null;
-  const riskMeter = analysisResult ? getRiskMeter(analysisResult) : null;
   const analysisQuickChips = analysisResult ? getAnalysisQuickChips(analysisResult) : [];
   const hasConversationInput = messageText.trim().length > 0 || conversationBlocks.length > 0;
   const replyTiming = analysisResult ? getReplyTimingGuidance(analysisResult) : null;
-  const ignoreGuidance = analysisResult ? getIgnoreGuidance(analysisResult) : null;
   const topicLabel = activeCase?.title || buildSidebarConversationTitle(conversationBlocks, messageText);
   const toneChipValue =
     analysisResult?.emotional_context.tone || analysisResult?.tone_detected || "No disponible";
   const urgencyChipValue =
     analysisQuickChips.find((chip) => chip.label === "Urgencia")?.value ??
-    (riskMeter?.level === "high" ? "Alta" : riskMeter?.level === "medium" ? "Media" : "Baja");
-  const briefResponseIndex = resolveAdvisorResponseIndex(advisorResult, "brief_neutral");
-  const limitResponseIndex = resolveAdvisorResponseIndex(advisorResult, "clear_limit");
-  const laterResponseIndex = resolveAdvisorResponseIndex(advisorResult, "reply_later");
-  const decisionPreviewIndex =
-    selectedDecision === "brief_neutral"
-      ? briefResponseIndex
-      : selectedDecision === "clear_limit"
-        ? limitResponseIndex
-        : selectedDecision === "reply_later"
-          ? laterResponseIndex
-          : null;
-  const decisionPreviewResponse =
-    decisionPreviewIndex !== null ? advisorResult?.responses[decisionPreviewIndex] ?? null : null;
+    (analysisStatus?.kind === "risk" ? "Alta" : analysisStatus?.kind === "observation" ? "Media" : "Baja");
   const decisionActions = getDecisionActions(getDecisionSignals(analysisResult, conversationBlocks, messageText));
 
   return (
     <Panel className={styles.wizardPanel}>
       <ShellStepper
         currentStep={currentStep}
-        labels={["Entrada", "Analisis", "Decision"]}
+        labels={["Entrada", "Analisis", "Consejeros"]}
       />
 
       {currentStep === 1 ? (
@@ -2027,7 +2013,7 @@ export function WizardScaffold({
             <p className={styles.wizardStepKicker}>Paso 2</p>
             <h3 className={styles.wizardStepIntroTitle}>Analisis</h3>
             <p className={styles.wizardStepIntroCopy}>
-              Reorganizamos el analisis actual en bloques mas claros, usando solo datos reales ya disponibles.
+              Solo lo esencial para decidir si responder, esperar o consultar con un consejero.
             </p>
           </div>
 
@@ -2043,7 +2029,7 @@ export function WizardScaffold({
             <>
               <div className={styles.wizardAnalysisStack}>
                 <section className={styles.wizardAnalysisPrimaryCard}>
-                  <div className={styles.wizardAnalysisBlockLabel}>Conviene responder ahora?</div>
+                  <div className={styles.wizardAnalysisBlockLabel}>Recomendacion principal</div>
                   <div className={styles.wizardAnalysisDecisionRow}>
                     <div>
                       <p className={styles.wizardAnalysisDecisionTitle}>{replyTiming?.title}</p>
@@ -2059,55 +2045,13 @@ export function WizardScaffold({
                       }`}
                     >
                       {analysisStatus?.kind === "risk"
-                        ? "Pausa"
-                        : analysisStatus?.kind === "observation"
-                          ? "Cautela"
-                          : "Estable"}
+                          ? "Pausa"
+                          : analysisStatus?.kind === "observation"
+                            ? "Cautela"
+                            : "Estable"}
                     </span>
                   </div>
-
-                  {riskMeter ? (
-                    <div className={styles.wizardRiskMeter}>
-                      <div className={styles.wizardRiskMeterHead}>
-                        <p className={styles.wizardRiskMeterLabel}>Nivel de riesgo</p>
-                        <span className={styles.wizardRiskMeterValue}>
-                          {riskMeter.level === "high"
-                            ? "Alto"
-                            : riskMeter.level === "medium"
-                              ? "Medio"
-                              : "Bajo"}
-                        </span>
-                      </div>
-                      <div className={styles.wizardRiskMeterTrack}>
-                        <div
-                          className={`${styles.wizardRiskMeterFill} ${
-                            riskMeter.level === "high"
-                              ? styles.wizardRiskMeterHigh
-                              : riskMeter.level === "medium"
-                                ? styles.wizardRiskMeterMedium
-                                : styles.wizardRiskMeterLow
-                          }`}
-                          style={{ width: `${riskMeter.value}%` }}
-                        />
-                      </div>
-                    </div>
-                  ) : null}
                 </section>
-
-                <div className={styles.wizardAnalysisQuickChips}>
-                  <span className={styles.wizardAnalysisChip}>
-                    <span className={styles.wizardAnalysisChipLabel}>Tono</span>
-                    <span>{toneChipValue}</span>
-                  </span>
-                  <span className={styles.wizardAnalysisChip}>
-                    <span className={styles.wizardAnalysisChipLabel}>Urgencia</span>
-                    <span>{urgencyChipValue}</span>
-                  </span>
-                  <span className={styles.wizardAnalysisChip}>
-                    <span className={styles.wizardAnalysisChipLabel}>Tema</span>
-                    <span>{topicLabel}</span>
-                  </span>
-                </div>
 
                 <section className={styles.wizardMobileCard}>
                   <div className={styles.wizardAnalysisBlockLabel}>Lo que realmente dice</div>
@@ -2132,9 +2076,50 @@ export function WizardScaffold({
                   ) : null}
                 </section>
 
+                <div className={styles.wizardAnalysisQuickChips}>
+                  <span className={styles.wizardAnalysisChip}>
+                    <span className={styles.wizardAnalysisChipLabel}>Tono</span>
+                    <span>{toneChipValue}</span>
+                  </span>
+                  <span className={styles.wizardAnalysisChip}>
+                    <span className={styles.wizardAnalysisChipLabel}>Urgencia</span>
+                    <span>{urgencyChipValue}</span>
+                  </span>
+                  <span className={styles.wizardAnalysisChip}>
+                    <span className={styles.wizardAnalysisChipLabel}>Tema</span>
+                    <span>{topicLabel}</span>
+                  </span>
+                </div>
+
                 <section className={styles.wizardMobileCard}>
-                  <div className={styles.wizardAnalysisBlockLabel}>Lo que podes ignorar</div>
-                  <p className={styles.wizardAnalysisLongform}>{ignoreGuidance}</p>
+                  <div className={styles.wizardAnalysisBlockLabel}>Que queres hacer?</div>
+                  <div className={styles.wizardDecisionList}>
+                    {decisionActions.map((action) => {
+                      const isAdvisorAction = action.id === "advisor_help";
+                      const isActive = !isAdvisorAction && selectedDecision === action.id;
+
+                      return (
+                        <button
+                          key={action.id}
+                          type="button"
+                          onClick={() => {
+                            if (isAdvisorAction) {
+                              void handleContinueToStep3();
+                              return;
+                            }
+                            setSelectedDecision(action.id);
+                          }}
+                          className={`${styles.wizardDecisionOption} ${isActive ? styles.wizardDecisionOptionActive : ""}`}
+                          disabled={isAdvisorAction && (!analysisId || loadingAdvisor)}
+                        >
+                          <span className={styles.wizardDecisionTitle}>
+                            {isAdvisorAction && loadingAdvisor ? "Cargando consejeros..." : action.title}
+                          </span>
+                          <span className={styles.wizardDecisionCopy}>{action.subtitle}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </section>
               </div>
 
@@ -2159,21 +2144,20 @@ export function WizardScaffold({
                 <div className={styles.wizardFooterSpacer} />
                 <Button
                   type="button"
-                  onClick={handleContinueToStep3}
-                  disabled={!analysisId || loadingAdvisor}
+                  onClick={handleFinishDecision}
                   variant="primary"
                   className={`${styles.wizardPrimaryButton} h-10 min-w-[150px] text-[13px] hover:bg-[#265cc7]`}
                 >
                   <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
                     <path
-                      d="M4 10h12M10 4l6 6-6 6"
+                      d="M4.5 10 8 13.5l7.5-7.5"
                       stroke="currentColor"
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth="1.8"
                     />
                   </svg>
-                  {loadingAdvisor ? t("wizard.button.generating") : "Que hago?"}
+                  Listo
                 </Button>
               </div>
             </>
@@ -2185,9 +2169,9 @@ export function WizardScaffold({
         <div className={`${styles.wizardStepBody} ${styles.wizardStepBodyScroll}`}>
           <div className={styles.wizardStepHeader}>
             <p className={styles.wizardStepKicker}>Paso 3</p>
-            <h3 className={styles.wizardStepIntroTitle}>Que queres hacer?</h3>
+            <h3 className={styles.wizardStepIntroTitle}>Consejeros</h3>
             <p className={styles.wizardStepIntroCopy}>
-              Primero eliges una accion. Si necesitas mas profundidad, abres la subvista actual de consejeros.
+              Elige con quien quieres profundizar. Esta pantalla reutiliza exactamente las cards actuales.
             </p>
           </div>
 
@@ -2198,112 +2182,7 @@ export function WizardScaffold({
             ) : null}
           </div>
 
-          {stepThreeView === "actions" ? (
-            <>
-              <div className={styles.wizardDecisionList}>
-                {decisionActions.map((action) => {
-                  const isAdvisorAction = action.id === "advisor_help";
-                  const isActive = !isAdvisorAction && selectedDecision === action.id;
-
-                  return (
-                    <button
-                      key={action.id}
-                      type="button"
-                      onClick={() => {
-                        if (isAdvisorAction) {
-                          setStepThreeView("advisors");
-                          return;
-                        }
-                        setSelectedDecision(action.id);
-                      }}
-                      className={`${styles.wizardDecisionOption} ${isActive ? styles.wizardDecisionOptionActive : ""}`}
-                    >
-                      <span className={styles.wizardDecisionTitle}>{action.title}</span>
-                      <span className={styles.wizardDecisionCopy}>{action.subtitle}</span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <section className={styles.wizardDecisionPreview}>
-                <div className={styles.wizardAnalysisBlockLabel}>Vista rapida</div>
-                {selectedDecision === "no_reply" ? (
-                  <>
-                    <p className={styles.wizardDecisionPreviewTitle}>No hace falta responder ya.</p>
-                    <p className={styles.wizardDecisionPreviewText}>
-                      {replyTiming?.description || "Puedes pausar la respuesta sin perder contexto."}
-                    </p>
-                  </>
-                ) : decisionPreviewResponse ? (
-                  <>
-                    <p className={styles.wizardDecisionPreviewTitle}>
-                      {selectedDecision === "clear_limit"
-                        ? "Borrador con limite claro"
-                        : selectedDecision === "reply_later"
-                          ? "Borrador para retomar despues"
-                          : "Borrador breve y neutro"}
-                    </p>
-                    <p className={styles.wizardDecisionPreviewText}>{decisionPreviewResponse.text}</p>
-                    <div className={styles.wizardDecisionPreviewActions}>
-                      <Button
-                        type="button"
-                        onClick={() =>
-                          decisionPreviewIndex !== null
-                            ? void handleCopy(decisionPreviewResponse.text, decisionPreviewIndex)
-                            : undefined
-                        }
-                        variant="primary"
-                        className={`h-10 rounded-[12px] px-4 text-[13px] ${
-                          decisionPreviewIndex !== null && copiedIndex === decisionPreviewIndex
-                            ? "bg-[#16A34A] text-white hover:bg-[#15803d]"
-                            : `${styles.wizardPrimaryButton} hover:bg-[#265cc7]`
-                        }`}
-                      >
-                        {decisionPreviewIndex !== null && copiedIndex === decisionPreviewIndex
-                          ? "Respuesta copiada"
-                          : "Copiar borrador"}
-                      </Button>
-                      <Button
-                        type="button"
-                        onClick={() => {
-                          if (decisionPreviewIndex !== null) {
-                            openAdvisorChat(decisionPreviewIndex);
-                          }
-                        }}
-                        variant="secondary"
-                        className={`${styles.wizardSecondaryButton} h-10 text-[13px] hover:bg-[rgba(255,255,255,0.12)]`}
-                      >
-                        Ajustar con ese consejero
-                      </Button>
-                    </div>
-                  </>
-                ) : (
-                  <p className={styles.wizardDecisionPreviewText}>
-                    Aun no hay un borrador disponible para esta accion.
-                  </p>
-                )}
-              </section>
-            </>
-          ) : (
-            <>
-              <div className={styles.wizardSubsectionHeader}>
-                <div>
-                  <p className={styles.wizardAnalysisBlockLabel}>Consejeros</p>
-                  <p className={styles.wizardPanelHint}>
-                    Esta subvista reutiliza las mismas advisor cards actuales del paso 3.
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  onClick={() => setStepThreeView("actions")}
-                  variant="secondary"
-                  className={`${styles.wizardSecondaryButton} h-9 text-[13px] hover:bg-[rgba(255,255,255,0.12)]`}
-                >
-                  Volver a acciones
-                </Button>
-              </div>
-
-              <div className={`${styles.wizardCardsGrid} ${styles.wizardAdvisorCards}`}>
+          <div className={`${styles.wizardCardsGrid} ${styles.wizardAdvisorCards}`}>
                 {Array.from({ length: 3 }).map((_, index) => {
                   const advisorVisual = getAdvisorVisualByIndex(index);
                   const advisorAvatar64 = getAdvisorAvatar(advisorVisual, "64");
@@ -2456,21 +2335,13 @@ export function WizardScaffold({
                     </article>
                   );
                 })}
-              </div>
-            </>
-          )}
+          </div>
 
           <div className={styles.wizardFooterRow}>
             <div className={styles.wizardActionGroup}>
               <Button
                 type="button"
-                onClick={() => {
-                  if (stepThreeView === "advisors") {
-                    setStepThreeView("actions");
-                    return;
-                  }
-                  setCurrentStep(2);
-                }}
+                onClick={() => setCurrentStep(2)}
                 variant="secondary"
                 className={`${styles.wizardSecondaryButton} h-10 text-[13px] hover:bg-[rgba(255,255,255,0.12)]`}
               >
@@ -2483,44 +2354,7 @@ export function WizardScaffold({
                     strokeWidth="1.8"
                   />
                 </svg>
-                {stepThreeView === "advisors" ? "Volver a acciones" : "Volver al paso 2"}
-              </Button>
-            </div>
-            <div className={styles.wizardFooterSpacer} />
-            <div className={styles.wizardActionGroup}>
-              <Button
-                type="button"
-                onClick={() => setCurrentStep(1)}
-                variant="secondary"
-                className={`${styles.wizardMutedButton} h-10 px-3 text-[12px] hover:bg-[rgba(255,255,255,0.08)]`}
-              >
-                <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
-                  <path
-                    d="M10 5.5v4.5m0 0 3 3m-3-3-3 3M4.75 10a5.25 5.25 0 1 1 10.5 0 5.25 5.25 0 0 1-10.5 0Z"
-                    stroke="currentColor"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="1.6"
-                  />
-                </svg>
-                Ninguna me sirve / quiero agregar mas contexto
-              </Button>
-              <Button
-                type="button"
-                onClick={handleStartNewConversation}
-                variant="primary"
-                className={`${styles.wizardPrimaryButton} h-10 text-[13px] hover:bg-[#265cc7]`}
-              >
-                <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
-                  <path
-                    d="M10 4v12M4 10h12"
-                    stroke="currentColor"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="1.8"
-                  />
-                </svg>
-                Iniciar nueva conversacion
+                Volver
               </Button>
             </div>
           </div>
