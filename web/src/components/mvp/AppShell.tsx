@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { AdvisorChatModal } from "@/components/mvp/AdvisorChatModal";
+import { MvpShellContextProvider } from "@/components/mvp/MvpShellContext";
 import styles from "@/components/mvp/MvpShell.module.css";
 import { ADVISOR_PROFILES } from "@/data/advisors";
 import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
@@ -161,6 +162,11 @@ export function AppShell({ children }: AppShellProps) {
     setAdvisorChatOpen(true);
   }
 
+  function openAdvisorConversation(advisorId: string) {
+    const advisorIndex = ADVISOR_PROFILES.findIndex((advisor) => advisor.id === advisorId);
+    handleSelectAdvisor(advisorIndex >= 0 ? advisorIndex : 0);
+  }
+
   async function handleSendAdvisorMessage() {
     if (advisorChatIndex === null || advisorChatSending || !advisorChatInput.trim()) return;
     const userInput = advisorChatInput.trim();
@@ -264,7 +270,15 @@ export function AppShell({ children }: AppShellProps) {
   }
 
   return (
-    <main className={styles.shellRoot}>
+    <MvpShellContextProvider
+      value={{
+        displayName,
+        initials,
+        sidebarConversation,
+        openAdvisorConversation,
+      }}
+    >
+      <main className={styles.shellRoot}>
       <header className={styles.shellTopbar}>
         <div className={styles.shellBrand}>
           <span className={styles.shellBrandAccent} aria-hidden="true" />
@@ -479,6 +493,7 @@ export function AppShell({ children }: AppShellProps) {
         autoSendOnVoiceComplete
         onVoiceSessionSync={handleVoiceAdvisorSessionSync}
       />
-    </main>
+      </main>
+    </MvpShellContextProvider>
   );
 }

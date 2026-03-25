@@ -554,7 +554,11 @@ function ShellStepSection({
 /**
  * Client-side wizard that orchestrates analysis and advisor response calls.
  */
-export function WizardScaffold() {
+export function WizardScaffold({
+  preferredAdvisorId = null,
+}: {
+  preferredAdvisorId?: string | null;
+}) {
   const locale = resolveRuntimeLocale();
   const t = (key: string) => tRuntime(key, locale);
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
@@ -1845,7 +1849,9 @@ export function WizardScaffold() {
               const advisorAvatar64 = getAdvisorAvatar(advisorVisual, "64");
               const response = advisorResult?.responses[index];
               const responseText = response?.text ?? "";
-              const isRecommended = index === 0;
+              const isRecommended = preferredAdvisorId
+                ? advisorVisual.id === preferredAdvisorId
+                : index === 0;
               const advisorInitials = advisorVisual.name
                 .split(" ")
                 .filter((part) => part.trim().length > 0)
@@ -1877,7 +1883,7 @@ export function WizardScaffold() {
                             strokeWidth="1.3"
                           />
                         </svg>
-                        Recomendada
+                        {preferredAdvisorId ? "Tu consejero" : "Recomendada"}
                       </span>
                     ) : null}
                     <span className={styles.wizardAdvisorBadge}>

@@ -1,0 +1,477 @@
+.viewport {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+}
+
+.entryViewport {
+  align-items: center;
+  justify-content: center;
+}
+
+.entryShell {
+  width: 100%;
+  max-width: 430px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.entryPanel {
+  position: relative;
+  overflow: hidden;
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background:
+    radial-gradient(circle at top, rgba(30, 158, 117, 0.12) 0%, transparent 28%),
+    linear-gradient(180deg, rgba(15, 19, 28, 0.98) 0%, rgba(10, 14, 22, 0.98) 100%);
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.34);
+}
+
+.entryPanel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 28%),
+    radial-gradient(circle at bottom right, rgba(45, 107, 228, 0.12) 0%, transparent 36%);
+}
+
+.entryBody {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 22px;
+}
+
+.entryHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.entryBrand {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.entryAvatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid rgba(44, 191, 136, 0.64);
+  background: rgba(29, 158, 117, 0.15);
+  color: #49d49c;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.38);
+}
+
+.headline {
+  margin-top: 6px;
+  font-size: clamp(28px, 7vw, 34px);
+  line-height: 1.08;
+  font-weight: 600;
+  letter-spacing: -0.05em;
+  color: rgba(255, 255, 255, 0.96);
+}
+
+.subcopy {
+  margin-top: 8px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.moodGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.moodButton {
+  display: grid;
+  gap: 5px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.moodButton:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.moodButtonActive {
+  border-color: rgba(255, 255, 255, 0.56);
+  background: linear-gradient(180deg, rgba(35, 43, 58, 0.96) 0%, rgba(23, 29, 41, 0.96) 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.moodTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.moodText {
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.54);
+}
+
+.sessionCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.sessionDot {
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: 999px;
+  background: rgba(126, 184, 247, 0.7);
+  box-shadow: 0 0 0 6px rgba(126, 184, 247, 0.08);
+  flex-shrink: 0;
+}
+
+.sessionLabel {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.38);
+}
+
+.sessionTitle {
+  margin-top: 3px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.sessionMeta {
+  margin-top: 3px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.56);
+}
+
+.actions {
+  display: grid;
+  gap: 10px;
+}
+
+.primaryAction,
+.secondaryAction,
+.tertiaryAction {
+  min-height: 52px;
+  width: 100%;
+  border: 0;
+  border-radius: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 18px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    opacity 160ms ease,
+    background 160ms ease,
+    border-color 160ms ease;
+}
+
+.primaryAction:hover,
+.secondaryAction:hover,
+.tertiaryAction:hover {
+  transform: translateY(-1px);
+}
+
+.primaryAction {
+  background: rgba(245, 247, 250, 0.96);
+  color: #0c1119;
+  border: 0;
+}
+
+.secondaryAction {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.tertiaryAction {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.sheetBackdrop {
+  position: fixed;
+  inset: 56px 0 0 0;
+  z-index: 24;
+  background: rgba(4, 8, 14, 0.64);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 12px 12px;
+  backdrop-filter: blur(6px);
+}
+
+.sheet {
+  width: min(100%, 460px);
+  border-radius: 24px 24px 18px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(180deg, rgba(22, 27, 38, 0.98) 0%, rgba(14, 18, 28, 0.99) 100%);
+  padding: 14px 16px 18px;
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.38);
+}
+
+.sheetHandle {
+  width: 40px;
+  height: 4px;
+  margin: 0 auto 16px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.sheetTitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.96);
+}
+
+.sheetSubtitle {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.58);
+}
+
+.advisorList {
+  display: grid;
+  gap: 9px;
+  margin-top: 18px;
+}
+
+.advisorCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.035);
+  padding: 12px 13px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.advisorCard:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.advisorCardActive {
+  border-color: rgba(255, 255, 255, 0.54);
+  background: linear-gradient(180deg, rgba(38, 45, 59, 0.96) 0%, rgba(25, 30, 42, 0.98) 100%);
+}
+
+.advisorAvatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.advisorAvatarLaura {
+  background: rgba(29, 158, 117, 0.16);
+  color: #33cc97;
+}
+
+.advisorAvatarRobert {
+  background: rgba(55, 138, 221, 0.16);
+  color: #68b5ff;
+}
+
+.advisorAvatarLidia {
+  background: rgba(216, 90, 48, 0.16);
+  color: #ff9467;
+}
+
+.advisorName {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.advisorCopy {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.56);
+}
+
+.checkboxRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  color: rgba(255, 255, 255, 0.64);
+  font-size: 12px;
+}
+
+.checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: #1d9e75;
+}
+
+.sheetActions {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.sheetPrimary {
+  min-height: 50px;
+  width: 100%;
+  border: 0;
+  border-radius: 16px;
+  background: rgba(245, 247, 250, 0.96);
+  color: #0c1119;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sheetSecondary {
+  min-height: 42px;
+  width: 100%;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.wizardViewport {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.intentNotice {
+  border-radius: 18px;
+  border: 1px solid rgba(45, 107, 228, 0.18);
+  background: linear-gradient(180deg, rgba(17, 32, 51, 0.9) 0%, rgba(12, 21, 32, 0.94) 100%);
+  padding: 14px 16px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.18);
+}
+
+.intentLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(126, 184, 247, 0.76);
+}
+
+.intentTitle {
+  margin-top: 5px;
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.intentText {
+  margin-top: 5px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.wizardPanelWrap {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+}
+
+@media (max-width: 1023px) {
+  .entryShell {
+    max-width: none;
+  }
+
+  .entryBody {
+    padding: 18px;
+  }
+
+  .sheetBackdrop {
+    inset: 56px 0 0 0;
+    padding: 0;
+  }
+
+  .sheet {
+    width: 100%;
+    border-radius: 24px 24px 0 0;
+    border-left: 0;
+    border-right: 0;
+    border-bottom: 0;
+    padding-bottom: 22px;
+  }
+}
