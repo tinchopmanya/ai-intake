@@ -70,6 +70,25 @@ type DecisionActionId =
   | "reply_later"
   | "advisor_help";
 
+type DecisionAction = {
+  id: DecisionActionId;
+  title: string;
+  subtitle: string;
+};
+
+type DecisionSignals = {
+  hasConcreteQuestion: boolean;
+  hasLogisticsRequest: boolean;
+  hasImmediateUrgency: boolean;
+  hasHighEmotionOrEscalation: boolean;
+  hasBoundaryOrAggression: boolean;
+  hasChildrenOrCoordination: boolean;
+  shouldAvoidImmediateReply: boolean;
+  shouldOfferBriefReply: boolean;
+  shouldOfferClearLimit: boolean;
+  shouldOfferLaterReply: boolean;
+};
+
 const RISK_LABELS: Record<string, string> = {
   custody_related: "Tema sensible detectado: custodia y coparentalidad",
   high_emotion: "Carga emocional elevada",
@@ -427,6 +446,156 @@ function resolveAdvisorResponseIndex(
   const emotionIndex = byEmotion(["calm", "empathetic", "friendly"]);
   if (emotionIndex >= 0) return emotionIndex;
   return advisorResult.responses[0] ? 0 : null;
+}
+
+function matchesAny(text: string, patterns: RegExp[]) {
+  return patterns.some((pattern) => pattern.test(text));
+}
+
+function getDecisionSignals(
+  analysisResult: AnalysisResponse | null,
+  blocks: ConversationBlock[],
+  fallbackText: string,
+): DecisionSignals {
+  const latestIncomingText = (
+    getLatestExPartnerMessage(blocks) ?? getConversationSubmissionText(blocks, fallbackText)
+  ).toLowerCase();
+  const backendDerivedText = [
+    analysisResult?.summary ?? "",
+    analysisResult?.emotional_context.intent_guess ?? "",
+    analysisResult?.emotional_context.tone ?? "",
+    analysisResult?.tone_detected ?? "",
+    ...(analysisResult?.ui_alerts.map((alert) => alert.message) ?? []),
+    ...(analysisResult?.risk_flags.map((flag) => flag.code.replaceAll("_", " ")) ?? []),
+  ]
+    .join(" ")
+    .toLowerCase();
+  const combinedText = `${latestIncomingText}\n${backendDerivedText}`;
+  const riskCodes = new Set(analysisResult?.risk_flags.map((flag) => flag.code) ?? []);
+  const analysisStatusKind = analysisResult ? getAnalysisStatus(analysisResult).kind : "ok";
+
+  const hasConcreteQuestion =
+    latestIncomingText.includes("?") ||
+    matchesAny(latestIncomingText, [
+      /\b(cuando|cuándo|donde|dónde|como|cómo|quien|quién|puedes|podes|podés|podrias|podrías)\b/,
+      /\b(me confirmas|confirmame|avisame|decime|dime|necesito saber|quiero saber)\b/,
+      /\b(vas a|puedo|podemos|vas a poder)\b/,
+    ]);
+
+  const hasLogisticsRequest = matchesAny(combinedText, [
+    /\b(horario|hora|horas|agenda|calendario|coordina|coordinar|organiza|organizar)\b/,
+    /\b(visita|visitas|retiro|entrega|buscar|llevar|pasar|fin de semana)\b/,
+    /\b(colegio|escuela|guarderia|guardería|medico|médico|doctor|vacuna)\b/,
+    /\b(pago|pagos|gasto|gastos|transferencia|cuota|reintegro)\b/,
+    /\b(permiso|papeles|firma|documento|documentos|viaje|vacaciones)\b/,
+  ]);
+
+  const hasImmediateUrgency =
+    riskCodes.has("urgency_conflict") ||
+    matchesAny(combinedText, [/\b(urgente|urgencia|hoy|ahora|cuanto antes|enseguida)\b/]);
+
+  const hasHighEmotionOrEscalation =
+    riskCodes.has("high_emotion") ||
+    riskCodes.has("passive_aggressive") ||
+    analysisResult?.ui_alerts.some((alert) => alert.level === "critical") === true ||
+    matchesAny(combinedText, [
+      /\b(agresiv|hostil|provoc|escal|enoj|rabia|ira|manipul|culpa|tension|tensión|conflict)\b/,
+    ]) ||
+    analysisStatusKind === "risk";
+
+  const hasBoundaryOrAggression =
+    riskCodes.has("boundary_pressure") ||
+    matchesAny(combinedText, [
+      /\b(limite|límite|presion|presión|control|amenaz|insult|falta de respeto)\b/,
+      /\b(respondeme|respóndeme|tenes que|tenés que|deja de|dejame en paz)\b/,
+      /\b(no me escribas|no aparezcas|no vengas)\b/,
+    ]);
+
+  const hasChildrenOrCoordination =
+    riskCodes.has("custody_related") ||
+    matchesAny(combinedText, [
+      /\b(hijo|hija|hijos|hijas|nene|nena|nenes|nenas|niño|niña|niños|niñas)\b/,
+      /\b(coparent|coordinacion|coordinación|visita|retiro|entrega)\b/,
+      /\b(colegio|escuela|guarderia|guardería|medico|médico|doctor|vacuna)\b/,
+    ]);
+
+  const intentSuggestsReply = matchesAny(backendDerivedText, [
+    /\b(coordina|coordinar|organiza|organizar|aclara|aclarar|pregunta|confirm|solicita)\b/,
+    /\b(respuesta|responder|resolver|logistica|logística)\b/,
+  ]);
+
+  const hasConcreteRequest = hasConcreteQuestion || hasLogisticsRequest || intentSuggestsReply;
+  const shouldAvoidImmediateReply =
+    !hasConcreteRequest || analysisStatusKind === "risk" || (hasHighEmotionOrEscalation && !hasImmediateUrgency);
+  const shouldOfferBriefReply = hasConcreteRequest || hasImmediateUrgency;
+  const shouldOfferClearLimit =
+    riskCodes.has("boundary_pressure") ||
+    riskCodes.has("custody_related") ||
+    hasBoundaryOrAggression ||
+    (hasChildrenOrCoordination && (analysisStatusKind !== "ok" || hasHighEmotionOrEscalation));
+  const shouldOfferLaterReply =
+    shouldOfferBriefReply && (analysisStatusKind !== "ok" || hasHighEmotionOrEscalation);
+
+  return {
+    hasConcreteQuestion,
+    hasLogisticsRequest,
+    hasImmediateUrgency,
+    hasHighEmotionOrEscalation,
+    hasBoundaryOrAggression,
+    hasChildrenOrCoordination,
+    shouldAvoidImmediateReply,
+    shouldOfferBriefReply,
+    shouldOfferClearLimit,
+    shouldOfferLaterReply,
+  };
+}
+
+function getDecisionActions(signals: DecisionSignals): DecisionAction[] {
+  const actions: DecisionAction[] = [];
+
+  if (signals.shouldAvoidImmediateReply) {
+    actions.push({
+      id: "no_reply",
+      title: "No responder ahora",
+      subtitle: signals.hasHighEmotionOrEscalation
+        ? "Responder ahora puede empeorarlo"
+        : "Dejalo pasar, no requiere respuesta inmediata",
+    });
+  }
+
+  if (signals.shouldOfferBriefReply) {
+    actions.push({
+      id: "brief_neutral",
+      title: "Responder breve y neutro",
+      subtitle: "Solo los hechos, sin entrar en el tono",
+    });
+  }
+
+  if (signals.shouldOfferClearLimit) {
+    actions.push({
+      id: "clear_limit",
+      title: "Poner un limite claro",
+      subtitle: signals.hasChildrenOrCoordination
+        ? "Firme, sin agredir, centrado en los hijos"
+        : "Marca el limite sin engancharte",
+    });
+  }
+
+  if (signals.shouldOfferLaterReply) {
+    actions.push({
+      id: "reply_later",
+      title: "Responder mas tarde",
+      subtitle: "Cuando estes mas tranquilo/a",
+    });
+  }
+
+  actions.push({
+    id: "advisor_help",
+    title: "Obtener ayuda de los consejeros",
+    subtitle: "Te ayudamos a pensarlo antes de contestar",
+  });
+
+  return actions;
 }
 
 function buildSidebarConversationTitle(
@@ -816,9 +985,13 @@ export function WizardScaffold({
       setStepThreeView("actions");
       return;
     }
+    const nextPrimaryDecisionId =
+      getDecisionActions(getDecisionSignals(analysisResult, conversationBlocks, messageText)).find(
+        (action) => action.id !== "advisor_help",
+      )?.id ?? "advisor_help";
     setStepThreeView("actions");
-    setSelectedDecision("no_reply");
-  }, [currentStep, advisorResult?.created_at]);
+    setSelectedDecision(nextPrimaryDecisionId);
+  }, [analysisResult, conversationBlocks, currentStep, advisorResult?.created_at, messageText]);
 
   useEffect(() => {
     if (currentStep !== 1) return;
@@ -832,6 +1005,15 @@ export function WizardScaffold({
       setSpeakingResponseIndex(null);
     }
   }, [speakingResponseIndex, speechSynthesis.speaking]);
+
+  useEffect(() => {
+    if (currentStep !== 3) return;
+    const visibleActions = getDecisionActions(getDecisionSignals(analysisResult, conversationBlocks, messageText));
+    const actionStillVisible = visibleActions.some((action) => action.id === selectedDecision);
+    if (actionStillVisible) return;
+    const nextPrimaryDecisionId = visibleActions.find((action) => action.id !== "advisor_help")?.id ?? "advisor_help";
+    setSelectedDecision(nextPrimaryDecisionId);
+  }, [analysisResult, conversationBlocks, currentStep, messageText, selectedDecision]);
 
   function openAdvisorProfileById(advisorId: string) {
     const profile = ADVISOR_PROFILES.find((advisor) => advisor.id === advisorId) ?? null;
@@ -1459,6 +1641,7 @@ export function WizardScaffold({
           : null;
   const decisionPreviewResponse =
     decisionPreviewIndex !== null ? advisorResult?.responses[decisionPreviewIndex] ?? null : null;
+  const decisionActions = getDecisionActions(getDecisionSignals(analysisResult, conversationBlocks, messageText));
 
   return (
     <Panel className={styles.wizardPanel}>
@@ -2018,56 +2201,28 @@ export function WizardScaffold({
           {stepThreeView === "actions" ? (
             <>
               <div className={styles.wizardDecisionList}>
-                <button
-                  type="button"
-                  onClick={() => setSelectedDecision("no_reply")}
-                  className={`${styles.wizardDecisionOption} ${selectedDecision === "no_reply" ? styles.wizardDecisionOptionActive : ""}`}
-                >
-                  <span className={styles.wizardDecisionTitle}>No responder ahora</span>
-                  <span className={styles.wizardDecisionCopy}>
-                    Recomendado cuando el analisis marca mas riesgo que beneficio inmediato.
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedDecision("brief_neutral")}
-                  className={`${styles.wizardDecisionOption} ${selectedDecision === "brief_neutral" ? styles.wizardDecisionOptionActive : ""}`}
-                >
-                  <span className={styles.wizardDecisionTitle}>Responder breve y neutro</span>
-                  <span className={styles.wizardDecisionCopy}>
-                    Usa la variante mas corta y limpia que ya genero el flujo actual.
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedDecision("clear_limit")}
-                  className={`${styles.wizardDecisionOption} ${selectedDecision === "clear_limit" ? styles.wizardDecisionOptionActive : ""}`}
-                >
-                  <span className={styles.wizardDecisionTitle}>Poner un limite claro</span>
-                  <span className={styles.wizardDecisionCopy}>
-                    Prioriza una respuesta firme sin reescribir advisors ni backend.
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedDecision("reply_later")}
-                  className={`${styles.wizardDecisionOption} ${selectedDecision === "reply_later" ? styles.wizardDecisionOptionActive : ""}`}
-                >
-                  <span className={styles.wizardDecisionTitle}>Responder mas tarde</span>
-                  <span className={styles.wizardDecisionCopy}>
-                    Guarda la direccion sugerida y vuelve cuando baje la carga emocional.
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStepThreeView("advisors")}
-                  className={styles.wizardDecisionOption}
-                >
-                  <span className={styles.wizardDecisionTitle}>Obtener ayuda de los consejeros</span>
-                  <span className={styles.wizardDecisionCopy}>
-                    Abre la misma grilla actual de consejeros en una subvista del paso 3.
-                  </span>
-                </button>
+                {decisionActions.map((action) => {
+                  const isAdvisorAction = action.id === "advisor_help";
+                  const isActive = !isAdvisorAction && selectedDecision === action.id;
+
+                  return (
+                    <button
+                      key={action.id}
+                      type="button"
+                      onClick={() => {
+                        if (isAdvisorAction) {
+                          setStepThreeView("advisors");
+                          return;
+                        }
+                        setSelectedDecision(action.id);
+                      }}
+                      className={`${styles.wizardDecisionOption} ${isActive ? styles.wizardDecisionOptionActive : ""}`}
+                    >
+                      <span className={styles.wizardDecisionTitle}>{action.title}</span>
+                      <span className={styles.wizardDecisionCopy}>{action.subtitle}</span>
+                    </button>
+                  );
+                })}
               </div>
 
               <section className={styles.wizardDecisionPreview}>
