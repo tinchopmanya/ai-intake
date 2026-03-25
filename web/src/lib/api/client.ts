@@ -3,6 +3,7 @@ import { authFetch } from "@/lib/auth/client";
 import type { AdvisorRequest } from "@/lib/api/types";
 import type { AdvisorChatRequest } from "@/lib/api/types";
 import type { AdvisorChatResponse } from "@/lib/api/types";
+import type { AdvisorVoiceRequest } from "@/lib/api/types";
 import type { AdvisorResponse } from "@/lib/api/types";
 import type { AnalysisRequest } from "@/lib/api/types";
 import type { AnalysisResponse } from "@/lib/api/types";
@@ -81,6 +82,37 @@ export function postAdvisor(payload: AdvisorRequest): Promise<AdvisorResponse> {
 
 export function postAdvisorChat(payload: AdvisorChatRequest): Promise<AdvisorChatResponse> {
   return postJson<AdvisorChatResponse>("/v1/advisor/chat", payload);
+}
+
+export async function postAdvisorVoice(payload: AdvisorVoiceRequest): Promise<AdvisorChatResponse> {
+  const formData = new FormData();
+  formData.append("advisor_id", payload.advisor_id);
+  formData.append("entry_mode", payload.entry_mode);
+  formData.append("transcript", payload.transcript);
+  formData.append("messages_json", JSON.stringify(payload.messages));
+  if (payload.case_id) {
+    formData.append("case_id", payload.case_id);
+  }
+  if (payload.conversation_context) {
+    formData.append("conversation_context_json", JSON.stringify(payload.conversation_context));
+  }
+  if (payload.base_reply) {
+    formData.append("base_reply", payload.base_reply);
+  }
+  if (payload.debug) {
+    formData.append("debug", "true");
+  }
+  const extension = payload.audio_mime_type?.includes("ogg")
+    ? "ogg"
+    : payload.audio_mime_type?.includes("mp4")
+      ? "m4a"
+      : "webm";
+  formData.append("audio", payload.audio_blob, `voice-input.${extension}`);
+
+  return requestJson<AdvisorChatResponse>("/v1/advisor/voice", {
+    method: "POST",
+    body: formData,
+  });
 }
 
 /**

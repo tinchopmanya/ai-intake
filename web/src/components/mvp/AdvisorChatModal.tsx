@@ -600,7 +600,7 @@ export function AdvisorChatModal({
 
   return (
     <>
-      <div className={`${styles.cpOverlay} z-50 backdrop-blur-[2px]`}>
+      <div className={styles.cpOverlay}>
         <div className="relative w-full max-w-[560px]">
           <button
             type="button"

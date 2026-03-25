@@ -91,6 +91,28 @@ export type AdvisorChatResponse = {
   debug?: Record<string, unknown> | null;
 };
 
+export type AdvisorVoiceRequest = {
+  advisor_id: string;
+  entry_mode: "advisor_conversation" | "advisor_refine_response";
+  transcript: string;
+  audio_blob: Blob;
+  audio_mime_type?: string;
+  messages: Array<{
+    role: "user" | "advisor";
+    content: string;
+  }>;
+  case_id?: string | null;
+  conversation_context?: {
+    user_name?: string | null;
+    ex_name?: string | null;
+    has_children?: boolean | null;
+    relationship_type?: string | null;
+    extra?: Record<string, unknown> | null;
+  } | null;
+  base_reply?: string | null;
+  debug?: boolean;
+};
+
 export type WizardEventRequest = {
   event_name: "reply_copied" | "case_exported";
   session_id?: string | null;
