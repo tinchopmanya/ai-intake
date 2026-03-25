@@ -711,13 +711,14 @@ function ShellStepper({
   currentStep,
   labels,
 }: {
-  currentStep: 1 | 2 | 3;
-  labels: [string, string, string];
+  currentStep: 1 | 2 | 3 | 4;
+  labels: [string, string, string, string];
 }) {
   const steps = [
     { id: 1, label: labels[0] },
     { id: 2, label: labels[1] },
     { id: 3, label: labels[2] },
+    { id: 4, label: labels[3] },
   ] as const;
 
   return (
@@ -800,7 +801,7 @@ export function WizardScaffold({
 }) {
   const locale = resolveRuntimeLocale();
   const t = (key: string) => tRuntime(key, locale);
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
   const [stepOneInputMode, setStepOneInputMode] = useState<StepOneInputMode>("write");
   const [selectedDecision, setSelectedDecision] = useState<DecisionActionId>("no_reply");
   const [messageText, setMessageText] = useState("");
@@ -938,48 +939,24 @@ export function WizardScaffold({
     const transcript = contextVoice.transcript.trim();
     if (!transcript) return;
 
-    if (stepOneInputMode === "voice") {
-      setMessageText((previous) => {
-        const nextText = previous.trim() ? `${previous.trim()}\n${transcript}` : transcript;
-        if (looksLikeConversationInput(nextText)) {
-          window.setTimeout(() => {
-            void interpretConversationText(nextText, "text");
-          }, 0);
-        }
-        return nextText;
-      });
-      window.setTimeout(() => {
-        const input = document.getElementById("wizard-primary-input") as HTMLTextAreaElement | null;
-        input?.focus();
-      }, 30);
-      contextVoice.resetTranscript();
-      return;
-    }
-
-    setContextOptional((previous) =>
-      previous.trim()
-        ? `${previous.trim()}\n${transcript}`
-        : transcript,
-    );
-    const wrapper = document.getElementById("wizard-context-optional-wrap");
-    if (wrapper) {
-      wrapper.style.transition = "box-shadow 180ms ease, background-color 180ms ease";
-      wrapper.style.boxShadow = "0 0 0 2px rgba(191, 219, 254, 1)";
-      wrapper.style.backgroundColor = "#f8fafc";
-      window.setTimeout(() => {
-        wrapper.style.boxShadow = "";
-        wrapper.style.backgroundColor = "";
-      }, 850);
-    }
+    setMessageText((previous) => {
+      const nextText = previous.trim() ? `${previous.trim()}\n${transcript}` : transcript;
+      if (looksLikeConversationInput(nextText)) {
+        window.setTimeout(() => {
+          void interpretConversationText(nextText, "text");
+        }, 0);
+      }
+      return nextText;
+    });
     window.setTimeout(() => {
-      const input = document.getElementById("wizard-context-optional") as HTMLInputElement | null;
+      const input = document.getElementById("wizard-primary-input") as HTMLTextAreaElement | null;
       input?.focus();
     }, 30);
     contextVoice.resetTranscript();
   }, [contextVoice.transcript, stepOneInputMode, contextVoice]);
 
   useEffect(() => {
-    if (currentStep !== 2) {
+    if (currentStep !== 3) {
       return;
     }
     const nextPrimaryDecisionId =
@@ -990,7 +967,7 @@ export function WizardScaffold({
   }, [analysisResult, conversationBlocks, currentStep, advisorResult?.created_at, messageText]);
 
   useEffect(() => {
-    if (currentStep !== 1) return;
+    if (currentStep !== 2) return;
     const container = conversationListRef.current;
     if (!container) return;
     container.scrollTop = container.scrollHeight;
@@ -1003,7 +980,7 @@ export function WizardScaffold({
   }, [speakingResponseIndex, speechSynthesis.speaking]);
 
   useEffect(() => {
-    if (currentStep !== 2) return;
+    if (currentStep !== 3) return;
     const visibleActions = getDecisionActions(getDecisionSignals(analysisResult, conversationBlocks, messageText));
     const actionStillVisible = visibleActions.some((action) => action.id === selectedDecision);
     if (actionStillVisible) return;
@@ -1323,7 +1300,7 @@ export function WizardScaffold({
         context: buildContextPayload(),
       });
       setAdvisorResult(result);
-      setCurrentStep(3);
+      setCurrentStep(4);
     } catch (exc) {
       setAdvisorError(toUiErrorMessage(exc, "No se pudo generar respuestas de advisor."));
     } finally {
@@ -1341,11 +1318,27 @@ export function WizardScaffold({
     setAnalysisResult(null);
     setAnalysisId(null);
     setAnalysisError(null);
-    setCurrentStep(2);
+    setAdvisorResult(null);
+    setAdvisorError(null);
+
+    if (conversationBlocks.length > 0) {
+      setCurrentStep(2);
+      return;
+    }
+
+    setCurrentStep(3);
     await runAnalysis();
   }
 
-  async function handleContinueToStep3() {
+  async function handleContinueFromReviewStep() {
+    setAnalysisResult(null);
+    setAnalysisId(null);
+    setAnalysisError(null);
+    setCurrentStep(3);
+    await runAnalysis();
+  }
+
+  async function handleContinueToStep4() {
     if (!analysisId) return;
     await requestAdvisor({ quickMode: false, analysisId });
   }
@@ -1633,17 +1626,15 @@ export function WizardScaffold({
     <Panel className={styles.wizardPanel}>
       <ShellStepper
         currentStep={currentStep}
-        labels={["Entrada", "Analisis", "Consejeros"]}
+        labels={["Entrada", "Revision", "Analisis", "Consejeros"]}
       />
 
       {currentStep === 1 ? (
         <div className={`${styles.wizardStepBody} ${styles.wizardStepBodyScroll}`}>
           <div className={styles.wizardStepHeader}>
-            <p className={styles.wizardStepKicker}>Paso 1</p>
-            <h3 className={styles.wizardStepIntroTitle}>Que paso?</h3>
+            <h3 className={styles.wizardStepIntroTitle}>¿Qué pasó?</h3>
             <p className={styles.wizardStepIntroCopy}>
-              Escribe, sube una captura o dicta la conversacion. La separacion de turnos y la correccion
-              manual siguen usando la logica actual.
+              Escribí, subí una captura o dictá la conversación.
             </p>
             {caseError ? <p className="mt-2 text-xs text-red-700">{caseError}</p> : null}
           </div>
@@ -1655,21 +1646,74 @@ export function WizardScaffold({
                 onClick={() => setStepOneInputMode("write")}
                 className={`${styles.wizardModeTab} ${stepOneInputMode === "write" ? styles.wizardModeTabActive : ""}`}
               >
-                Escribir
+                <span className={styles.wizardModeTabInner}>
+                  <span className={styles.wizardModeTabIcon} aria-hidden="true">
+                    <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none">
+                      <path
+                        d="M4.5 13.75V16h2.25l7.9-7.9-2.25-2.25-7.9 7.9Zm9.15-8.9 1.25-1.25a1.06 1.06 0 0 1 1.5 0l.75.75a1.06 1.06 0 0 1 0 1.5l-1.25 1.25-2.25-2.25Z"
+                        stroke="currentColor"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="1.6"
+                      />
+                    </svg>
+                  </span>
+                  <span>Escribir</span>
+                </span>
               </button>
               <button
                 type="button"
                 onClick={() => setStepOneInputMode("capture")}
                 className={`${styles.wizardModeTab} ${stepOneInputMode === "capture" ? styles.wizardModeTabActive : ""}`}
               >
-                Captura
+                <span className={styles.wizardModeTabInner}>
+                  <span className={styles.wizardModeTabIcon} aria-hidden="true">
+                    <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none">
+                      <path
+                        d="M6.25 5.5h1.1l.85-1.25h3.6l.85 1.25h1.1a2 2 0 0 1 2 2v5.75a2 2 0 0 1-2 2h-7.5a2 2 0 0 1-2-2V7.5a2 2 0 0 1 2-2Z"
+                        stroke="currentColor"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="1.6"
+                      />
+                      <path
+                        d="M10 12.75a2.25 2.25 0 1 0 0-4.5 2.25 2.25 0 0 0 0 4.5Z"
+                        stroke="currentColor"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="1.6"
+                      />
+                    </svg>
+                  </span>
+                  <span>Captura</span>
+                </span>
               </button>
               <button
                 type="button"
                 onClick={() => setStepOneInputMode("voice")}
                 className={`${styles.wizardModeTab} ${stepOneInputMode === "voice" ? styles.wizardModeTabActive : ""}`}
               >
-                Voz
+                <span className={styles.wizardModeTabInner}>
+                  <span className={styles.wizardModeTabIcon} aria-hidden="true">
+                    <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none">
+                      <path
+                        d="M10 3.75A2.25 2.25 0 0 0 7.75 6v3.25a2.25 2.25 0 1 0 4.5 0V6A2.25 2.25 0 0 0 10 3.75Z"
+                        stroke="currentColor"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="1.6"
+                      />
+                      <path
+                        d="M5.75 9a4.25 4.25 0 1 0 8.5 0M10 13.75v2.5m-2 0h4"
+                        stroke="currentColor"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="1.6"
+                      />
+                    </svg>
+                  </span>
+                  <span>Voz</span>
+                </span>
               </button>
             </div>
 
@@ -1677,8 +1721,8 @@ export function WizardScaffold({
               <div className={styles.wizardInputGroup}>
                 <div className={styles.wizardPanelTitleRow}>
                   <div>
-                    <h4 className={styles.wizardPanelTitle}>Escribir o pegar</h4>
-                    <p className={styles.wizardPanelHint}>Pega la conversacion y reutilizamos el parser actual.</p>
+                    <h4 className={styles.wizardPanelTitle}>Escribir</h4>
+                    <p className={styles.wizardPanelHint}>Pegá el mensaje o contalo con tus palabras.</p>
                   </div>
                   {hasConversationInput ? (
                     <button
@@ -1705,7 +1749,7 @@ export function WizardScaffold({
                   value={messageText}
                   onChange={(event) => handleMessageTextChange(event.target.value)}
                   rows={7}
-                  placeholder="Pega aqui el mensaje que recibiste o copia la conversacion completa."
+                  placeholder="Pegá el mensaje que recibiste o copiá la conversación completa."
                   spellCheck={false}
                   className={styles.wizardPrimaryTextarea}
                 />
@@ -1715,8 +1759,8 @@ export function WizardScaffold({
             {stepOneInputMode === "capture" ? (
               <div className={styles.wizardInputGroup}>
                 <div>
-                  <h4 className={styles.wizardPanelTitle}>Subir captura</h4>
-                  <p className={styles.wizardPanelHint}>Usa el OCR actual y revisa el texto antes del analisis.</p>
+                  <h4 className={styles.wizardPanelTitle}>Captura</h4>
+                  <p className={styles.wizardPanelHint}>Adjuntá una imagen y reutilizamos el OCR actual.</p>
                 </div>
                 <input
                   type="file"
@@ -1756,7 +1800,7 @@ export function WizardScaffold({
                   value={messageText}
                   onChange={(event) => handleMessageTextChange(event.target.value)}
                   rows={6}
-                  placeholder="Aqui aparecera el texto extraido para que puedas ajustarlo."
+                  placeholder="Acá va a aparecer el texto extraído para que lo ajustes."
                   spellCheck={false}
                   className={styles.wizardPrimaryTextarea}
                 />
@@ -1766,8 +1810,8 @@ export function WizardScaffold({
             {stepOneInputMode === "voice" ? (
               <div className={styles.wizardInputGroup}>
                 <div>
-                  <h4 className={styles.wizardPanelTitle}>Dictar la conversacion</h4>
-                  <p className={styles.wizardPanelHint}>El dictado entra directo al campo principal.</p>
+                  <h4 className={styles.wizardPanelTitle}>Voz</h4>
+                  <p className={styles.wizardPanelHint}>Tu dictado entra directo al texto principal.</p>
                 </div>
                 <div className={styles.wizardVoiceCaptureCard}>
                   <button
@@ -1816,7 +1860,7 @@ export function WizardScaffold({
                   value={messageText}
                   onChange={(event) => handleMessageTextChange(event.target.value)}
                   rows={7}
-                  placeholder="Aqui se ira armando el dictado para que lo revises."
+                  placeholder="Acá se va armando el dictado para que lo revises."
                   spellCheck={false}
                   className={styles.wizardPrimaryTextarea}
                 />
@@ -1825,66 +1869,6 @@ export function WizardScaffold({
                 ) : null}
               </div>
             ) : null}
-
-            <div className={styles.wizardInputGroup}>
-              <div>
-                <h4 className={styles.wizardPanelTitle}>Contexto opcional</h4>
-                <p className={styles.wizardPanelHint}>Agrega contexto breve para entender mejor la situacion.</p>
-              </div>
-              <div id="wizard-context-optional-wrap" className="rounded-xl transition-all duration-200">
-                <div className={styles.wizardContextRow}>
-                  <input
-                    id="wizard-context-optional"
-                    type="text"
-                    value={contextOptional}
-                    onChange={(event) => setContextOptional(event.target.value)}
-                    placeholder="Contanos el contexto para entender mejor"
-                    spellCheck={false}
-                    className={styles.wizardContextInput}
-                  />
-                  {stepOneInputMode !== "voice" ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (contextVoice.listening) {
-                          contextVoice.stopListening();
-                        } else {
-                          contextVoice.startListening();
-                        }
-                      }}
-                      disabled={contextVoice.microphoneStatus === "requesting"}
-                      className={`${styles.wizardVoiceMic} ${
-                        contextVoice.listening ? styles.wizardVoiceMicActive : ""
-                      }`}
-                      aria-label={contextVoice.listening ? "Escuchando contexto" : "Dictar contexto"}
-                    >
-                      <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none">
-                        <path
-                          d="M12 3.75a2.75 2.75 0 0 0-2.75 2.75v4.75a2.75 2.75 0 1 0 5.5 0V6.5A2.75 2.75 0 0 0 12 3.75Z"
-                          stroke="currentColor"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="1.85"
-                        />
-                        <path
-                          d="M6.75 10.75a5.25 5.25 0 1 0 10.5 0M12 16v4.25M9.25 20.25h5.5"
-                          stroke="currentColor"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="1.85"
-                        />
-                      </svg>
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-              {stepOneInputMode !== "voice" && contextMicrophoneStatusMessage ? (
-                <p className={styles.wizardPanelHint}>{contextMicrophoneStatusMessage}</p>
-              ) : null}
-              {stepOneInputMode !== "voice" && contextVoice.error ? (
-                <p className="text-[12px] text-[#92400e]">{getSpeechToTextErrorMessage(contextVoice.error)}</p>
-              ) : null}
-            </div>
 
             {ocrCapabilities?.available === false ? (
               <p className="text-xs text-amber-700">
@@ -1904,18 +1888,70 @@ export function WizardScaffold({
             {autoParseError ? <p className="text-xs text-amber-700">{autoParseError}</p> : null}
           </section>
 
+          <div className={styles.wizardStepActions}>
+            <div className={styles.wizardActionGroup}>
+              {hasConversationInput ? (
+                <Button
+                  type="button"
+                  onClick={handleStartNewConversation}
+                  variant="secondary"
+                  className={`${styles.wizardSecondaryButton} h-10 text-[13px] hover:bg-[rgba(255,255,255,0.12)]`}
+                >
+                  Limpiar
+                </Button>
+              ) : null}
+            </div>
+            <div className={styles.wizardActionGroup}>
+              <Button
+                type="button"
+                onClick={handleContinueFromStep1}
+                disabled={
+                  (!messageText.trim() && conversationBlocks.length === 0) ||
+                  loadingAnalysis ||
+                  autoParsing ||
+                  ocrLoading
+                }
+                variant="primary"
+                className={`${styles.wizardPrimaryButton} h-10 text-[13px] hover:bg-[#265cc7]`}
+              >
+                <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
+                  <path
+                    d="M4 10h12M10 4l6 6-6 6"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="1.8"
+                  />
+                </svg>
+                {loadingAnalysis ? t("wizard.button.analyzing") : "Continuar"}
+              </Button>
+            </div>
+          </div>
+          {advisorError ? <p className="mt-2 text-sm text-red-700">{advisorError}</p> : null}
+        </div>
+      ) : null}
+      {currentStep === 2 ? (
+        <div className={`${styles.wizardStepBody} ${styles.wizardStepBodyScroll}`}>
+          <div className={styles.wizardStepHeader}>
+            <p className={styles.wizardStepKicker}>Paso 2</p>
+            <h3 className={styles.wizardStepIntroTitle}>Revisión</h3>
+            <p className={styles.wizardStepIntroCopy}>
+              Corregí quién dijo qué antes de pasar al análisis.
+            </p>
+          </div>
+
           <section className={styles.wizardMobileCard}>
             <div className={styles.wizardPanelTitleRow}>
               <div>
-                <h4 className={styles.wizardPanelTitle}>Revision de speakers</h4>
-                <p className={styles.wizardPanelHint}>Corrige quien dijo que sin salir del paso 1.</p>
+                <h4 className={styles.wizardPanelTitle}>Revisión de speakers</h4>
+                <p className={styles.wizardPanelHint}>Ajustá los turnos con la lógica actual antes de analizar.</p>
               </div>
             </div>
 
             <div ref={conversationListRef} className={styles.wizardConversationList}>
               {conversationBlocks.length === 0 ? (
                 <p className={styles.wizardEmptyState}>
-                  Cuando detectemos una conversacion, aparecera aqui en bloques editables.
+                  No detectamos bloques separados para revisar. Podés seguir directo al análisis.
                 </p>
               ) : null}
               {conversationBlocks.map((item) => (
@@ -1970,47 +2006,51 @@ export function WizardScaffold({
             </div>
           </section>
 
-          <div className={styles.wizardStepActions}>
-            <div className={styles.wizardActionGroup}>
-              {hasConversationInput ? (
-                <Button
-                  type="button"
-                  onClick={handleStartNewConversation}
-                  variant="secondary"
-                  className={`${styles.wizardSecondaryButton} h-10 text-[13px] hover:bg-[rgba(255,255,255,0.12)]`}
-                >
-                  Limpiar
-                </Button>
-              ) : null}
-            </div>
-            <div className={styles.wizardActionGroup}>
-              <Button
-                type="button"
-                onClick={handleContinueFromStep1}
-                disabled={(!messageText.trim() && conversationBlocks.length === 0) || loadingAnalysis}
-                variant="primary"
-                className={`${styles.wizardPrimaryButton} h-10 text-[13px] hover:bg-[#265cc7]`}
-              >
-                <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
-                  <path
-                    d="M4 10h12M10 4l6 6-6 6"
-                    stroke="currentColor"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="1.8"
-                  />
-                </svg>
-                {loadingAnalysis ? t("wizard.button.analyzing") : "Ver analisis"}
-              </Button>
-            </div>
+          <div className={styles.wizardFooterRow}>
+            <Button
+              type="button"
+              onClick={() => setCurrentStep(1)}
+              variant="secondary"
+              className={`${styles.wizardSecondaryButton} h-10 text-[13px] hover:bg-[rgba(255,255,255,0.12)]`}
+            >
+              <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
+                <path
+                  d="M16 10H4m6 6-6-6 6-6"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="1.8"
+                />
+              </svg>
+              Volver
+            </Button>
+            <div className={styles.wizardFooterSpacer} />
+            <Button
+              type="button"
+              onClick={() => void handleContinueFromReviewStep()}
+              disabled={loadingAnalysis}
+              variant="primary"
+              className={`${styles.wizardPrimaryButton} h-10 min-w-[150px] text-[13px] hover:bg-[#265cc7]`}
+            >
+              <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
+                <path
+                  d="M4 10h12M10 4l6 6-6 6"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="1.8"
+                />
+              </svg>
+              {loadingAnalysis ? t("wizard.button.analyzing") : "Ver analisis"}
+            </Button>
           </div>
-          {advisorError ? <p className="mt-2 text-sm text-red-700">{advisorError}</p> : null}
         </div>
       ) : null}
-      {currentStep === 2 ? (
+
+      {currentStep === 3 ? (
         <div className={`${styles.wizardStepBody} ${styles.wizardStepBodyScroll}`}>
           <div className={styles.wizardStepHeader}>
-            <p className={styles.wizardStepKicker}>Paso 2</p>
+            <p className={styles.wizardStepKicker}>Paso 3</p>
             <h3 className={styles.wizardStepIntroTitle}>Analisis</h3>
             <p className={styles.wizardStepIntroCopy}>
               Solo lo esencial para decidir si responder, esperar o consultar con un consejero.
@@ -2045,10 +2085,10 @@ export function WizardScaffold({
                       }`}
                     >
                       {analysisStatus?.kind === "risk"
-                          ? "Pausa"
-                          : analysisStatus?.kind === "observation"
-                            ? "Cautela"
-                            : "Estable"}
+                        ? "Pausa"
+                        : analysisStatus?.kind === "observation"
+                          ? "Cautela"
+                          : "Estable"}
                     </span>
                   </div>
                 </section>
@@ -2104,7 +2144,7 @@ export function WizardScaffold({
                           type="button"
                           onClick={() => {
                             if (isAdvisorAction) {
-                              void handleContinueToStep3();
+                              void handleContinueToStep4();
                               return;
                             }
                             setSelectedDecision(action.id);
@@ -2126,7 +2166,7 @@ export function WizardScaffold({
               <div className={styles.wizardFooterRow}>
                 <Button
                   type="button"
-                  onClick={() => setCurrentStep(1)}
+                  onClick={() => setCurrentStep(conversationBlocks.length > 0 ? 2 : 1)}
                   variant="secondary"
                   className={`${styles.wizardSecondaryButton} h-10 text-[13px] hover:bg-[rgba(255,255,255,0.12)]`}
                 >
@@ -2165,10 +2205,10 @@ export function WizardScaffold({
         </div>
       ) : null}
 
-      {currentStep === 3 ? (
+      {currentStep === 4 ? (
         <div className={`${styles.wizardStepBody} ${styles.wizardStepBodyScroll}`}>
           <div className={styles.wizardStepHeader}>
-            <p className={styles.wizardStepKicker}>Paso 3</p>
+            <p className={styles.wizardStepKicker}>Paso 4</p>
             <h3 className={styles.wizardStepIntroTitle}>Consejeros</h3>
             <p className={styles.wizardStepIntroCopy}>
               Elige con quien quieres profundizar. Esta pantalla reutiliza exactamente las cards actuales.
@@ -2341,7 +2381,7 @@ export function WizardScaffold({
             <div className={styles.wizardActionGroup}>
               <Button
                 type="button"
-                onClick={() => setCurrentStep(2)}
+                onClick={() => setCurrentStep(3)}
                 variant="secondary"
                 className={`${styles.wizardSecondaryButton} h-10 text-[13px] hover:bg-[rgba(255,255,255,0.12)]`}
               >

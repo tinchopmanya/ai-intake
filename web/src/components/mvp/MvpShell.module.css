@@ -597,6 +597,9 @@
 }
 
 .wizardModeTab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 42px;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -606,6 +609,24 @@
   font-weight: 600;
   cursor: pointer;
   transition: background 180ms ease, border-color 180ms ease, color 180ms ease;
+}
+
+.wizardModeTabInner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.wizardModeTabIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.wizardModeTabActive .wizardModeTabIcon {
+  color: #ff8a65;
 }
 
 .wizardModeTabActive {
@@ -1589,16 +1610,21 @@
     margin-bottom: 8px;
   }
 
+  .wizardStepItem {
+    gap: 8px;
+  }
+
   .wizardStepLead {
-    gap: 10px;
+    gap: 8px;
   }
 
   .wizardStepLabel {
-    font-size: 11px;
+    font-size: 10px;
   }
 
   .wizardStepConnector {
-    margin: 0 8px;
+    min-width: 8px;
+    margin: 0 4px;
   }
 
   .wizardModeTabs {
@@ -1608,6 +1634,10 @@
   .wizardModeTab {
     min-height: 40px;
     font-size: 12px;
+  }
+
+  .wizardModeTabInner {
+    gap: 6px;
   }
 
   .wizardPrimaryTextarea {
