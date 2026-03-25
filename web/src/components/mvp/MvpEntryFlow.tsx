@@ -269,14 +269,34 @@ export function MvpEntryFlow() {
             aria-labelledby="advisor-selector-title"
           >
             <div className={styles.sheetHandle} aria-hidden="true" />
-            <h2 id="advisor-selector-title" className={styles.sheetTitle}>
-              {selectorIntent === "vent" ? "Con quien quieres hablar?" : "Con quien quieres escribir?"}
-            </h2>
-            <p className={styles.sheetSubtitle}>
-              {selectorIntent === "vent"
-                ? "Elige el consejero con el que te sientas mas comodo/a para desahogarte."
-                : "Elige el consejero que quieres priorizar cuando pases al flujo actual de respuesta."}
-            </p>
+            <div className={styles.sheetHeader}>
+              <div>
+                <h2 id="advisor-selector-title" className={styles.sheetTitle}>
+                  {selectorIntent === "vent" ? "Con quien quieres hablar?" : "Con quien quieres escribir?"}
+                </h2>
+                <p className={styles.sheetSubtitle}>
+                  {selectorIntent === "vent"
+                    ? "Elige el consejero con el que te sientas mas comodo/a para desahogarte."
+                    : "Elige el consejero que quieres priorizar cuando pases al flujo actual de respuesta."}
+                </p>
+              </div>
+              <button
+                type="button"
+                className={styles.sheetClose}
+                aria-label="Cerrar selector de consejeros"
+                onClick={() => setSelectorIntent(null)}
+              >
+                <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
+                  <path
+                    d="M6 6l8 8M14 6l-8 8"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="1.8"
+                  />
+                </svg>
+              </button>
+            </div>
 
             <div className={styles.advisorList}>
               {ADVISOR_PROFILES.map((advisor) => {
@@ -298,10 +318,11 @@ export function MvpEntryFlow() {
                     <span className={`${styles.advisorAvatar} ${avatarClass}`}>
                       {advisor.id === "lidia" ? "Li" : advisor.name[0]}
                     </span>
-                    <span>
+                    <span className={styles.advisorTextGroup}>
                       <span className={styles.advisorName}>{advisor.name}</span>
                       <span className={styles.advisorCopy}>{ADVISOR_MICROCOPY[advisor.id]}</span>
                     </span>
+                    {isActive ? <span className={styles.advisorSelectedMark}>Elegido</span> : null}
                   </button>
                 );
               })}

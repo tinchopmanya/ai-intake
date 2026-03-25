@@ -387,7 +387,10 @@
   min-width: 0;
   min-height: 0;
   flex: 1;
-  padding: 22px;
+  justify-content: center;
+  align-items: stretch;
+  overflow: hidden;
+  padding: 24px;
 }
 
 .shellMobileBackdrop {
@@ -400,19 +403,19 @@
 .wizardPanel {
   height: 100%;
   min-height: 0;
-  width: min(100%, 880px);
+  width: min(100%, 860px);
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 16px;
   overflow: hidden;
   border: 1px solid var(--panel-border);
-  border-radius: 22px;
+  border-radius: 26px;
   background:
     radial-gradient(circle at top left, rgba(45, 107, 228, 0.07) 0%, transparent 28%),
     linear-gradient(180deg, rgba(13, 24, 37, 0.98) 0%, rgba(10, 21, 32, 0.98) 100%);
-  padding: 22px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.24);
+  padding: 20px;
+  box-shadow: 0 28px 72px rgba(0, 0, 0, 0.26);
   margin: 0 auto;
 }
 
@@ -422,7 +425,7 @@
   width: 100%;
   gap: 0;
   overflow: hidden;
-  margin-bottom: 16px;
+  margin-bottom: 10px;
   padding: 0;
 }
 
@@ -566,7 +569,8 @@
 
 .wizardStepBodyScroll {
   overflow-y: auto;
-  padding-right: 2px;
+  padding-right: 4px;
+  overscroll-behavior: contain;
 }
 
 .wizardStepBodyScroll::-webkit-scrollbar {
@@ -584,7 +588,7 @@
   border-radius: 22px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: linear-gradient(180deg, rgba(17, 32, 51, 0.9) 0%, rgba(10, 21, 32, 0.96) 100%);
-  padding: 16px;
+  padding: 18px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
@@ -595,7 +599,7 @@
 }
 
 .wizardModeTab {
-  min-height: 40px;
+  min-height: 42px;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.04);
@@ -670,8 +674,8 @@
 }
 
 .wizardPrimaryTextarea {
-  min-height: 180px;
-  max-height: 280px;
+  min-height: 190px;
+  max-height: 300px;
   resize: none;
   overflow-y: auto;
   border-radius: 16px;
@@ -866,7 +870,7 @@
   flex-direction: column;
   gap: 12px;
   overflow-y: auto;
-  max-height: min(38vh, 420px);
+  max-height: min(40vh, 430px);
   min-height: 180px;
   border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -1100,7 +1104,7 @@
   border-radius: 22px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: linear-gradient(180deg, rgba(17, 32, 51, 0.92) 0%, rgba(10, 21, 32, 0.96) 100%);
-  padding: 18px;
+  padding: 20px;
   box-shadow: 0 16px 34px rgba(0, 0, 0, 0.14);
 }
 
@@ -1269,7 +1273,7 @@
 
 .wizardDecisionList {
   display: grid;
-  gap: 10px;
+  gap: 11px;
 }
 
 .wizardDecisionOption {
@@ -1293,6 +1297,7 @@
 .wizardDecisionOptionActive {
   border-color: rgba(126, 184, 247, 0.34);
   background: rgba(45, 107, 228, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(126, 184, 247, 0.08);
 }
 
 .wizardDecisionTitle {
@@ -1316,7 +1321,7 @@
   border-radius: 22px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: linear-gradient(180deg, rgba(17, 32, 51, 0.92) 0%, rgba(10, 21, 32, 0.96) 100%);
-  padding: 16px;
+  padding: 18px;
 }
 
 .wizardDecisionPreviewTitle {
@@ -1538,6 +1543,17 @@
     padding: 14px;
   }
 
+  .wizardPanel {
+    border-radius: 24px;
+    padding: 16px;
+  }
+
+  .wizardMobileCard,
+  .wizardAnalysisPrimaryCard,
+  .wizardDecisionPreview {
+    padding: 16px;
+  }
+
   .wizardStepOneGrid,
   .wizardAdvisorCards {
     grid-template-columns: minmax(0, 1fr);
@@ -1547,5 +1563,71 @@
   .wizardSubsectionHeader {
     flex-direction: column;
     align-items: flex-start;
+  }
+}
+
+@media (min-width: 1024px) and (max-width: 1399px) {
+  .wizardAdvisorCards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .wizardAdvisorCards > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 639px) {
+  .shellContent {
+    padding: 12px;
+  }
+
+  .wizardPanel {
+    width: 100%;
+    border-radius: 22px;
+    padding: 14px;
+  }
+
+  .wizardStepper {
+    margin-bottom: 8px;
+  }
+
+  .wizardStepLead {
+    gap: 10px;
+  }
+
+  .wizardStepLabel {
+    font-size: 11px;
+  }
+
+  .wizardStepConnector {
+    margin: 0 8px;
+  }
+
+  .wizardModeTabs {
+    gap: 6px;
+  }
+
+  .wizardModeTab {
+    min-height: 40px;
+    font-size: 12px;
+  }
+
+  .wizardPrimaryTextarea {
+    min-height: 168px;
+    max-height: 260px;
+  }
+
+  .wizardDecisionPreviewActions,
+  .wizardActionGroup {
+    width: 100%;
+  }
+
+  .wizardDecisionPreviewActions > *,
+  .wizardActionGroup > * {
+    flex: 1 1 100%;
+  }
+
+  .wizardFooterSpacer {
+    display: none;
   }
 }
