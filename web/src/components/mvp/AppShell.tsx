@@ -2,25 +2,22 @@
 
 import type { ReactNode } from "react";
 import Image from "next/image";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { AdvisorChatModal } from "@/components/mvp/AdvisorChatModal";
 import { MvpShellContextProvider } from "@/components/mvp/MvpShellContext";
+import type { SidebarConversationSummary } from "@/components/mvp/MvpShellContext";
 import styles from "@/components/mvp/MvpShell.module.css";
 import { ADVISOR_PROFILES } from "@/data/advisors";
 import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
+import { getConversations, postConversation } from "@/lib/api/client";
 import { postAdvisorChat } from "@/lib/api/client";
 import { toUiErrorMessage } from "@/lib/api/errors";
 import { getCurrentUser, logoutSession } from "@/lib/auth/client";
 
 type AppShellProps = {
   children: ReactNode;
-};
-
-type SidebarConversationSummary = {
-  title: string;
-  startedAt: string;
 };
 
 function getAdvisorAvatar(
@@ -30,6 +27,19 @@ function getAdvisorAvatar(
   if (!advisor) return null;
   if (variant === "64") return advisor.avatar64 ?? advisor.avatar128 ?? null;
   return advisor.avatar128 ?? advisor.avatar64 ?? null;
+}
+
+function mapConversationSummary(
+  conversation: Awaited<ReturnType<typeof postConversation>>,
+): SidebarConversationSummary {
+  return {
+    id: conversation.id,
+    title: conversation.title,
+    titleStatus: conversation.title_status,
+    advisorId: conversation.advisor_id,
+    startedAt: conversation.created_at,
+    lastMessageAt: conversation.last_message_at,
+  };
 }
 
 export function AppShell({ children }: AppShellProps) {
@@ -49,7 +59,8 @@ export function AppShell({ children }: AppShellProps) {
   const [advisorChatMessages, setAdvisorChatMessages] = useState<
     Array<{ id: string; role: "user" | "advisor"; text: string }>
   >([]);
-  const [sidebarConversation, setSidebarConversation] = useState<SidebarConversationSummary | null>(null);
+  const [conversations, setConversations] = useState<SidebarConversationSummary[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const speechSynthesis = useSpeechSynthesis({ lang: "es-ES" });
 
   useEffect(() => {
@@ -59,6 +70,22 @@ export function AppShell({ children }: AppShellProps) {
       const resolvedName = (user.name || user.email || "Usuario").trim();
       setDisplayName(resolvedName || "Usuario");
     });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    void getConversations()
+      .then((response) => {
+        if (!mounted) return;
+        setConversations(response.conversations.map(mapConversationSummary));
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setConversations([]);
+      });
     return () => {
       mounted = false;
     };
@@ -103,29 +130,12 @@ export function AppShell({ children }: AppShellProps) {
     };
   }, []);
 
-  useEffect(() => {
-    function handleConversationSummary(event: Event) {
-      const customEvent = event as CustomEvent<{
-        title?: string;
-        startedAt?: string;
-        visible?: boolean;
-      }>;
-      const detail = customEvent.detail;
-      if (!detail || detail.visible === false || !detail.title || !detail.startedAt) {
-        setSidebarConversation(null);
-        return;
-      }
-      setSidebarConversation({
-        title: detail.title,
-        startedAt: detail.startedAt,
-      });
-    }
+  const activeConversation = useMemo(
+    () => conversations.find((conversation) => conversation.id === activeConversationId) ?? null,
+    [activeConversationId, conversations],
+  );
 
-    window.addEventListener("mvp:conversation-summary", handleConversationSummary as EventListener);
-    return () => {
-      window.removeEventListener("mvp:conversation-summary", handleConversationSummary as EventListener);
-    };
-  }, []);
+  const sidebarConversation = activeConversation ?? conversations[0] ?? null;
 
   const initials = useMemo(() => {
     const parts = displayName
@@ -136,17 +146,32 @@ export function AppShell({ children }: AppShellProps) {
     return parts.map((part) => part[0]!.toUpperCase()).join("");
   }, [displayName]);
 
-  const sidebarConversationMeta = useMemo(() => {
-    if (!sidebarConversation?.startedAt) return "";
-    const parsed = new Date(sidebarConversation.startedAt);
-    if (Number.isNaN(parsed.getTime())) return "";
-    return new Intl.DateTimeFormat("es-UY", {
-      day: "2-digit",
-      month: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(parsed);
-  }, [sidebarConversation]);
+  const createSidebarConversation = useCallback(
+    async (options?: { advisorId?: string | null }) => {
+      try {
+        const created = mapConversationSummary(
+          await postConversation({
+            advisor_id: options?.advisorId ?? undefined,
+          }),
+        );
+        setConversations((previous) => [created, ...previous.filter((item) => item.id !== created.id)]);
+        setActiveConversationId(created.id);
+        return created;
+      } catch (error) {
+        console.error("sidebar_conversation_create_failed", error);
+        return null;
+      }
+    },
+    [],
+  );
+
+  const ensureActiveConversation = useCallback(
+    async (options?: { advisorId?: string | null }) => {
+      if (activeConversation) return activeConversation;
+      return createSidebarConversation(options);
+    },
+    [activeConversation, createSidebarConversation],
+  );
 
   async function handleLogout() {
     await logoutSession();
@@ -275,6 +300,10 @@ export function AppShell({ children }: AppShellProps) {
         displayName,
         initials,
         sidebarConversation,
+        activeConversation,
+        ensureActiveConversation,
+        createSidebarConversation,
+        setActiveConversationId,
         openAdvisorConversation,
       }}
     >
@@ -436,11 +465,13 @@ export function AppShell({ children }: AppShellProps) {
                   type="button"
                   className={styles.shellNewConversation}
                   onClick={() => {
-                    setSidebarConversation(null);
-                    if (typeof window !== "undefined") {
-                      window.dispatchEvent(new Event("mvp:new-conversation"));
-                    }
-                    if (!isDesktop) setSidebarOpen(false);
+                    void createSidebarConversation().then((created) => {
+                      if (!created) return;
+                      if (typeof window !== "undefined") {
+                        window.dispatchEvent(new Event("mvp:new-conversation"));
+                      }
+                      if (!isDesktop) setSidebarOpen(false);
+                    });
                   }}
                 >
                   <span className={styles.shellNewConversationIcon} aria-hidden="true">
@@ -450,12 +481,31 @@ export function AppShell({ children }: AppShellProps) {
                 </button>
               </div>
               <div className={styles.shellSidebarBody}>
-                {sidebarConversation ? (
+                {conversations.length > 0 ? (
                   <div className={styles.shellSessionList}>
-                    <button type="button" className={`${styles.shellSessionItem} ${styles.shellSessionActive}`}>
-                      <p className={styles.shellSessionTitle}>{sidebarConversation.title}</p>
-                      <p className={styles.shellSessionMeta}>{sidebarConversationMeta}</p>
-                    </button>
+                    {conversations.map((conversation) => {
+                      const isActive = conversation.id === activeConversationId;
+                      const parsedDate = new Date(conversation.lastMessageAt);
+                      const metaLabel = Number.isNaN(parsedDate.getTime())
+                        ? ""
+                        : new Intl.DateTimeFormat("es-UY", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          }).format(parsedDate);
+                      return (
+                        <button
+                          key={conversation.id}
+                          type="button"
+                          className={`${styles.shellSessionItem} ${isActive ? styles.shellSessionActive : ""}`}
+                          onClick={() => setActiveConversationId(conversation.id)}
+                        >
+                          <p className={styles.shellSessionTitle}>{conversation.title}</p>
+                          <p className={styles.shellSessionMeta}>{metaLabel}</p>
+                        </button>
+                      );
+                    })}
                   </div>
                 ) : null}
               </div>

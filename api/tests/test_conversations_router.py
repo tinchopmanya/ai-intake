@@ -1,0 +1,116 @@
+import unittest
+from datetime import UTC
+from datetime import datetime
+from uuid import NAMESPACE_URL
+from uuid import UUID
+from uuid import uuid4
+from uuid import uuid5
+
+from fastapi.testclient import TestClient
+
+from app.api.deps import get_current_user
+from app.api.deps import get_uow
+from app.services.auth_service import AuthenticatedUser
+from main import app
+
+
+class FakeConversationRepository:
+    def __init__(self) -> None:
+        self.created_payloads: list[dict[str, object]] = []
+        self.rows = [
+            {
+                "id": uuid4(),
+                "user_id": uuid5(NAMESPACE_URL, "user-a"),
+                "title": "Nueva conversacion",
+                "title_status": "pending",
+                "advisor_id": None,
+                "created_at": datetime(2026, 3, 26, 10, 30, tzinfo=UTC),
+                "last_message_at": datetime(2026, 3, 26, 10, 30, tzinfo=UTC),
+            },
+            {
+                "id": uuid4(),
+                "user_id": uuid5(NAMESPACE_URL, "user-a"),
+                "title": "Nueva conversacion",
+                "title_status": "fallback",
+                "advisor_id": "laura",
+                "created_at": datetime(2026, 3, 25, 18, 15, tzinfo=UTC),
+                "last_message_at": datetime(2026, 3, 25, 18, 40, tzinfo=UTC),
+            },
+        ]
+
+    def list_by_user(self, *, user_id: UUID, limit: int = 50, offset: int = 0):
+        filtered = [row for row in self.rows if row["user_id"] == user_id]
+        sorted_rows = sorted(
+            filtered,
+            key=lambda row: (row["last_message_at"], row["created_at"]),
+            reverse=True,
+        )
+        return sorted_rows[offset : offset + limit]
+
+    def create(self, *, user_id: UUID, title: str, title_status: str, advisor_id: str | None = None):
+        created = {
+            "id": uuid4(),
+            "user_id": user_id,
+            "title": title,
+            "title_status": title_status,
+            "advisor_id": advisor_id,
+            "created_at": datetime(2026, 3, 26, 11, 0, tzinfo=UTC),
+            "last_message_at": datetime(2026, 3, 26, 11, 0, tzinfo=UTC),
+        }
+        self.created_payloads.append(created)
+        self.rows.insert(0, created)
+        return created
+
+
+class FakeUow:
+    def __init__(self) -> None:
+        self.conversations = FakeConversationRepository()
+
+
+class TestConversationsRouter(unittest.TestCase):
+    def setUp(self) -> None:
+        app.dependency_overrides.clear()
+        self._active_user_label = "user-a"
+        self.fake_uow = FakeUow()
+        app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(
+            id=uuid5(NAMESPACE_URL, self._active_user_label),
+            email="conversations@example.com",
+            name="Conversation User",
+            memory_opt_in=False,
+            locale="es-UY",
+            picture_url=None,
+            country_code="UY",
+            language_code="es",
+            onboarding_completed=False,
+        )
+        app.dependency_overrides[get_uow] = lambda: self.fake_uow
+        self.client = TestClient(app)
+
+    def tearDown(self) -> None:
+        app.dependency_overrides.clear()
+
+    def test_list_conversations_returns_current_user_items(self):
+        response = self.client.get("/v1/conversations")
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertIn("conversations", body)
+        self.assertEqual(len(body["conversations"]), 2)
+        self.assertEqual(body["conversations"][0]["title"], "Nueva conversacion")
+        self.assertEqual(body["conversations"][0]["title_status"], "pending")
+        self.assertEqual(body["conversations"][1]["advisor_id"], "laura")
+
+    def test_create_conversation_uses_authenticated_user(self):
+        response = self.client.post("/v1/conversations", json={"advisor_id": "robert"})
+        self.assertEqual(response.status_code, 201)
+        body = response.json()
+        self.assertEqual(body["title"], "Nueva conversacion")
+        self.assertEqual(body["title_status"], "pending")
+        self.assertEqual(body["advisor_id"], "robert")
+        self.assertEqual(
+            self.fake_uow.conversations.created_payloads[-1]["user_id"],
+            uuid5(NAMESPACE_URL, "user-a"),
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()

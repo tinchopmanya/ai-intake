@@ -159,6 +159,25 @@ export type CaseListResponse = {
   cases: CaseSummary[];
 };
 
+export type ConversationTitleStatus = "pending" | "fallback" | "generated";
+
+export type ConversationSummary = {
+  id: string;
+  title: string;
+  title_status: ConversationTitleStatus;
+  advisor_id: string | null;
+  created_at: string;
+  last_message_at: string;
+};
+
+export type ConversationCreateRequest = {
+  advisor_id?: string | null;
+};
+
+export type ConversationListResponse = {
+  conversations: ConversationSummary[];
+};
+
 export type IncidentType =
   | "schedule_change"
   | "cancellation"

@@ -11,6 +11,9 @@ import type { CaseCreateRequest } from "@/lib/api/types";
 import type { CaseListResponse } from "@/lib/api/types";
 import type { CaseSummary } from "@/lib/api/types";
 import type { CaseUpdateRequest } from "@/lib/api/types";
+import type { ConversationCreateRequest } from "@/lib/api/types";
+import type { ConversationListResponse } from "@/lib/api/types";
+import type { ConversationSummary } from "@/lib/api/types";
 import type { IncidentCreateRequest } from "@/lib/api/types";
 import type { IncidentListResponse } from "@/lib/api/types";
 import type { IncidentSummary } from "@/lib/api/types";
@@ -136,6 +139,14 @@ export function getCaseById(caseId: string): Promise<CaseSummary> {
 
 export function patchCase(caseId: string, payload: CaseUpdateRequest): Promise<CaseSummary> {
   return patchJson<CaseSummary>(`/v1/cases/${caseId}`, payload);
+}
+
+export function getConversations(): Promise<ConversationListResponse> {
+  return getJson<ConversationListResponse>("/v1/conversations");
+}
+
+export function postConversation(payload: ConversationCreateRequest = {}): Promise<ConversationSummary> {
+  return postJson<ConversationSummary>("/v1/conversations", payload);
 }
 
 export function postIncident(payload: IncidentCreateRequest): Promise<IncidentSummary> {

@@ -5,6 +5,7 @@ import Image from "next/image";
 
 import { AdvisorChatModal } from "@/components/mvp/AdvisorChatModal";
 import { AdvisorProfileModal } from "@/components/mvp/AdvisorProfileModal";
+import { useMvpShell } from "@/components/mvp/MvpShellContext";
 import styles from "@/components/mvp/MvpShell.module.css";
 import { VoicePlaybackButton } from "@/components/mvp/VoiceControls";
 import { Button, Panel, Textarea } from "@/components/mvp/ui";
@@ -838,6 +839,7 @@ export function WizardScaffold({
   preferredAdvisorId?: string | null;
   onExitToEntry?: () => void;
 }) {
+  const { activeConversation, ensureActiveConversation } = useMvpShell();
   const locale = resolveRuntimeLocale();
   const t = (key: string) => tRuntime(key, locale);
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
@@ -962,6 +964,12 @@ export function WizardScaffold({
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (currentStep !== 1) return;
+    if (activeConversation) return;
+    void ensureActiveConversation({ advisorId: preferredAdvisorId });
+  }, [activeConversation, currentStep, ensureActiveConversation, preferredAdvisorId]);
 
   useEffect(() => {
     function handleExternalNewConversation() {

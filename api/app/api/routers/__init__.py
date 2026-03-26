@@ -2,6 +2,7 @@ from .advisor import router as advisor_router
 from .analysis import router as analysis_router
 from .auth import router as auth_router
 from .cases import router as cases_router
+from .conversations import router as conversations_router
 from .events import router as events_router
 from .incidents import router as incidents_router
 from .metrics import router as metrics_router
@@ -13,6 +14,7 @@ __all__ = [
     "analysis_router",
     "auth_router",
     "cases_router",
+    "conversations_router",
     "events_router",
     "incidents_router",
     "metrics_router",

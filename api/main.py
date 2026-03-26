@@ -10,6 +10,7 @@ from app.api.routers import advisor_router as advisor_v1_router
 from app.api.routers import analysis_router
 from app.api.routers import auth_router
 from app.api.routers import cases_router
+from app.api.routers import conversations_router
 from app.api.routers import events_router
 from app.api.routers import incidents_router
 from app.api.routers import metrics_router
@@ -59,6 +60,7 @@ else:
 app.include_router(auth_router)
 app.include_router(onboarding_router)
 app.include_router(cases_router)
+app.include_router(conversations_router)
 app.include_router(incidents_router)
 app.include_router(analysis_router)
 app.include_router(advisor_v1_router)
