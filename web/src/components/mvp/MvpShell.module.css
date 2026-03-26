@@ -501,14 +501,15 @@
 }
 
 .wizardStepIntroTitle {
-  font-size: 18px;
+  font-size: 19px;
   font-weight: 600;
   color: var(--text-primary);
 }
 
 .wizardStepIntroCopy {
   margin-top: 4px;
-  font-size: 13px;
+  font-size: 14px;
+  line-height: 1.55;
   color: var(--text-secondary);
 }
 
@@ -547,7 +548,7 @@
   min-height: 0;
   flex: 1;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   overflow: hidden;
 }
 
@@ -582,33 +583,42 @@
 
 .wizardMobileCard {
   display: grid;
-  gap: 14px;
+  gap: 12px;
   border-radius: 22px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: linear-gradient(180deg, rgba(17, 32, 51, 0.9) 0%, rgba(10, 21, 32, 0.96) 100%);
-  padding: 18px;
+  padding: 16px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.wizardStepOneCard {
+  gap: 14px;
 }
 
 .wizardModeTabs {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  gap: 7px;
 }
 
 .wizardModeTab {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 42px;
-  border-radius: 12px;
+  min-height: 44px;
+  border-radius: 13px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.04);
   color: rgba(255, 255, 255, 0.62);
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 180ms ease, border-color 180ms ease, color 180ms ease;
+  transition: background 180ms ease, border-color 180ms ease, color 180ms ease, transform 180ms ease;
+}
+
+.wizardModeTab:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.14);
 }
 
 .wizardModeTabInner {
@@ -618,6 +628,11 @@
   gap: 8px;
 }
 
+.wizardModeTabSvg {
+  width: 18px;
+  height: 18px;
+}
+
 .wizardModeTabIcon {
   display: inline-flex;
   align-items: center;
@@ -625,13 +640,32 @@
   color: rgba(255, 255, 255, 0.6);
 }
 
+.wizardModeTabVoiceIcon {
+  color: #f87171;
+}
+
+.wizardModeTabVoicePulse {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  animation: wizardMicPulse 2.2s ease-in-out infinite;
+}
+
+.wizardTabLabel {
+  color: inherit;
+}
+
 .wizardModeTabActive .wizardModeTabIcon {
-  color: #ff8a65;
+  color: #a5c8ff;
+}
+
+.wizardModeTabActive .wizardModeTabVoiceIcon {
+  color: #ef4444;
 }
 
 .wizardModeTabActive {
   border-color: rgba(126, 184, 247, 0.34);
-  background: rgba(45, 107, 228, 0.16);
+  background: rgba(45, 107, 228, 0.12);
   color: rgba(255, 255, 255, 0.94);
 }
 
@@ -677,24 +711,25 @@
 }
 
 .wizardPanelTitle {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text-primary);
 }
 
 .wizardPanelHint {
-  font-size: 12px;
+  font-size: 13px;
+  line-height: 1.5;
   color: var(--text-secondary);
 }
 
 .wizardInputGroup {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .wizardPrimaryTextarea {
-  min-height: 190px;
-  max-height: 300px;
+  min-height: 170px;
+  max-height: 240px;
   resize: none;
   overflow-y: auto;
   border-radius: 16px;
@@ -702,10 +737,15 @@
   background: linear-gradient(180deg, rgba(17, 32, 51, 0.96) 0%, rgba(10, 21, 32, 0.98) 100%);
   color: var(--text-primary);
   padding: 14px 15px;
-  line-height: 1.6;
-  font-size: 14px;
+  line-height: 1.65;
+  font-size: 15px;
   scrollbar-width: thin;
   scrollbar-color: rgba(45, 107, 228, 0.28) transparent;
+}
+
+.wizardPrimaryTextareaCompact {
+  min-height: 164px;
+  max-height: min(34vh, 232px);
 }
 
 .wizardPrimaryTextarea::placeholder {
@@ -741,10 +781,15 @@
   border-radius: 16px;
   border: 1px dashed rgba(126, 184, 247, 0.38);
   background: rgba(45, 107, 228, 0.06);
-  padding: 14px;
+  padding: 13px 14px;
   text-align: left;
   color: rgba(255, 255, 255, 0.88);
   cursor: pointer;
+}
+
+.wizardUploadCard:hover {
+  border-color: rgba(126, 184, 247, 0.52);
+  background: rgba(45, 107, 228, 0.09);
 }
 
 .wizardUploadIcon {
@@ -825,11 +870,11 @@
 .wizardVoiceCaptureCard {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   border-radius: 18px;
   border: 1px solid rgba(239, 68, 68, 0.16);
   background: rgba(127, 29, 29, 0.12);
-  padding: 14px;
+  padding: 12px 14px;
 }
 
 .wizardVoiceCaptureButton {
@@ -851,14 +896,14 @@
 }
 
 .wizardVoiceCaptureTitle {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text-primary);
 }
 
 .wizardVoiceCaptureCopy {
   margin-top: 4px;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.55;
   color: var(--text-secondary);
 }
@@ -1003,14 +1048,23 @@
   box-shadow: none;
 }
 
+.wizardStatusStack {
+  display: grid;
+  gap: 4px;
+}
+
 .wizardStepActions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
+  gap: 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
-  padding-top: 14px;
+  padding-top: 12px;
+}
+
+.wizardStepOneActions {
+  margin-top: 2px;
 }
 
 .wizardActionGroup {
@@ -1047,11 +1101,11 @@
   gap: 8px;
   justify-content: center;
   border-radius: 12px;
-  background: linear-gradient(180deg, #2d6be4 0%, #275fd0 100%);
+  background: linear-gradient(180deg, #3f4fd3 0%, #3342b8 100%);
   color: #fff;
-  border: 1px solid rgba(59, 130, 246, 0.3);
+  border: 1px solid rgba(99, 102, 241, 0.34);
   padding: 0 16px;
-  box-shadow: 0 14px 24px rgba(45, 107, 228, 0.18);
+  box-shadow: 0 12px 22px rgba(51, 66, 184, 0.18);
 }
 
 .wizardSecondaryButton {
@@ -1643,6 +1697,11 @@
   .wizardPrimaryTextarea {
     min-height: 168px;
     max-height: 260px;
+  }
+
+  .wizardPrimaryTextareaCompact {
+    min-height: 156px;
+    max-height: min(32vh, 216px);
   }
 
   .wizardDecisionPreviewActions,

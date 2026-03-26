@@ -796,8 +796,10 @@ function ShellStepSection({
  */
 export function WizardScaffold({
   preferredAdvisorId = null,
+  onExitToEntry,
 }: {
   preferredAdvisorId?: string | null;
+  onExitToEntry?: () => void;
 }) {
   const locale = resolveRuntimeLocale();
   const t = (key: string) => tRuntime(key, locale);
@@ -1639,7 +1641,7 @@ export function WizardScaffold({
             {caseError ? <p className="mt-2 text-xs text-red-700">{caseError}</p> : null}
           </div>
 
-          <section className={styles.wizardMobileCard} onPaste={handleStepOnePaste}>
+          <section className={`${styles.wizardMobileCard} ${styles.wizardStepOneCard}`} onPaste={handleStepOnePaste}>
             <div className={styles.wizardModeTabs}>
               <button
                 type="button"
@@ -1648,7 +1650,7 @@ export function WizardScaffold({
               >
                 <span className={styles.wizardModeTabInner}>
                   <span className={styles.wizardModeTabIcon} aria-hidden="true">
-                    <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none">
+                    <svg viewBox="0 0 20 20" className={styles.wizardModeTabSvg} fill="none">
                       <path
                         d="M4.5 13.75V16h2.25l7.9-7.9-2.25-2.25-7.9 7.9Zm9.15-8.9 1.25-1.25a1.06 1.06 0 0 1 1.5 0l.75.75a1.06 1.06 0 0 1 0 1.5l-1.25 1.25-2.25-2.25Z"
                         stroke="currentColor"
@@ -1668,7 +1670,7 @@ export function WizardScaffold({
               >
                 <span className={styles.wizardModeTabInner}>
                   <span className={styles.wizardModeTabIcon} aria-hidden="true">
-                    <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none">
+                    <svg viewBox="0 0 20 20" className={styles.wizardModeTabSvg} fill="none">
                       <path
                         d="M6.25 5.5h1.1l.85-1.25h3.6l.85 1.25h1.1a2 2 0 0 1 2 2v5.75a2 2 0 0 1-2 2h-7.5a2 2 0 0 1-2-2V7.5a2 2 0 0 1 2-2Z"
                         stroke="currentColor"
@@ -1694,25 +1696,30 @@ export function WizardScaffold({
                 className={`${styles.wizardModeTab} ${stepOneInputMode === "voice" ? styles.wizardModeTabActive : ""}`}
               >
                 <span className={styles.wizardModeTabInner}>
-                  <span className={styles.wizardModeTabIcon} aria-hidden="true">
-                    <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none">
-                      <path
-                        d="M10 3.75A2.25 2.25 0 0 0 7.75 6v3.25a2.25 2.25 0 1 0 4.5 0V6A2.25 2.25 0 0 0 10 3.75Z"
-                        stroke="currentColor"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="1.6"
-                      />
-                      <path
-                        d="M5.75 9a4.25 4.25 0 1 0 8.5 0M10 13.75v2.5m-2 0h4"
-                        stroke="currentColor"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="1.6"
-                      />
-                    </svg>
+                  <span
+                    className={`${styles.wizardModeTabIcon} ${styles.wizardModeTabVoiceIcon}`}
+                    aria-hidden="true"
+                  >
+                    <span className={styles.wizardModeTabVoicePulse}>
+                      <svg viewBox="0 0 20 20" className={styles.wizardModeTabSvg} fill="none">
+                        <path
+                          d="M10 3.75A2.25 2.25 0 0 0 7.75 6v3.25a2.25 2.25 0 1 0 4.5 0V6A2.25 2.25 0 0 0 10 3.75Z"
+                          stroke="currentColor"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="1.6"
+                        />
+                        <path
+                          d="M5.75 9a4.25 4.25 0 1 0 8.5 0M10 13.75v2.5m-2 0h4"
+                          stroke="currentColor"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="1.6"
+                        />
+                      </svg>
+                    </span>
                   </span>
-                  <span>Voz</span>
+                  <span className={styles.wizardTabLabel}>Voz</span>
                 </span>
               </button>
             </div>
@@ -1748,10 +1755,10 @@ export function WizardScaffold({
                   id="wizard-primary-input"
                   value={messageText}
                   onChange={(event) => handleMessageTextChange(event.target.value)}
-                  rows={7}
+                  rows={6}
                   placeholder="Pegá el mensaje que recibiste o copiá la conversación completa."
                   spellCheck={false}
-                  className={styles.wizardPrimaryTextarea}
+                  className={`${styles.wizardPrimaryTextarea} ${styles.wizardPrimaryTextareaCompact}`}
                 />
               </div>
             ) : null}
@@ -1799,10 +1806,10 @@ export function WizardScaffold({
                   id="wizard-primary-input"
                   value={messageText}
                   onChange={(event) => handleMessageTextChange(event.target.value)}
-                  rows={6}
+                  rows={5}
                   placeholder="Acá va a aparecer el texto extraído para que lo ajustes."
                   spellCheck={false}
-                  className={styles.wizardPrimaryTextarea}
+                  className={`${styles.wizardPrimaryTextarea} ${styles.wizardPrimaryTextareaCompact}`}
                 />
               </div>
             ) : null}
@@ -1859,10 +1866,10 @@ export function WizardScaffold({
                   id="wizard-primary-input"
                   value={messageText}
                   onChange={(event) => handleMessageTextChange(event.target.value)}
-                  rows={7}
+                  rows={6}
                   placeholder="Acá se va armando el dictado para que lo revises."
                   spellCheck={false}
-                  className={styles.wizardPrimaryTextarea}
+                  className={`${styles.wizardPrimaryTextarea} ${styles.wizardPrimaryTextareaCompact}`}
                 />
                 {contextVoice.error ? (
                   <p className="text-[12px] text-[#92400e]">{getSpeechToTextErrorMessage(contextVoice.error)}</p>
@@ -1870,26 +1877,45 @@ export function WizardScaffold({
               </div>
             ) : null}
 
-            {ocrCapabilities?.available === false ? (
-              <p className="text-xs text-amber-700">
-                OCR no disponible: {resolveOcrErrorMessage(ocrCapabilities.reason_codes[0])}
-              </p>
-            ) : null}
-            {ocrLoading || autoParsing ? (
-              <p className={styles.wizardStepStatus}>Detectando participantes e interpretando contexto...</p>
-            ) : null}
-            {ocrStatusMessage ? (
-              <p className={styles.wizardPanelHint}>
-                {ocrStatusMessage}
-                {ocrInfo?.provider ? ` (${ocrInfo.provider})` : ""}
-              </p>
-            ) : null}
-            {ocrError ? <p className="text-xs text-red-700">{ocrError}</p> : null}
-            {autoParseError ? <p className="text-xs text-amber-700">{autoParseError}</p> : null}
+            <div className={styles.wizardStatusStack}>
+              {ocrCapabilities?.available === false ? (
+                <p className="text-xs text-amber-700">
+                  OCR no disponible: {resolveOcrErrorMessage(ocrCapabilities.reason_codes[0])}
+                </p>
+              ) : null}
+              {ocrLoading || autoParsing ? (
+                <p className={styles.wizardStepStatus}>Detectando participantes e interpretando contexto...</p>
+              ) : null}
+              {ocrStatusMessage ? (
+                <p className={styles.wizardPanelHint}>
+                  {ocrStatusMessage}
+                  {ocrInfo?.provider ? ` (${ocrInfo.provider})` : ""}
+                </p>
+              ) : null}
+              {ocrError ? <p className="text-xs text-red-700">{ocrError}</p> : null}
+              {autoParseError ? <p className="text-xs text-amber-700">{autoParseError}</p> : null}
+            </div>
           </section>
 
-          <div className={styles.wizardStepActions}>
+          <div className={`${styles.wizardStepActions} ${styles.wizardStepOneActions}`}>
             <div className={styles.wizardActionGroup}>
+              <Button
+                type="button"
+                onClick={() => onExitToEntry?.()}
+                variant="secondary"
+                className={`${styles.wizardSecondaryButton} h-10 text-[13px] hover:bg-[rgba(255,255,255,0.12)]`}
+              >
+                <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
+                  <path
+                    d="M16 10H4m6 6-6-6 6-6"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="1.8"
+                  />
+                </svg>
+                Volver
+              </Button>
               {hasConversationInput ? (
                 <Button
                   type="button"
@@ -1912,7 +1938,7 @@ export function WizardScaffold({
                   ocrLoading
                 }
                 variant="primary"
-                className={`${styles.wizardPrimaryButton} h-10 text-[13px] hover:bg-[#265cc7]`}
+                className={`${styles.wizardPrimaryButton} h-10 min-w-[148px] text-[13px] hover:bg-[#265cc7]`}
               >
                 <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
                   <path

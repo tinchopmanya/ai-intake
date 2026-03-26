@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 
 import styles from "@/components/mvp/MvpEntryFlow.module.css";
 import { useMvpShell } from "@/components/mvp/MvpShellContext";
@@ -10,40 +10,27 @@ import { ADVISOR_PROFILES } from "@/data/advisors";
 type FlowView = "entry" | "wizard";
 type SelectorIntent = "vent" | "write_to_ex";
 
-type MoodOption = {
+type SliderOption = {
   id: string;
-  icon: string;
-  title: string;
-  description: string;
+  label: string;
 };
 
 const DEFAULT_ADVISOR_STORAGE_KEY = "exreply-default-advisor-id";
 
-const MOOD_OPTIONS: MoodOption[] = [
-  {
-    id: "angry",
-    icon: "😤",
-    title: "Enojado/a",
-    description: "Me sacó algo",
-  },
-  {
-    id: "sad",
-    icon: "😔",
-    title: "Triste",
-    description: "Sin energía para esto",
-  },
-  {
-    id: "confused",
-    icon: "😕",
-    title: "Confundido/a",
-    description: "No sé cómo tomarlo",
-  },
-  {
-    id: "calm",
-    icon: "😌",
-    title: "Tranquilo/a",
-    description: "Quiero manejarlo bien",
-  },
+const MOOD_OPTIONS: SliderOption[] = [
+  { id: "angry", label: "Enojado" },
+  { id: "sad", label: "Triste" },
+  { id: "normal", label: "Normal" },
+  { id: "pretty_good", label: "Bastante bien" },
+  { id: "excellent", label: "Excelente" },
+];
+
+const SELF_ESTEEM_OPTIONS: SliderOption[] = [
+  { id: "very_low", label: "Muy baja" },
+  { id: "low", label: "Baja" },
+  { id: "normal", label: "Normal" },
+  { id: "good", label: "Bien" },
+  { id: "high", label: "Alta" },
 ];
 
 const ADVISOR_MICROCOPY: Record<string, string> = {
@@ -95,10 +82,94 @@ function readStoredAdvisorId() {
   return ADVISOR_PROFILES.some((advisor) => advisor.id === stored) ? stored : null;
 }
 
+function SliderPlaceholderIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className={styles.sliderPlaceholderIcon}>
+      <path
+        d="M7 16.5 10 13.5l2.5 2.5 4.5-4.5 2 2v3.5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1h4"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.55"
+      />
+      <path
+        d="M15.5 7.75a1.75 1.75 0 1 0 0-3.5 1.75 1.75 0 0 0 0 3.5Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.55"
+      />
+    </svg>
+  );
+}
+
+function EntrySlider({
+  question,
+  options,
+  value,
+  onChange,
+}: {
+  question: string;
+  options: SliderOption[];
+  value: number;
+  onChange: (nextValue: number) => void;
+}) {
+  const thumbPosition = `${(value / Math.max(options.length - 1, 1)) * 100}%`;
+  const sliderStyle = { "--thumb-position": thumbPosition } as CSSProperties;
+  const activeLabel = options[value]?.label ?? "";
+
+  return (
+    <section className={styles.sliderSection}>
+      <div className={styles.sliderHeader}>
+        <div>
+          <h2 className={styles.sliderQuestion}>{question}</h2>
+          <p className={styles.sliderSupport}>Ajusta el punto que mejor te represente ahora.</p>
+        </div>
+        <span className={styles.sliderValue}>{activeLabel}</span>
+      </div>
+
+      <div className={styles.sliderFigure} style={sliderStyle}>
+        <div className={styles.sliderThumbStage} aria-hidden="true">
+          <div className={styles.sliderThumbPlaceholder}>
+            <SliderPlaceholderIcon />
+            <span>Imagen</span>
+          </div>
+        </div>
+
+        <input
+          type="range"
+          min={0}
+          max={options.length - 1}
+          step={1}
+          value={value}
+          onChange={(event) => onChange(Number(event.target.value))}
+          className={styles.sliderControl}
+          aria-label={question}
+        />
+      </div>
+
+      <div className={styles.sliderLabels}>
+        {options.map((option, index) => (
+          <button
+            key={option.id}
+            type="button"
+            onClick={() => onChange(index)}
+            className={`${styles.sliderLabelButton} ${value === index ? styles.sliderLabelButtonActive : ""}`}
+            aria-pressed={value === index}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function MvpEntryFlow() {
   const { displayName, sidebarConversation, openAdvisorConversation } = useMvpShell();
   const [view, setView] = useState<FlowView>("entry");
-  const [selectedMoodId, setSelectedMoodId] = useState<string>("calm");
+  const [selectedMoodIndex, setSelectedMoodIndex] = useState(2);
+  const [selectedSelfEsteemIndex, setSelectedSelfEsteemIndex] = useState(2);
   const [selectorIntent, setSelectorIntent] = useState<SelectorIntent | null>(null);
   const [selectedAdvisorId, setSelectedAdvisorId] = useState<string>("laura");
   const [rememberAdvisor, setRememberAdvisor] = useState(false);
@@ -180,6 +251,12 @@ export function MvpEntryFlow() {
     enterWizard(null);
   }
 
+  function handleReturnToEntry() {
+    setPreferredAdvisorId(null);
+    setSelectorIntent(null);
+    setView("entry");
+  }
+
   return (
     <>
       {view === "entry" ? (
@@ -189,72 +266,108 @@ export function MvpEntryFlow() {
               <div className={styles.entryBody}>
                 <div>
                   <p className={styles.eyebrow}>{greeting}</p>
-                  <h1 className={styles.headline}>¿Cómo estás ahora?</h1>
+                  <h1 className={styles.headline}>Como te sientes ahora?</h1>
                   <p className={styles.subcopy}>
-                    Antes de continuar, contanos cómo te encontrás.
+                    Antes de continuar, marca dos referencias rapidas y elige como quieres avanzar.
                   </p>
                 </div>
 
-                <div className={styles.moodGrid}>
-                  {MOOD_OPTIONS.map((mood) => (
-                    <button
-                      key={mood.id}
-                      type="button"
-                      className={`${styles.moodButton} ${
-                        selectedMoodId === mood.id ? styles.moodButtonActive : ""
-                      }`}
-                      onClick={() => setSelectedMoodId(mood.id)}
-                    >
-                      <span className={styles.moodIcon} aria-hidden="true">
-                        {mood.icon}
-                      </span>
-                      <span className={styles.moodTitle}>{mood.title}</span>
-                      <span className={styles.moodText}>{mood.description}</span>
-                    </button>
-                  ))}
+                <div className={styles.sliderStack}>
+                  <EntrySlider
+                    question="Como esta tu estado de animo?"
+                    options={MOOD_OPTIONS}
+                    value={selectedMoodIndex}
+                    onChange={setSelectedMoodIndex}
+                  />
+                  <EntrySlider
+                    question="Como esta tu autoestima?"
+                    options={SELF_ESTEEM_OPTIONS}
+                    value={selectedSelfEsteemIndex}
+                    onChange={setSelectedSelfEsteemIndex}
+                  />
                 </div>
 
                 {sidebarConversation && lastSessionMeta ? (
                   <div className={styles.sessionCard}>
                     <span className={styles.sessionDot} aria-hidden="true" />
                     <p className={styles.sessionText}>
-                      Última sesión: {lastSessionMeta} · {sidebarConversation.title}
+                      Ultima sesion: {lastSessionMeta} - {sidebarConversation.title}
                     </p>
-                    <span className={styles.sessionArrow} aria-hidden="true">
-                      ›
-                    </span>
                   </div>
                 ) : null}
 
+                <div className={styles.actionsHeader}>
+                  <p className={styles.actionsKicker}>Quiero empezar por...</p>
+                </div>
+
                 <div className={styles.actions}>
                   <button type="button" className={styles.primaryAction} onClick={() => openSelector("vent")}>
-                    <span className={styles.buttonIcon} aria-hidden="true">
-                      💬
+                    <span className={styles.buttonIconBadge} aria-hidden="true">
+                      <svg viewBox="0 0 20 20" className={styles.buttonIcon} fill="none">
+                        <path
+                          d="M4.75 5.75h10.5a1.5 1.5 0 0 1 1.5 1.5v5a1.5 1.5 0 0 1-1.5 1.5H9.8L6.2 16.6a.75.75 0 0 1-1.2-.6v-2.25H4.75a1.5 1.5 0 0 1-1.5-1.5v-5a1.5 1.5 0 0 1 1.5-1.5Z"
+                          stroke="currentColor"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="1.55"
+                        />
+                      </svg>
                     </span>
-                    Solo quiero desahogarme
+                    <span className={styles.actionTextBlock}>
+                      <span className={styles.actionTitle}>Solo quiero desahogarme</span>
+                      <span className={styles.actionCopy}>Abrir un espacio breve para descargar y ordenar.</span>
+                    </span>
                   </button>
                   <button type="button" className={styles.secondaryAction} onClick={handleAnalyzeConversation}>
-                    <span className={styles.buttonIcon} aria-hidden="true">
-                      📋
+                    <span className={styles.buttonIconBadge} aria-hidden="true">
+                      <svg viewBox="0 0 20 20" className={styles.buttonIcon} fill="none">
+                        <path
+                          d="M6 4.5h8a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 14 16.5H6A1.5 1.5 0 0 1 4.5 15V6A1.5 1.5 0 0 1 6 4.5Z"
+                          stroke="currentColor"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="1.55"
+                        />
+                        <path
+                          d="M7.5 8h5M7.5 10.75h5M7.5 13.5H11"
+                          stroke="currentColor"
+                          strokeLinecap="round"
+                          strokeWidth="1.55"
+                        />
+                      </svg>
                     </span>
-                    Tengo una conversación para analizar
+                    <span className={styles.actionTextBlock}>
+                      <span className={styles.actionTitle}>Tengo una conversacion para analizar</span>
+                      <span className={styles.actionCopy}>Entrar directo al wizard actual con el flujo existente.</span>
+                    </span>
                   </button>
                   <button
                     type="button"
                     className={styles.tertiaryAction}
                     onClick={() => openSelector("write_to_ex")}
                   >
-                    <span className={styles.buttonIcon} aria-hidden="true">
-                      ✍️
+                    <span className={styles.buttonIconBadge} aria-hidden="true">
+                      <svg viewBox="0 0 20 20" className={styles.buttonIcon} fill="none">
+                        <path
+                          d="M4.75 15.25V17h1.75l7.5-7.5-1.75-1.75-7.5 7.5ZM13 6.25l1.3-1.3a1.06 1.06 0 0 1 1.5 0l.25.25a1.06 1.06 0 0 1 0 1.5l-1.3 1.3L13 6.25Z"
+                          stroke="currentColor"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="1.55"
+                        />
+                      </svg>
                     </span>
-                    Quiero escribirle a mi ex
+                    <span className={styles.actionTextBlock}>
+                      <span className={styles.actionTitle}>Quiero escribirle a mi ex</span>
+                      <span className={styles.actionCopy}>Elegir consejero y luego seguir con la escritura guiada.</span>
+                    </span>
                   </button>
                 </div>
 
                 <p className={styles.disclaimer}>
-                  No guardamos conversaciones por defecto · La IA puede equivocarse
+                  No guardamos conversaciones por defecto - La IA puede equivocarse
                   <br />
-                  No reemplaza apoyo <a href="#" className={styles.disclaimerLink}>psicológico</a>, legal ni atención de emergencia
+                  No reemplaza apoyo <a href="#" className={styles.disclaimerLink}>psicologico</a>, legal ni atencion de emergencia
                 </p>
               </div>
             </section>
@@ -277,7 +390,11 @@ export function MvpEntryFlow() {
           ) : null}
 
           <div className={styles.wizardPanelWrap}>
-            <WizardScaffold key={wizardKey} preferredAdvisorId={preferredAdvisorId} />
+            <WizardScaffold
+              key={wizardKey}
+              preferredAdvisorId={preferredAdvisorId}
+              onExitToEntry={handleReturnToEntry}
+            />
           </div>
         </div>
       )}
