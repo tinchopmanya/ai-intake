@@ -651,13 +651,13 @@ function getSafeTopicLabel(
     return "Tema familiar";
   }
   if (/(coordina|horario|agenda|turno|visita|retiro|entrega|fin de semana)/.test(source)) {
-    return "Coordinacion";
+    return "Coordinación";
   }
   if (/(gasto|pago|transferencia|cuota|reintegro|documento|permiso|papeles|firma|viaje|vacaciones)/.test(source)) {
-    return "Logistica";
+    return "Logística";
   }
   if (/(limite|límite|presion|presión|respeto|control|amenaz|agres)/.test(source)) {
-    return "Limites";
+    return "Límites";
   }
   return "Sin tema claro";
 }

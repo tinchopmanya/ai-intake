@@ -943,14 +943,14 @@
   min-height: 0;
   flex: 1;
   flex-direction: column;
-  gap: 8px;
+  gap: 7px;
   overflow-y: auto;
-  max-height: min(48vh, 468px);
-  min-height: 196px;
+  max-height: min(47vh, 438px);
+  min-height: 188px;
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.06);
   background: linear-gradient(180deg, rgba(10, 21, 32, 0.96) 0%, rgba(8, 17, 26, 0.98) 100%);
-  padding: 10px;
+  padding: 9px;
   scrollbar-width: thin;
   scrollbar-color: rgba(45, 107, 228, 0.34) transparent;
   overscroll-behavior: contain;
@@ -978,12 +978,12 @@
   position: relative;
   max-width: 96%;
   display: grid;
-  gap: 8px;
+  gap: 7px;
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.06);
-  padding: 10px 10px 9px;
+  padding: 9px 10px 8px;
   overflow: hidden;
-  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.08);
 }
 
 .wizardBubble::after {
@@ -991,10 +991,10 @@
   position: absolute;
   top: 0;
   right: 0;
-  width: 26px;
-  height: 26px;
+  width: 20px;
+  height: 20px;
   clip-path: polygon(100% 0, 0 0, 100% 100%);
-  opacity: 0.9;
+  opacity: 0.56;
 }
 
 .wizardBubbleIncoming {
@@ -1038,14 +1038,14 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
 }
 
 .wizardBubbleSpeakerLabel {
   display: inline-flex;
   align-items: center;
-  min-height: 22px;
-  padding: 0 8px;
+  min-height: 20px;
+  padding: 0 7px;
   border-radius: 999px;
   font-size: 9px;
   font-weight: 700;
@@ -1063,13 +1063,13 @@
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.04);
-  padding: 2px;
+  padding: 1px;
 }
 
 .wizardSpeakerOption {
   border-radius: 10px;
-  padding: 4px 7px;
-  font-size: 10px;
+  padding: 4px 6px;
+  font-size: 9px;
   font-weight: 600;
   letter-spacing: 0.02em;
   background: transparent;
@@ -1101,13 +1101,14 @@
   overflow-y: auto;
   border: 0;
   background: transparent;
-  padding: 0;
-  color: inherit;
-  min-height: 66px;
-  max-height: 126px;
-  line-height: 1.5;
+  padding: 2px 1px 0;
+  color: rgba(255, 255, 255, 0.95);
+  min-height: 62px;
+  max-height: 118px;
+  line-height: 1.46;
   font-size: 13px;
   scrollbar-width: thin;
+  caret-color: rgba(255, 255, 255, 0.94);
 }
 
 .wizardBubbleTextarea:focus {
@@ -1240,55 +1241,55 @@
 
 .wizardAnalysisLayout {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   grid-template-columns: minmax(0, 1.08fr) minmax(280px, 0.92fr);
   align-items: start;
 }
 
 .wizardAnalysisColumn {
   display: grid;
-  gap: 9px;
+  gap: 8px;
   min-width: 0;
 }
 
 .wizardAnalysisCompactCard {
-  gap: 8px;
-  padding: 11px 12px;
+  gap: 7px;
+  padding: 10px 11px;
 }
 
 .wizardAnalysisMetaCard {
-  gap: 8px;
-  padding: 11px 12px;
+  gap: 7px;
+  padding: 10px 11px;
 }
 
 .wizardAnalysisActionsCard {
-  gap: 10px;
-  padding: 11px 12px;
+  gap: 8px;
+  padding: 10px 11px;
 }
 
 .wizardAnalysisCardHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
 }
 
 .wizardAnalysisSummaryStack {
   display: grid;
-  gap: 4px;
+  gap: 3px;
 }
 
 .wizardAnalysisBlockLabel {
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 700;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.13em;
   text-transform: uppercase;
   color: rgba(126, 184, 247, 0.76);
 }
 
 .wizardAnalysisMetaGrid {
   display: grid;
-  gap: 6px;
+  gap: 5px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
@@ -1298,7 +1299,7 @@
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.03);
-  padding: 8px 9px;
+  padding: 7px 8px;
 }
 
 .wizardAnalysisMetaLabel {
@@ -1310,7 +1311,7 @@
 }
 
 .wizardAnalysisMetaValue {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.9);
 }
@@ -1319,19 +1320,19 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 14px;
+  gap: 10px;
 }
 
 .wizardAnalysisDecisionTitle {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
-  line-height: 1.18;
+  line-height: 1.14;
   color: rgba(255, 255, 255, 0.95);
 }
 
 .wizardAnalysisDecisionText {
-  font-size: 12px;
-  line-height: 1.45;
+  font-size: 11px;
+  line-height: 1.4;
   color: rgba(255, 255, 255, 0.62);
 }
 
@@ -1339,10 +1340,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 66px;
+  min-width: 62px;
   border-radius: 999px;
-  padding: 5px 10px;
-  font-size: 10px;
+  padding: 4px 9px;
+  font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.04em;
 }
@@ -1363,8 +1364,8 @@
 }
 
 .wizardAnalysisLongform {
-  font-size: 12px;
-  line-height: 1.48;
+  font-size: 11px;
+  line-height: 1.42;
   color: rgba(255, 255, 255, 0.86);
 }
 
@@ -1432,18 +1433,18 @@
 .wizardAnalysisQuickChips {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
 }
 
 .wizardAnalysisChip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(17, 32, 51, 0.96);
-  padding: 5px 12px;
-  font-size: 12px;
+  padding: 4px 10px;
+  font-size: 11px;
   color: var(--text-primary);
 }
 
@@ -1458,10 +1459,10 @@
   border-radius: 12px;
   border: 1px solid rgba(45, 107, 228, 0.14);
   background: rgba(45, 107, 228, 0.06);
-  padding: 9px 10px;
+  padding: 8px 9px;
   color: var(--text-primary);
-  font-size: 11px;
-  line-height: 1.4;
+  font-size: 10px;
+  line-height: 1.35;
 }
 
 .wizardInsightIcon {
@@ -1476,17 +1477,17 @@
 
 .wizardDecisionListCompact {
   display: grid;
-  gap: 7px;
+  gap: 6px;
 }
 
 .wizardDecisionOption {
   display: grid;
-  gap: 3px;
+  gap: 2px;
   width: 100%;
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.04);
-  padding: 10px 11px;
+  padding: 9px 10px;
   text-align: left;
   cursor: pointer;
   transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;
@@ -1510,15 +1511,15 @@
 
 .wizardDecisionTitle {
   display: block;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--text-primary);
 }
 
 .wizardDecisionCopy {
   display: block;
-  font-size: 10px;
-  line-height: 1.35;
+  font-size: 9px;
+  line-height: 1.3;
   color: var(--text-secondary);
 }
 
