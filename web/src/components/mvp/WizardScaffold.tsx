@@ -639,6 +639,29 @@ function buildSidebarConversationTitle(
   return "Tema en revision";
 }
 
+function getSafeTopicLabel(
+  rawTopic: string | null | undefined,
+  blocks: ConversationBlock[],
+  fallbackText: string,
+) {
+  const source = `${rawTopic ?? ""}\n${buildSidebarConversationTitle(blocks, fallbackText)}`.toLowerCase();
+
+  if (!source.trim()) return "Sin tema claro";
+  if (/(famil|hijo|hija|custodia|coparent|colegio|escuela|medico|vacuna)/.test(source)) {
+    return "Tema familiar";
+  }
+  if (/(coordina|horario|agenda|turno|visita|retiro|entrega|fin de semana)/.test(source)) {
+    return "Coordinacion";
+  }
+  if (/(gasto|pago|transferencia|cuota|reintegro|documento|permiso|papeles|firma|viaje|vacaciones)/.test(source)) {
+    return "Logistica";
+  }
+  if (/(limite|límite|presion|presión|respeto|control|amenaz|agres)/.test(source)) {
+    return "Limites";
+  }
+  return "Sin tema claro";
+}
+
 /**
  * Visual step indicator for intake, analysis and response stages.
  */
@@ -1624,7 +1647,7 @@ export function WizardScaffold({
   const analysisQuickChips = analysisResult ? getAnalysisQuickChips(analysisResult) : [];
   const hasConversationInput = messageText.trim().length > 0 || conversationBlocks.length > 0;
   const replyTiming = analysisResult ? getReplyTimingGuidance(analysisResult) : null;
-  const topicLabel = activeCase?.title || buildSidebarConversationTitle(conversationBlocks, messageText);
+  const topicLabel = getSafeTopicLabel(activeCase?.title, conversationBlocks, messageText);
   const toneChipValue =
     analysisResult?.emotional_context.tone || analysisResult?.tone_detected || "No disponible";
   const urgencyChipValue =
@@ -2039,7 +2062,7 @@ export function WizardScaffold({
             </div>
           </section>
 
-          <div className={styles.wizardFooterRow}>
+          <div className={`${styles.wizardFooterRow} ${styles.wizardReviewFooter}`}>
             <Button
               type="button"
               onClick={() => setCurrentStep(1)}
