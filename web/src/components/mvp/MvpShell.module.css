@@ -1101,7 +1101,7 @@
   overflow-y: auto;
   border: 0;
   background: transparent;
-  padding: 2px 1px 0;
+  padding: 3px 2px 1px;
   color: rgba(255, 255, 255, 0.95);
   min-height: 62px;
   max-height: 118px;
@@ -1109,6 +1109,10 @@
   font-size: 13px;
   scrollbar-width: thin;
   caret-color: rgba(255, 255, 255, 0.94);
+}
+
+.wizardBubbleTextarea::placeholder {
+  color: rgba(255, 255, 255, 0.42);
 }
 
 .wizardBubbleTextarea:focus {
@@ -1236,35 +1240,35 @@
 
 .wizardAnalysisStack {
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
 .wizardAnalysisLayout {
   display: grid;
-  gap: 8px;
+  gap: 7px;
   grid-template-columns: minmax(0, 1.08fr) minmax(280px, 0.92fr);
   align-items: start;
 }
 
 .wizardAnalysisColumn {
   display: grid;
-  gap: 8px;
+  gap: 7px;
   min-width: 0;
 }
 
 .wizardAnalysisCompactCard {
-  gap: 7px;
-  padding: 10px 11px;
+  gap: 6px;
+  padding: 9px 10px;
 }
 
 .wizardAnalysisMetaCard {
-  gap: 7px;
-  padding: 10px 11px;
+  gap: 6px;
+  padding: 9px 10px;
 }
 
 .wizardAnalysisActionsCard {
-  gap: 8px;
-  padding: 10px 11px;
+  gap: 7px;
+  padding: 9px 10px;
 }
 
 .wizardAnalysisCardHeader {
@@ -1276,7 +1280,7 @@
 
 .wizardAnalysisSummaryStack {
   display: grid;
-  gap: 3px;
+  gap: 2px;
 }
 
 .wizardAnalysisBlockLabel {
@@ -1289,7 +1293,7 @@
 
 .wizardAnalysisMetaGrid {
   display: grid;
-  gap: 5px;
+  gap: 4px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
@@ -1299,7 +1303,7 @@
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.03);
-  padding: 7px 8px;
+  padding: 6px 8px;
 }
 
 .wizardAnalysisMetaLabel {
@@ -1324,7 +1328,7 @@
 }
 
 .wizardAnalysisDecisionTitle {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   line-height: 1.14;
   color: rgba(255, 255, 255, 0.95);
@@ -1433,7 +1437,7 @@
 .wizardAnalysisQuickChips {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 7px;
 }
 
 .wizardAnalysisChip {
@@ -1443,8 +1447,8 @@
   border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(17, 32, 51, 0.96);
-  padding: 4px 10px;
-  font-size: 11px;
+  padding: 3px 9px;
+  font-size: 10px;
   color: var(--text-primary);
 }
 
@@ -1477,7 +1481,7 @@
 
 .wizardDecisionListCompact {
   display: grid;
-  gap: 6px;
+  gap: 5px;
 }
 
 .wizardDecisionOption {
@@ -1487,7 +1491,7 @@
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.04);
-  padding: 9px 10px;
+  padding: 8px 9px;
   text-align: left;
   cursor: pointer;
   transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;

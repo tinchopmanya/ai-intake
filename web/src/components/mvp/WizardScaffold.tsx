@@ -651,13 +651,13 @@ function getSafeTopicLabel(
     return "Tema familiar";
   }
   if (/(coordina|horario|agenda|turno|visita|retiro|entrega|fin de semana)/.test(source)) {
-    return "Coordinación";
+    return "Coordinaci\u00f3n";
   }
   if (/(gasto|pago|transferencia|cuota|reintegro|documento|permiso|papeles|firma|viaje|vacaciones)/.test(source)) {
-    return "Logística";
+    return "Log\u00edstica";
   }
-  if (/(limite|límite|presion|presión|respeto|control|amenaz|agres)/.test(source)) {
-    return "Límites";
+  if (/(limite|l\u00edmite|presion|presi\u00f3n|respeto|control|amenaz|agres)/.test(source)) {
+    return "L\u00edmites";
   }
   return "Sin tema claro";
 }
