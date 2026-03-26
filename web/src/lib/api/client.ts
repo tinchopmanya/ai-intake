@@ -40,13 +40,19 @@ async function requestJson<T>(
       | null;
     throw new Error(
       errorPayload?.error_code ||
-        errorPayload?.message ||
         errorPayload?.detail ||
+        errorPayload?.message ||
         `http_${response.status}`,
     );
   }
 
   return (await response.json()) as T;
+}
+
+function isNetworkUnavailableError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const normalized = error.message.trim().toLowerCase();
+  return normalized === "network_unavailable" || normalized === "no se pudo conectar con el backend.";
 }
 
 async function postJson<T>(path: string, payload: unknown): Promise<T> {
@@ -145,7 +151,12 @@ export function patchCase(caseId: string, payload: CaseUpdateRequest): Promise<C
 }
 
 export function getConversations(): Promise<ConversationListResponse> {
-  return getJson<ConversationListResponse>("/v1/conversations");
+  return getJson<ConversationListResponse>("/v1/conversations").catch((error) => {
+    if (isNetworkUnavailableError(error)) {
+      return { conversations: [] };
+    }
+    throw error;
+  });
 }
 
 export function postConversation(payload: ConversationCreateRequest = {}): Promise<ConversationSummary> {
@@ -153,7 +164,15 @@ export function postConversation(payload: ConversationCreateRequest = {}): Promi
 }
 
 export function getEmotionalCheckinToday(): Promise<EmotionalCheckinTodayResponse> {
-  return getJson<EmotionalCheckinTodayResponse>("/v1/emotional-checkins/today");
+  return getJson<EmotionalCheckinTodayResponse>("/v1/emotional-checkins/today").catch((error) => {
+    if (isNetworkUnavailableError(error)) {
+      return {
+        has_checkin_today: false,
+        today_checkin: null,
+      };
+    }
+    throw error;
+  });
 }
 
 export function postEmotionalCheckin(payload: EmotionalCheckinCreateRequest): Promise<EmotionalCheckinSummary> {
