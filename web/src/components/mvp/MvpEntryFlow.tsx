@@ -1,42 +1,59 @@
 "use client";
 
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import Image from "next/image";
+import { useEffect, useMemo, useState } from "react";
 
 import styles from "@/components/mvp/MvpEntryFlow.module.css";
 import { useMvpShell } from "@/components/mvp/MvpShellContext";
 import { WizardScaffold } from "@/components/mvp/WizardScaffold";
 import { ADVISOR_PROFILES } from "@/data/advisors";
+import { getEmotionalCheckinToday, postEmotionalCheckin } from "@/lib/api/client";
+import { toUiErrorMessage } from "@/lib/api/errors";
+import type { EmotionalCheckinSummary } from "@/lib/api/types";
 
 type FlowView = "entry" | "wizard";
 type SelectorIntent = "vent" | "write_to_ex";
+type SelectorCardVariant = "calm" | "structured" | "direct";
 
-type SliderOption = {
-  id: string;
+type CheckinOption = {
+  value: number;
   label: string;
 };
 
 const DEFAULT_ADVISOR_STORAGE_KEY = "exreply-default-advisor-id";
 
-const MOOD_OPTIONS: SliderOption[] = [
-  { id: "angry", label: "Enojado" },
-  { id: "sad", label: "Triste" },
-  { id: "normal", label: "Normal" },
-  { id: "pretty_good", label: "Bastante bien" },
-  { id: "excellent", label: "Excelente" },
+const DAILY_MOOD_OPTIONS: CheckinOption[] = [
+  { value: 0, label: "Muy agotado/a" },
+  { value: 1, label: "Con poco" },
+  { value: 2, label: "Normal" },
+  { value: 3, label: "Bastante bien" },
+  { value: 4, label: "Con fuerza" },
 ];
 
-const SELF_ESTEEM_OPTIONS: SliderOption[] = [
-  { id: "very_low", label: "Muy baja" },
-  { id: "low", label: "Baja" },
-  { id: "normal", label: "Normal" },
-  { id: "good", label: "Bien" },
-  { id: "high", label: "Alta" },
+const DAILY_CONFIDENCE_OPTIONS: CheckinOption[] = [
+  { value: 0, label: "Dudando mucho" },
+  { value: 1, label: "Un poco inseguro/a" },
+  { value: 2, label: "Estable" },
+  { value: 3, label: "Bastante firme" },
+  { value: 4, label: "Muy firme" },
 ];
 
 const ADVISOR_MICROCOPY: Record<string, string> = {
-  laura: "Perspectiva empatica - escucha primero",
-  robert: "Perspectiva estrategica - limites claros",
-  lidia: "Perspectiva directa - al grano",
+  laura: "Espacio breve para bajar intensidad y ordenar lo que sientes.",
+  robert: "Mirada clara para poner foco y recuperar perspectiva.",
+  lidia: "Acompanamiento concreto para descargar sin dar mas vueltas.",
+};
+
+const ADVISOR_STYLE_LABEL: Record<string, string> = {
+  laura: "Escucha primero",
+  robert: "Limites claros",
+  lidia: "Al grano",
+};
+
+const ADVISOR_CARD_VARIANT: Record<string, SelectorCardVariant> = {
+  laura: "calm",
+  robert: "structured",
+  lidia: "direct",
 };
 
 function getGreetingLabel() {
@@ -82,82 +99,39 @@ function readStoredAdvisorId() {
   return ADVISOR_PROFILES.some((advisor) => advisor.id === stored) ? stored : null;
 }
 
-function SliderPlaceholderIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className={styles.sliderPlaceholderIcon}>
-      <path
-        d="M7 16.5 10 13.5l2.5 2.5 4.5-4.5 2 2v3.5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1h4"
-        fill="none"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.55"
-      />
-      <path
-        d="M15.5 7.75a1.75 1.75 0 1 0 0-3.5 1.75 1.75 0 0 0 0 3.5Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.55"
-      />
-    </svg>
-  );
+function getMoodSummaryLabel(level: number | null | undefined) {
+  return DAILY_MOOD_OPTIONS.find((option) => option.value === level)?.label ?? null;
 }
 
-function EntrySlider({
-  question,
+function getConfidenceSummaryLabel(level: number | null | undefined) {
+  return DAILY_CONFIDENCE_OPTIONS.find((option) => option.value === level)?.label ?? null;
+}
+
+function CheckinQuestion({
+  title,
   options,
   value,
   onChange,
 }: {
-  question: string;
-  options: SliderOption[];
-  value: number;
+  title: string;
+  options: CheckinOption[];
+  value: number | null;
   onChange: (nextValue: number) => void;
 }) {
-  const thumbPosition = `${(value / Math.max(options.length - 1, 1)) * 100}%`;
-  const sliderStyle = { "--thumb-position": thumbPosition } as CSSProperties;
-  const activeLabel = options[value]?.label ?? "";
-
   return (
-    <section className={styles.sliderSection}>
-      <div className={styles.sliderHeader}>
-        <div>
-          <h2 className={styles.sliderQuestion}>{question}</h2>
-          <p className={styles.sliderSupport}>Ajusta el punto que mejor te represente ahora.</p>
-        </div>
-        <span className={styles.sliderValue}>{activeLabel}</span>
-      </div>
-
-      <div className={styles.sliderFigure} style={sliderStyle}>
-        <div className={styles.sliderThumbStage} aria-hidden="true">
-          <div className={styles.sliderThumbPlaceholder}>
-            <SliderPlaceholderIcon />
-            <span>Imagen</span>
-          </div>
-        </div>
-
-        <input
-          type="range"
-          min={0}
-          max={options.length - 1}
-          step={1}
-          value={value}
-          onChange={(event) => onChange(Number(event.target.value))}
-          className={styles.sliderControl}
-          aria-label={question}
-        />
-      </div>
-
-      <div className={styles.sliderLabels}>
-        {options.map((option, index) => (
+    <section className={styles.checkinQuestionBlock}>
+      <p className={styles.checkinQuestionTitle}>{title}</p>
+      <div className={styles.checkinOptionGrid}>
+        {options.map((option) => (
           <button
-            key={option.id}
+            key={option.value}
             type="button"
-            onClick={() => onChange(index)}
-            className={`${styles.sliderLabelButton} ${value === index ? styles.sliderLabelButtonActive : ""}`}
-            aria-pressed={value === index}
+            onClick={() => onChange(option.value)}
+            className={`${styles.checkinOptionButton} ${value === option.value ? styles.checkinOptionButtonActive : ""}`}
+            aria-pressed={value === option.value}
           >
-            {option.label}
+            <span className={styles.checkinOptionValue}>{option.value}</span>
+            <span className={styles.checkinOptionLabel}>{option.label}</span>
           </button>
         ))}
       </div>
@@ -165,16 +139,28 @@ function EntrySlider({
   );
 }
 
+function getAdvisorCardVariantClass(variant: SelectorCardVariant) {
+  if (variant === "structured") return styles.advisorCardStructured;
+  if (variant === "direct") return styles.advisorCardDirect;
+  return styles.advisorCardCalm;
+}
+
 export function MvpEntryFlow() {
   const { displayName, sidebarConversation, openAdvisorConversation } = useMvpShell();
   const [view, setView] = useState<FlowView>("entry");
-  const [selectedMoodIndex, setSelectedMoodIndex] = useState(2);
-  const [selectedSelfEsteemIndex, setSelectedSelfEsteemIndex] = useState(2);
   const [selectorIntent, setSelectorIntent] = useState<SelectorIntent | null>(null);
   const [selectedAdvisorId, setSelectedAdvisorId] = useState<string>("laura");
   const [rememberAdvisor, setRememberAdvisor] = useState(false);
   const [preferredAdvisorId, setPreferredAdvisorId] = useState<string | null>(null);
   const [wizardKey, setWizardKey] = useState(0);
+  const [checkinModalOpen, setCheckinModalOpen] = useState(false);
+  const [checkinDismissedForVisit, setCheckinDismissedForVisit] = useState(false);
+  const [checkinSubmitting, setCheckinSubmitting] = useState(false);
+  const [checkinError, setCheckinError] = useState<string | null>(null);
+  const [todayCheckin, setTodayCheckin] = useState<EmotionalCheckinSummary | null>(null);
+  const [draftMoodLevel, setDraftMoodLevel] = useState<number | null>(null);
+  const [draftConfidenceLevel, setDraftConfidenceLevel] = useState<number | null>(null);
+  const [draftRecentContact, setDraftRecentContact] = useState<boolean | null>(null);
 
   useEffect(() => {
     const storedAdvisorId = readStoredAdvisorId();
@@ -183,6 +169,25 @@ export function MvpEntryFlow() {
     setRememberAdvisor(true);
     setPreferredAdvisorId(storedAdvisorId);
   }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadTodayCheckin() {
+      try {
+        const response = await getEmotionalCheckinToday();
+        if (!mounted) return;
+        setTodayCheckin(response.today_checkin ?? null);
+        setCheckinModalOpen(!response.has_checkin_today && !checkinDismissedForVisit);
+      } catch {
+        if (!mounted) return;
+        setCheckinModalOpen(false);
+      }
+    }
+    void loadTodayCheckin();
+    return () => {
+      mounted = false;
+    };
+  }, [checkinDismissedForVisit]);
 
   useEffect(() => {
     function handleNewConversation() {
@@ -208,6 +213,17 @@ export function MvpEntryFlow() {
 
   const selectedAdvisor =
     ADVISOR_PROFILES.find((advisor) => advisor.id === selectedAdvisorId) ?? ADVISOR_PROFILES[0];
+
+  const checkinSummaryLine = useMemo(() => {
+    if (!todayCheckin) return null;
+    const moodLabel = getMoodSummaryLabel(todayCheckin.mood_level);
+    const confidenceLabel = getConfidenceSummaryLabel(todayCheckin.confidence_level);
+    if (!moodLabel || !confidenceLabel) return null;
+    return `Hoy: animo ${moodLabel} \u00b7 confianza ${confidenceLabel}`;
+  }, [todayCheckin]);
+
+  const canSubmitCheckin =
+    draftMoodLevel !== null && draftConfidenceLevel !== null && draftRecentContact !== null && !checkinSubmitting;
 
   function openSelector(intent: SelectorIntent) {
     const storedAdvisorId = readStoredAdvisorId();
@@ -235,14 +251,18 @@ export function MvpEntryFlow() {
     setView("wizard");
   }
 
-  function handleConfirmAdvisor() {
-    persistAdvisorPreference();
+  function handleAdvisorCardClick(advisorId: string) {
+    const advisor = ADVISOR_PROFILES.find((item) => item.id === advisorId) ?? ADVISOR_PROFILES[0];
     if (selectorIntent === "vent") {
-      openAdvisorConversation(selectedAdvisor.id);
       setSelectorIntent(null);
+      openAdvisorConversation(advisor.id);
       return;
     }
+    setSelectedAdvisorId(advisor.id);
+  }
 
+  function handleConfirmAdvisor() {
+    persistAdvisorPreference();
     setSelectorIntent(null);
     enterWizard(selectedAdvisor.id);
   }
@@ -257,6 +277,31 @@ export function MvpEntryFlow() {
     setView("entry");
   }
 
+  async function handleSaveDailyCheckin() {
+    if (!canSubmitCheckin) return;
+    setCheckinSubmitting(true);
+    setCheckinError(null);
+    try {
+      const created = await postEmotionalCheckin({
+        mood_level: draftMoodLevel,
+        confidence_level: draftConfidenceLevel,
+        recent_contact: draftRecentContact,
+      });
+      setTodayCheckin(created);
+      setCheckinModalOpen(false);
+    } catch (error) {
+      setCheckinError(toUiErrorMessage(error, "No pudimos guardar tu check-in por ahora."));
+    } finally {
+      setCheckinSubmitting(false);
+    }
+  }
+
+  function handleSkipCheckinForVisit() {
+    setCheckinDismissedForVisit(true);
+    setCheckinModalOpen(false);
+    setCheckinError(null);
+  }
+
   return (
     <>
       {view === "entry" ? (
@@ -266,26 +311,18 @@ export function MvpEntryFlow() {
               <div className={styles.entryBody}>
                 <div>
                   <p className={styles.eyebrow}>{greeting}</p>
-                  <h1 className={styles.headline}>Como te sientes ahora?</h1>
+                  <h1 className={styles.headline}>\u00bfComo quieres empezar hoy?</h1>
                   <p className={styles.subcopy}>
-                    Antes de continuar, marca dos referencias rapidas y elige como quieres avanzar.
+                    Usa ExReply para descargar, analizar una conversacion o preparar mejor tu siguiente mensaje.
                   </p>
                 </div>
 
-                <div className={styles.sliderStack}>
-                  <EntrySlider
-                    question="Como esta tu estado de animo?"
-                    options={MOOD_OPTIONS}
-                    value={selectedMoodIndex}
-                    onChange={setSelectedMoodIndex}
-                  />
-                  <EntrySlider
-                    question="Como esta tu autoestima?"
-                    options={SELF_ESTEEM_OPTIONS}
-                    value={selectedSelfEsteemIndex}
-                    onChange={setSelectedSelfEsteemIndex}
-                  />
-                </div>
+                {checkinSummaryLine ? (
+                  <div className={styles.daySummaryCard}>
+                    <span className={styles.daySummaryDot} aria-hidden="true" />
+                    <p className={styles.daySummaryText}>{checkinSummaryLine}</p>
+                  </div>
+                ) : null}
 
                 {sidebarConversation && lastSessionMeta ? (
                   <div className={styles.sessionCard}>
@@ -315,7 +352,7 @@ export function MvpEntryFlow() {
                     </span>
                     <span className={styles.actionTextBlock}>
                       <span className={styles.actionTitle}>Solo quiero desahogarme</span>
-                      <span className={styles.actionCopy}>Abrir un espacio breve para descargar y ordenar.</span>
+                      <span className={styles.actionCopy}>Abrir directo un espacio breve para descargar y ordenar.</span>
                     </span>
                   </button>
                   <button type="button" className={styles.secondaryAction} onClick={handleAnalyzeConversation}>
@@ -399,6 +436,100 @@ export function MvpEntryFlow() {
         </div>
       )}
 
+      {checkinModalOpen && view === "entry" ? (
+        <div className={styles.checkinBackdrop} role="presentation">
+          <section
+            className={styles.checkinModal}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="daily-checkin-title"
+          >
+            <button
+              type="button"
+              className={styles.checkinClose}
+              aria-label="Omitir por hoy"
+              onClick={handleSkipCheckinForVisit}
+            >
+              <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
+                <path
+                  d="M6 6l8 8M14 6l-8 8"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="1.8"
+                />
+              </svg>
+            </button>
+
+            <div className={styles.checkinHeader}>
+              <p className={styles.checkinEyebrow}>Check-in diario</p>
+              <h2 id="daily-checkin-title" className={styles.checkinTitle}>
+                Antes de empezar, \u00bfcomo estas hoy?
+              </h2>
+              <p className={styles.checkinSubtitle}>
+                Esto nos ayuda a acompa\u00f1arte mejor y a sugerirte cu\u00e1ndo conviene responder y cu\u00e1ndo no.
+              </p>
+            </div>
+
+            <div className={styles.checkinBody}>
+              <CheckinQuestion
+                title="\u00bfComo estas emocionalmente para afrontar el dia?"
+                options={DAILY_MOOD_OPTIONS}
+                value={draftMoodLevel}
+                onChange={setDraftMoodLevel}
+              />
+
+              <CheckinQuestion
+                title="\u00bfComo sientes tu confianza hoy?"
+                options={DAILY_CONFIDENCE_OPTIONS}
+                value={draftConfidenceLevel}
+                onChange={setDraftConfidenceLevel}
+              />
+
+              <section className={styles.checkinQuestionBlock}>
+                <p className={styles.checkinQuestionTitle}>
+                  \u00bfTuviste contacto con tu ex en las ultimas 12 horas?
+                </p>
+                <div className={styles.binaryOptionRow}>
+                  <button
+                    type="button"
+                    className={`${styles.binaryOptionButton} ${draftRecentContact === true ? styles.binaryOptionButtonActive : ""}`}
+                    onClick={() => setDraftRecentContact(true)}
+                    aria-pressed={draftRecentContact === true}
+                  >
+                    Si
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.binaryOptionButton} ${draftRecentContact === false ? styles.binaryOptionButtonActive : ""}`}
+                    onClick={() => setDraftRecentContact(false)}
+                    aria-pressed={draftRecentContact === false}
+                  >
+                    No
+                  </button>
+                </div>
+              </section>
+            </div>
+
+            {checkinError ? <p className={styles.checkinError}>{checkinError}</p> : null}
+
+            <div className={styles.checkinActions}>
+              <button
+                type="button"
+                className={styles.checkinPrimary}
+                onClick={() => void handleSaveDailyCheckin()}
+                disabled={!canSubmitCheckin}
+              >
+                {checkinSubmitting ? "Guardando..." : "Guardar y continuar"}
+              </button>
+              <button type="button" className={styles.checkinSecondary} onClick={handleSkipCheckinForVisit}>
+                Omitir por hoy
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
       {selectorIntent ? (
         <div
           className={styles.sheetBackdrop}
@@ -415,15 +546,16 @@ export function MvpEntryFlow() {
             aria-modal="true"
             aria-labelledby="advisor-selector-title"
           >
-            <div className={styles.sheetHandle} aria-hidden="true" />
             <div className={styles.sheetHeader}>
               <div>
                 <h2 id="advisor-selector-title" className={styles.sheetTitle}>
-                  {selectorIntent === "vent" ? "Con quien quieres hablar?" : "Con quien quieres escribir?"}
+                  {selectorIntent === "vent"
+                    ? "\u00bfCon quien quieres hablar ahora?"
+                    : "\u00bfCon quien quieres escribir?"}
                 </h2>
                 <p className={styles.sheetSubtitle}>
                   {selectorIntent === "vent"
-                    ? "Elige el consejero con el que te sientas mas comodo/a para desahogarte."
+                    ? "Elige una perspectiva y entra directo al espacio de conversacion."
                     : "Elige el consejero que quieres priorizar cuando pases al flujo actual de respuesta."}
                 </p>
               </div>
@@ -448,51 +580,63 @@ export function MvpEntryFlow() {
             <div className={styles.advisorList}>
               {ADVISOR_PROFILES.map((advisor) => {
                 const isActive = advisor.id === selectedAdvisor.id;
-                const avatarClass =
-                  advisor.id === "laura"
-                    ? styles.advisorAvatarLaura
-                    : advisor.id === "robert"
-                      ? styles.advisorAvatarRobert
-                      : styles.advisorAvatarLidia;
-
+                const isVentSelector = selectorIntent === "vent";
                 return (
                   <button
                     key={advisor.id}
                     type="button"
-                    className={`${styles.advisorCard} ${isActive ? styles.advisorCardActive : ""}`}
-                    onClick={() => setSelectedAdvisorId(advisor.id)}
+                    className={`${styles.advisorCard} ${getAdvisorCardVariantClass(
+                      ADVISOR_CARD_VARIANT[advisor.id] ?? "calm",
+                    )} ${isActive && !isVentSelector ? styles.advisorCardActive : ""}`}
+                    onClick={() => handleAdvisorCardClick(advisor.id)}
                   >
-                    <span className={`${styles.advisorAvatar} ${avatarClass}`}>
-                      {advisor.id === "lidia" ? "Li" : advisor.name[0]}
-                    </span>
-                    <span className={styles.advisorTextGroup}>
-                      <span className={styles.advisorName}>{advisor.name}</span>
-                      <span className={styles.advisorCopy}>{ADVISOR_MICROCOPY[advisor.id]}</span>
-                    </span>
-                    {isActive ? <span className={styles.advisorSelectedMark}>Elegido</span> : null}
+                    <div className={styles.advisorAvatarWrap}>
+                      <Image
+                        src={advisor.avatar128}
+                        alt={advisor.name}
+                        width={88}
+                        height={88}
+                        className={styles.advisorAvatarImage}
+                      />
+                    </div>
+                    <div className={styles.advisorCardBody}>
+                      <div className={styles.advisorCardHeader}>
+                        <span className={styles.advisorName}>{advisor.name}</span>
+                        <span className={styles.advisorRole}>{advisor.role}</span>
+                      </div>
+                      <p className={styles.advisorCopy}>{ADVISOR_MICROCOPY[advisor.id]}</p>
+                      <p className={styles.advisorStyleLabel}>Estilo: {ADVISOR_STYLE_LABEL[advisor.id]}</p>
+                    </div>
+                    {isActive && !isVentSelector ? (
+                      <span className={styles.advisorSelectedMark}>Elegido</span>
+                    ) : null}
                   </button>
                 );
               })}
             </div>
 
-            <label className={styles.checkboxRow}>
-              <input
-                type="checkbox"
-                checked={rememberAdvisor}
-                onChange={(event) => setRememberAdvisor(event.target.checked)}
-                className={styles.checkbox}
-              />
-              <span>Usar este consejero por defecto</span>
-            </label>
+            {selectorIntent === "write_to_ex" ? (
+              <>
+                <label className={styles.checkboxRow}>
+                  <input
+                    type="checkbox"
+                    checked={rememberAdvisor}
+                    onChange={(event) => setRememberAdvisor(event.target.checked)}
+                    className={styles.checkbox}
+                  />
+                  <span>Usar este consejero por defecto</span>
+                </label>
 
-            <div className={styles.sheetActions}>
-              <button type="button" className={styles.sheetPrimary} onClick={handleConfirmAdvisor}>
-                {selectorIntent === "vent" ? "Empezar a hablar" : "Continuar con este consejero"}
-              </button>
-              <button type="button" className={styles.sheetSecondary} onClick={() => setSelectorIntent(null)}>
-                Volver
-              </button>
-            </div>
+                <div className={styles.sheetActions}>
+                  <button type="button" className={styles.sheetPrimary} onClick={handleConfirmAdvisor}>
+                    Continuar con este consejero
+                  </button>
+                  <button type="button" className={styles.sheetSecondary} onClick={() => setSelectorIntent(null)}>
+                    Volver
+                  </button>
+                </div>
+              </>
+            ) : null}
           </section>
         </div>
       ) : null}

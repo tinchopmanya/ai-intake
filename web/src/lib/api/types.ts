@@ -178,6 +178,25 @@ export type ConversationListResponse = {
   conversations: ConversationSummary[];
 };
 
+export type EmotionalCheckinSummary = {
+  id: string;
+  created_at: string;
+  mood_level: number;
+  confidence_level: number;
+  recent_contact: boolean;
+};
+
+export type EmotionalCheckinCreateRequest = {
+  mood_level: number;
+  confidence_level: number;
+  recent_contact: boolean;
+};
+
+export type EmotionalCheckinTodayResponse = {
+  has_checkin_today: boolean;
+  today_checkin: EmotionalCheckinSummary | null;
+};
+
 export type IncidentType =
   | "schedule_change"
   | "cancellation"

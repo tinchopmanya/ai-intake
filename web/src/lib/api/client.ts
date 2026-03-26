@@ -14,6 +14,9 @@ import type { CaseUpdateRequest } from "@/lib/api/types";
 import type { ConversationCreateRequest } from "@/lib/api/types";
 import type { ConversationListResponse } from "@/lib/api/types";
 import type { ConversationSummary } from "@/lib/api/types";
+import type { EmotionalCheckinCreateRequest } from "@/lib/api/types";
+import type { EmotionalCheckinSummary } from "@/lib/api/types";
+import type { EmotionalCheckinTodayResponse } from "@/lib/api/types";
 import type { IncidentCreateRequest } from "@/lib/api/types";
 import type { IncidentListResponse } from "@/lib/api/types";
 import type { IncidentSummary } from "@/lib/api/types";
@@ -147,6 +150,14 @@ export function getConversations(): Promise<ConversationListResponse> {
 
 export function postConversation(payload: ConversationCreateRequest = {}): Promise<ConversationSummary> {
   return postJson<ConversationSummary>("/v1/conversations", payload);
+}
+
+export function getEmotionalCheckinToday(): Promise<EmotionalCheckinTodayResponse> {
+  return getJson<EmotionalCheckinTodayResponse>("/v1/emotional-checkins/today");
+}
+
+export function postEmotionalCheckin(payload: EmotionalCheckinCreateRequest): Promise<EmotionalCheckinSummary> {
+  return postJson<EmotionalCheckinSummary>("/v1/emotional-checkins", payload);
 }
 
 export function postIncident(payload: IncidentCreateRequest): Promise<IncidentSummary> {
