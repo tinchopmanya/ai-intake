@@ -47,6 +47,21 @@ export class AuthApiError extends Error {
 const SESSION_STORAGE_KEY = "zc_auth_session_v1";
 const ACCESS_SKEW_MS = 30_000;
 
+function buildNetworkErrorResponse(): Response {
+  return new Response(
+    JSON.stringify({
+      detail: "network_unavailable",
+      message: "No se pudo conectar con el backend.",
+    }),
+    {
+      status: 503,
+      headers: {
+        "Content-Type": "application/json",
+      },
+    },
+  );
+}
+
 function nowMs(): number {
   return Date.now();
 }
@@ -224,7 +239,12 @@ export async function authFetch(
     headers.set("Authorization", `Bearer ${session.accessToken}`);
   }
 
-  const response = await fetch(input, { ...init, headers });
+  let response: Response;
+  try {
+    response = await fetch(input, { ...init, headers });
+  } catch {
+    return buildNetworkErrorResponse();
+  }
   if (response.status !== 401 || !retryOn401 || !session) {
     if (response.status === 401) {
       clearSession();
@@ -243,7 +263,11 @@ export async function authFetch(
     retryHeaders.set("Accept-Language", resolvePreferredLanguage());
   }
   retryHeaders.set("Authorization", `Bearer ${refreshed.accessToken}`);
-  return fetch(input, { ...init, headers: retryHeaders });
+  try {
+    return await fetch(input, { ...init, headers: retryHeaders });
+  } catch {
+    return buildNetworkErrorResponse();
+  }
 }
 
 export async function loginWithGoogleIdToken(idToken: string): Promise<AuthUser> {
