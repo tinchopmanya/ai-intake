@@ -6,6 +6,7 @@ from app.repositories.cases import CaseRepository
 from app.repositories.conversations import ConversationRepository
 from app.repositories.contacts import ContactRepository
 from app.repositories.conversation_memory import ConversationMemoryRepository
+from app.repositories.emotional_checkins import EmotionalCheckinRepository
 from app.repositories.incidents import IncidentRepository
 from app.repositories.mvp_metrics import MvpMetricsRepository
 from app.repositories.tracking_events import TrackingEventRepository
@@ -21,6 +22,7 @@ __all__ = [
     "ConversationRepository",
     "ContactRepository",
     "ConversationMemoryRepository",
+    "EmotionalCheckinRepository",
     "IncidentRepository",
     "MvpMetricsRepository",
     "TrackingEventRepository",
