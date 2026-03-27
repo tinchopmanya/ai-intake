@@ -33,6 +33,28 @@ class MessageRepository:
             row = cursor.fetchone()
         return dict(row) if row else None
 
+    def list_by_conversation(
+        self,
+        *,
+        conversation_id: UUID,
+    ) -> list[Mapping[str, Any]]:
+        query = """
+            SELECT
+                id,
+                conversation_id,
+                role,
+                content,
+                message_type,
+                created_at
+            FROM messages
+            WHERE conversation_id = %s
+            ORDER BY created_at ASC
+        """
+        with self._connection.cursor() as cursor:
+            cursor.execute(query, (str(conversation_id),))
+            rows = cursor.fetchall() or []
+        return [dict(row) for row in rows]
+
     def create(
         self,
         *,

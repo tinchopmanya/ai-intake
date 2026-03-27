@@ -24,3 +24,7 @@ class MessageSummary(BaseModel):
     content: str
     message_type: MessageType
     created_at: datetime
+
+
+class MessageListResponse(BaseModel):
+    messages: list[MessageSummary]

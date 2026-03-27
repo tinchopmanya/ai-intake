@@ -75,7 +75,7 @@
 .contextSummaryGrid {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
 .daySummaryCard {
@@ -128,6 +128,39 @@
   font-size: 12px;
   line-height: 1.45;
   color: rgba(255, 255, 255, 0.76);
+}
+
+.historySummaryCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  min-height: 64px;
+  padding: 11px 13px;
+  border-radius: 14px;
+  border: 1px solid rgba(82, 193, 255, 0.16);
+  background: rgba(82, 193, 255, 0.06);
+}
+
+.historySummaryDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(82, 193, 255, 0.88);
+  flex-shrink: 0;
+}
+
+.historySummaryText {
+  flex: 1;
+  font-size: 12px;
+  line-height: 1.45;
+  color: rgba(238, 248, 255, 0.86);
+}
+
+.historySummaryPreview {
+  flex: 1;
+  font-size: 11px;
+  line-height: 1.5;
+  color: rgba(222, 234, 248, 0.72);
 }
 
 .contextSummaryTextBlock {

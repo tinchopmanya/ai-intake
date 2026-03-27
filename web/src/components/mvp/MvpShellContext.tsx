@@ -3,6 +3,7 @@
 import { createContext, useContext } from "react";
 
 import type { ConversationSummary } from "@/lib/api/types";
+import type { MessageSummary } from "@/lib/api/types";
 
 export type SidebarConversationSummary = {
   id: string;
@@ -18,6 +19,8 @@ type MvpShellContextValue = {
   initials: string;
   sidebarConversation: SidebarConversationSummary | null;
   activeConversation: SidebarConversationSummary | null;
+  activeConversationMessages: MessageSummary[];
+  activeConversationMessagesLoading: boolean;
   ensureActiveConversation: (options?: { advisorId?: string | null }) => Promise<SidebarConversationSummary | null>;
   createSidebarConversation: (options?: { advisorId?: string | null }) => Promise<SidebarConversationSummary | null>;
   updateSidebarConversation: (conversation: SidebarConversationSummary) => void;

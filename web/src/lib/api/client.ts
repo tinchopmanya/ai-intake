@@ -23,6 +23,7 @@ import type { IncidentListResponse } from "@/lib/api/types";
 import type { IncidentSummary } from "@/lib/api/types";
 import type { IncidentUpdateRequest } from "@/lib/api/types";
 import type { MessageCreateRequest } from "@/lib/api/types";
+import type { MessageListResponse } from "@/lib/api/types";
 import type { MessageSummary } from "@/lib/api/types";
 import type { OnboardingProfile } from "@/lib/api/types";
 import type { OnboardingProfileUpdateRequest } from "@/lib/api/types";
@@ -191,6 +192,15 @@ export function postEmotionalCheckin(payload: EmotionalCheckinCreateRequest): Pr
 
 export function postMessage(payload: MessageCreateRequest): Promise<MessageSummary> {
   return postJson<MessageSummary>("/v1/messages", payload);
+}
+
+export function getConversationMessages(conversationId: string): Promise<MessageListResponse> {
+  return getJson<MessageListResponse>(`/v1/conversations/${conversationId}/messages`).catch((error) => {
+    if (isNetworkUnavailableError(error)) {
+      return { messages: [] };
+    }
+    throw error;
+  });
 }
 
 export function postIncident(payload: IncidentCreateRequest): Promise<IncidentSummary> {

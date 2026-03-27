@@ -14,6 +14,8 @@ from app.schemas.conversations import ConversationCreateRequest
 from app.schemas.conversations import ConversationListResponse
 from app.schemas.conversations import ConversationSummary
 from app.schemas.conversations import ConversationUpdateRequest
+from app.schemas.messages import MessageListResponse
+from app.schemas.messages import MessageSummary
 from app.services.auth_service import AuthenticatedUser
 from app.services.conversation_titles import get_safe_conversation_title
 
@@ -28,6 +30,17 @@ def _to_conversation_summary(row: dict) -> ConversationSummary:
         advisor_id=row.get("advisor_id"),
         created_at=row["created_at"],
         last_message_at=row["last_message_at"],
+    )
+
+
+def _to_message_summary(row: dict) -> MessageSummary:
+    return MessageSummary(
+        id=row["id"],
+        conversation_id=row["conversation_id"],
+        role=row["role"],
+        content=str(row.get("content") or ""),
+        message_type=row["message_type"],
+        created_at=row["created_at"],
     )
 
 
@@ -65,6 +78,33 @@ async def create_conversation(
         advisor_id=payload.advisor_id.strip() if payload.advisor_id and payload.advisor_id.strip() else None,
     )
     return _to_conversation_summary(dict(created))
+
+
+@router.get(
+    "/{conversation_id}/messages",
+    response_model=MessageListResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def list_conversation_messages(
+    conversation_id: UUID,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    uow: Annotated[UnitOfWork | None, Depends(get_uow)],
+) -> MessageListResponse:
+    if uow is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="message_persistence_unavailable",
+        )
+
+    conversation = uow.conversations.get_by_id(
+        user_id=current_user.id,
+        conversation_id=conversation_id,
+    )
+    if conversation is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="conversation_not_found")
+
+    rows = uow.messages.list_by_conversation(conversation_id=conversation_id)
+    return MessageListResponse(messages=[_to_message_summary(row) for row in rows])
 
 
 @router.patch("/{conversation_id}", response_model=ConversationSummary, status_code=status.HTTP_200_OK)

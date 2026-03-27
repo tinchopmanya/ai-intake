@@ -11,9 +11,11 @@ import type { SidebarConversationSummary } from "@/components/mvp/MvpShellContex
 import styles from "@/components/mvp/MvpShell.module.css";
 import { ADVISOR_PROFILES } from "@/data/advisors";
 import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
+import { getConversationMessages } from "@/lib/api/client";
 import { getConversations, postConversation } from "@/lib/api/client";
 import { postAdvisorChat } from "@/lib/api/client";
 import { toUiErrorMessage } from "@/lib/api/errors";
+import type { MessageSummary } from "@/lib/api/types";
 import { getCurrentUser, logoutSession } from "@/lib/auth/client";
 
 type AppShellProps = {
@@ -62,6 +64,8 @@ export function AppShell({ children }: AppShellProps) {
   >([]);
   const [conversations, setConversations] = useState<SidebarConversationSummary[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [activeConversationMessages, setActiveConversationMessages] = useState<MessageSummary[]>([]);
+  const [activeConversationMessagesLoading, setActiveConversationMessagesLoading] = useState(false);
   const speechSynthesis = useSpeechSynthesis({ lang: "es-ES" });
 
   useEffect(() => {
@@ -137,6 +141,35 @@ export function AppShell({ children }: AppShellProps) {
   );
 
   const sidebarConversation = activeConversation ?? conversations[0] ?? null;
+
+  useEffect(() => {
+    if (!activeConversationId) {
+      setActiveConversationMessages([]);
+      setActiveConversationMessagesLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setActiveConversationMessagesLoading(true);
+    void getConversationMessages(activeConversationId)
+      .then((response) => {
+        if (cancelled) return;
+        setActiveConversationMessages(response.messages);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        console.error("conversation_messages_load_failed", error);
+        setActiveConversationMessages([]);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setActiveConversationMessagesLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeConversationId]);
 
   const initials = useMemo(() => {
     const parts = displayName
@@ -336,6 +369,8 @@ export function AppShell({ children }: AppShellProps) {
         initials,
         sidebarConversation,
         activeConversation,
+        activeConversationMessages,
+        activeConversationMessagesLoading,
         ensureActiveConversation,
         createSidebarConversation,
         updateSidebarConversation,

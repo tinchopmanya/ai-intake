@@ -55,6 +55,15 @@ class FakeMessageRepository:
         self.created_payloads.append(created)
         return created
 
+    def list_by_conversation(self, *, conversation_id: UUID):
+        rows = [
+            dict(row)
+            for row in self.rows_by_key.values()
+            if row["conversation_id"] == conversation_id
+        ]
+        rows.sort(key=lambda row: row["created_at"])
+        return rows
+
 
 class FakeUow:
     def __init__(self, owner_id: UUID, conversation_id: UUID) -> None:
@@ -135,6 +144,38 @@ class TestMessagesRouter(unittest.TestCase):
                 "message_type": "selected_reply",
             },
         )
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["detail"], "conversation_not_found")
+
+    def test_list_messages_returns_ordered_rows_for_owned_conversation(self):
+        self.fake_uow.messages.rows_by_key[(self.conversation_id, "source_text")] = {
+            "id": uuid4(),
+            "conversation_id": self.conversation_id,
+            "role": "user",
+            "content": "Texto original",
+            "message_type": "source_text",
+            "created_at": datetime(2026, 3, 26, 10, 30, tzinfo=UTC),
+        }
+        self.fake_uow.messages.rows_by_key[(self.conversation_id, "analysis_action")] = {
+            "id": uuid4(),
+            "conversation_id": self.conversation_id,
+            "role": "system",
+            "content": "Responder breve y neutro",
+            "message_type": "analysis_action",
+            "created_at": datetime(2026, 3, 26, 10, 45, tzinfo=UTC),
+        }
+
+        response = self.client.get(f"/v1/conversations/{self.conversation_id}/messages")
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(len(body["messages"]), 2)
+        self.assertEqual(body["messages"][0]["message_type"], "source_text")
+        self.assertEqual(body["messages"][1]["message_type"], "analysis_action")
+
+    def test_list_messages_requires_owned_conversation(self):
+        response = self.client.get(f"/v1/conversations/{uuid4()}/messages")
+
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json()["detail"], "conversation_not_found")
 

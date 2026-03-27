@@ -203,6 +203,10 @@ export type MessageSummary = {
   created_at: string;
 };
 
+export type MessageListResponse = {
+  messages: MessageSummary[];
+};
+
 export type EmotionalCheckinSummary = {
   id: string;
   created_at: string;

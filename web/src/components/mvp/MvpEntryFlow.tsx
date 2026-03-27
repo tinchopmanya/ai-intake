@@ -10,6 +10,7 @@ import { WizardScaffold } from "@/components/mvp/WizardScaffold";
 import { ADVISOR_PROFILES } from "@/data/advisors";
 import { getEmotionalCheckinToday, postEmotionalCheckin } from "@/lib/api/client";
 import { toUiErrorMessage } from "@/lib/api/errors";
+import type { MessageSummary } from "@/lib/api/types";
 import type { EmotionalCheckinSummary } from "@/lib/api/types";
 
 type FlowView = "entry" | "wizard";
@@ -108,6 +109,18 @@ function getConfidenceSummaryLabel(level: number | null | undefined) {
   return DAILY_CONFIDENCE_OPTIONS.find((option) => option.value === level)?.label ?? null;
 }
 
+function getMessageTypeLabel(messageType: MessageSummary["message_type"]) {
+  if (messageType === "analysis_action") return "decisión guardada";
+  if (messageType === "selected_reply") return "respuesta elegida";
+  return "texto original";
+}
+
+function getMessagePreview(content: string) {
+  const normalized = content.replace(/\s+/g, " ").trim();
+  if (normalized.length <= 112) return normalized;
+  return `${normalized.slice(0, 109)}...`;
+}
+
 function CheckinSliderQuestion({
   title,
   options,
@@ -174,7 +187,14 @@ function getAdvisorCardVariantClass(variant: SelectorCardVariant) {
 }
 
 export function MvpEntryFlow() {
-  const { displayName, sidebarConversation, openAdvisorConversation } = useMvpShell();
+  const {
+    displayName,
+    sidebarConversation,
+    activeConversation,
+    activeConversationMessages,
+    activeConversationMessagesLoading,
+    openAdvisorConversation,
+  } = useMvpShell();
   const [view, setView] = useState<FlowView>("entry");
   const [selectorIntent, setSelectorIntent] = useState<SelectorIntent | null>(null);
   const [selectedAdvisorId, setSelectedAdvisorId] = useState<string>("laura");
@@ -255,6 +275,17 @@ export function MvpEntryFlow() {
     sidebarConversation.title.trim().toLowerCase() !== "nueva conversacion"
       ? sidebarConversation.title
       : "Borrador reciente";
+
+  const activeConversationSummary = useMemo(() => {
+    if (!activeConversation || activeConversationMessages.length === 0) return null;
+    const latestMessage = activeConversationMessages[activeConversationMessages.length - 1] ?? null;
+    if (!latestMessage) return null;
+    return {
+      count: activeConversationMessages.length,
+      lastTypeLabel: getMessageTypeLabel(latestMessage.message_type),
+      preview: getMessagePreview(latestMessage.content),
+    };
+  }, [activeConversation, activeConversationMessages]);
 
   const canSubmitCheckin =
     draftMoodLevel !== null && draftConfidenceLevel !== null && draftRecentContact !== null && !checkinSubmitting;
@@ -351,7 +382,7 @@ export function MvpEntryFlow() {
                   </p>
                 </div>
 
-                {checkinSummaryLine || (sidebarConversation && lastSessionMeta) ? (
+                {checkinSummaryLine || (sidebarConversation && lastSessionMeta) || activeConversationSummary ? (
                   <div className={styles.contextSummaryGrid}>
                     {checkinSummaryLine ? (
                       <div className={styles.daySummaryCard}>
@@ -371,6 +402,27 @@ export function MvpEntryFlow() {
                           <p className={styles.sessionText}>
                             {sessionTitleLabel} · {lastSessionMeta}
                           </p>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {activeConversation ? (
+                      <div className={styles.historySummaryCard}>
+                        <span className={styles.historySummaryDot} aria-hidden="true" />
+                        <div className={styles.contextSummaryTextBlock}>
+                          <p className={styles.contextSummaryLabel}>Conversación seleccionada</p>
+                          {activeConversationMessagesLoading ? (
+                            <p className={styles.historySummaryText}>Cargando registros guardados...</p>
+                          ) : activeConversationSummary ? (
+                            <>
+                              <p className={styles.historySummaryText}>
+                                {activeConversationSummary.count} registros · último: {activeConversationSummary.lastTypeLabel}
+                              </p>
+                              <p className={styles.historySummaryPreview}>{activeConversationSummary.preview}</p>
+                            </>
+                          ) : (
+                            <p className={styles.historySummaryText}>Aún no tiene contenido persistido.</p>
+                          )}
                         </div>
                       </div>
                     ) : null}
