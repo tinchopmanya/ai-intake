@@ -44,6 +44,31 @@ function mapConversationSummary(
   };
 }
 
+function isDraftConversation(conversation: SidebarConversationSummary) {
+  return (
+    conversation.titleStatus === "pending" &&
+    conversation.title.trim().toLowerCase() === "nueva conversacion"
+  );
+}
+
+function getConversationDisplayTitle(conversation: SidebarConversationSummary) {
+  return conversation.title.trim().toLowerCase() === "nueva conversacion"
+    ? "Nueva conversación"
+    : conversation.title;
+}
+
+function getConversationMetaLabel(conversation: SidebarConversationSummary) {
+  if (isDraftConversation(conversation)) return "Sin contenido todavía";
+  const parsedDate = new Date(conversation.lastMessageAt);
+  if (Number.isNaN(parsedDate.getTime())) return "Conversación reciente";
+  return new Intl.DateTimeFormat("es-UY", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(parsedDate);
+}
+
 export function AppShell({ children }: AppShellProps) {
   const router = useRouter();
   const dropdownRef = useRef<HTMLDivElement | null>(null);
@@ -63,6 +88,7 @@ export function AppShell({ children }: AppShellProps) {
     Array<{ id: string; role: "user" | "advisor"; text: string }>
   >([]);
   const [conversations, setConversations] = useState<SidebarConversationSummary[]>([]);
+  const [conversationsLoading, setConversationsLoading] = useState(true);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [activeConversationMessages, setActiveConversationMessages] = useState<MessageSummary[]>([]);
   const [activeConversationMessagesLoading, setActiveConversationMessagesLoading] = useState(false);
@@ -82,6 +108,7 @@ export function AppShell({ children }: AppShellProps) {
 
   useEffect(() => {
     let mounted = true;
+    setConversationsLoading(true);
     void getConversations()
       .then((response) => {
         if (!mounted) return;
@@ -90,6 +117,10 @@ export function AppShell({ children }: AppShellProps) {
       .catch(() => {
         if (!mounted) return;
         setConversations([]);
+      })
+      .finally(() => {
+        if (!mounted) return;
+        setConversationsLoading(false);
       });
     return () => {
       mounted = false;
@@ -552,33 +583,39 @@ export function AppShell({ children }: AppShellProps) {
                 </button>
               </div>
               <div className={styles.shellSidebarBody}>
-                {conversations.length > 0 ? (
+                {conversationsLoading ? (
+                  <p className={styles.shellSidebarEmpty}>Cargando conversaciones...</p>
+                ) : conversations.length > 0 ? (
                   <div className={styles.shellSessionList}>
                     {conversations.map((conversation) => {
                       const isActive = conversation.id === activeConversationId;
-                      const parsedDate = new Date(conversation.lastMessageAt);
-                      const metaLabel = Number.isNaN(parsedDate.getTime())
-                        ? ""
-                        : new Intl.DateTimeFormat("es-UY", {
-                            day: "2-digit",
-                            month: "2-digit",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          }).format(parsedDate);
+                      const isDraft = isDraftConversation(conversation);
+                      const metaLabel = getConversationMetaLabel(conversation);
                       return (
                         <button
                           key={conversation.id}
                           type="button"
-                          className={`${styles.shellSessionItem} ${isActive ? styles.shellSessionActive : ""}`}
+                          className={`${styles.shellSessionItem} ${
+                            isActive ? styles.shellSessionActive : ""
+                          } ${isDraft ? styles.shellSessionDraft : ""}`}
                           onClick={() => setActiveConversationId(conversation.id)}
                         >
-                          <p className={styles.shellSessionTitle}>{conversation.title}</p>
+                          <div className={styles.shellSessionRow}>
+                            <p className={styles.shellSessionTitle}>{getConversationDisplayTitle(conversation)}</p>
+                            {isActive ? (
+                              <span className={styles.shellSessionBadge}>Activa</span>
+                            ) : isDraft ? (
+                              <span className={styles.shellSessionBadgeMuted}>Vacía</span>
+                            ) : null}
+                          </div>
                           <p className={styles.shellSessionMeta}>{metaLabel}</p>
                         </button>
                       );
                     })}
                   </div>
-                ) : null}
+                ) : (
+                  <p className={styles.shellSidebarEmpty}>Todavía no tienes conversaciones guardadas.</p>
+                )}
               </div>
             </>
           ) : (

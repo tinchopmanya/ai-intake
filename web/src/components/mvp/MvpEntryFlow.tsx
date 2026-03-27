@@ -110,15 +110,20 @@ function getConfidenceSummaryLabel(level: number | null | undefined) {
 }
 
 function getMessageTypeLabel(messageType: MessageSummary["message_type"]) {
-  if (messageType === "analysis_action") return "decisión guardada";
-  if (messageType === "selected_reply") return "respuesta elegida";
-  return "texto original";
+  if (messageType === "analysis_action") return "Acción elegida";
+  if (messageType === "selected_reply") return "Respuesta seleccionada";
+  return "Texto original guardado";
 }
 
 function getMessagePreview(content: string) {
   const normalized = content.replace(/\s+/g, " ").trim();
-  if (normalized.length <= 112) return normalized;
-  return `${normalized.slice(0, 109)}...`;
+  if (normalized.length <= 96) return normalized;
+  return `${normalized.slice(0, 93)}...`;
+}
+
+function getSavedItemsLabel(count: number) {
+  if (count === 1) return "1 elemento guardado";
+  return `${count} elementos guardados`;
 }
 
 function CheckinSliderQuestion({
@@ -412,16 +417,16 @@ export function MvpEntryFlow() {
                         <div className={styles.contextSummaryTextBlock}>
                           <p className={styles.contextSummaryLabel}>Conversación seleccionada</p>
                           {activeConversationMessagesLoading ? (
-                            <p className={styles.historySummaryText}>Cargando registros guardados...</p>
+                            <p className={styles.historySummaryText}>Cargando conversación...</p>
                           ) : activeConversationSummary ? (
                             <>
                               <p className={styles.historySummaryText}>
-                                {activeConversationSummary.count} registros · último: {activeConversationSummary.lastTypeLabel}
+                                {getSavedItemsLabel(activeConversationSummary.count)} · {activeConversationSummary.lastTypeLabel}
                               </p>
                               <p className={styles.historySummaryPreview}>{activeConversationSummary.preview}</p>
                             </>
                           ) : (
-                            <p className={styles.historySummaryText}>Aún no tiene contenido persistido.</p>
+                            <p className={styles.historySummaryText}>Todavía no guardaste contenido en esta conversación.</p>
                           )}
                         </div>
                       </div>

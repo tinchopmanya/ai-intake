@@ -161,6 +161,10 @@
   font-size: 11px;
   line-height: 1.5;
   color: rgba(222, 234, 248, 0.72);
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .contextSummaryTextBlock {

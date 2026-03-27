@@ -307,21 +307,46 @@
   gap: 8px;
 }
 
+.shellSidebarEmpty {
+  padding: 12px 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.44);
+}
+
 .shellSessionItem {
   width: 100%;
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.035);
-  padding: 13px 14px;
+  padding: 12px 13px;
   text-align: left;
   cursor: default;
-  transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+  transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.shellSessionItem:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .shellSessionActive {
-  background: linear-gradient(180deg, rgba(45, 107, 228, 0.18) 0%, rgba(13, 24, 37, 0.98) 100%);
-  border-color: rgba(45, 107, 228, 0.3);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 22px rgba(0, 0, 0, 0.1);
+  background: linear-gradient(180deg, rgba(45, 107, 228, 0.16) 0%, rgba(13, 24, 37, 0.98) 100%);
+  border-color: rgba(45, 107, 228, 0.34);
+  box-shadow: inset 0 0 0 1px rgba(45, 107, 228, 0.12);
+}
+
+.shellSessionDraft {
+  border-color: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.shellSessionRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .shellSessionTitle {
@@ -329,13 +354,42 @@
   font-weight: 600;
   line-height: 1.45;
   color: rgba(255, 255, 255, 0.9);
+  min-width: 0;
+  flex: 1;
 }
 
 .shellSessionMeta {
-  margin-top: 6px;
+  margin-top: 5px;
   font-size: 11px;
-  letter-spacing: 0.04em;
-  color: rgba(126, 184, 247, 0.76);
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.shellSessionBadge,
+.shellSessionBadgeMuted {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.shellSessionBadge {
+  border: 1px solid rgba(45, 107, 228, 0.22);
+  background: rgba(45, 107, 228, 0.14);
+  color: rgba(170, 214, 255, 0.92);
+}
+
+.shellSessionBadgeMuted {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.5);
 }
 
 .shellSidebarFooter {
