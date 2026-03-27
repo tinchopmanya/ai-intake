@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import styles from "@/components/mvp/MvpEntryFlow.module.css";
 import { useMvpShell } from "@/components/mvp/MvpShellContext";
-import { WizardScaffold } from "@/components/mvp/WizardScaffold";
+import { WizardScaffold, type ConversationResumeState } from "@/components/mvp/WizardScaffold";
 import { ADVISOR_PROFILES } from "@/data/advisors";
 import { getEmotionalCheckinToday, postEmotionalCheckin } from "@/lib/api/client";
 import { toUiErrorMessage } from "@/lib/api/errors";
@@ -16,6 +16,11 @@ import type { EmotionalCheckinSummary } from "@/lib/api/types";
 type FlowView = "entry" | "wizard";
 type SelectorIntent = "vent" | "write_to_ex";
 type SelectorCardVariant = "calm" | "structured" | "direct";
+type ResumeCta = ConversationResumeState & {
+  ctaLabel: string;
+  helperText: string;
+  previewText: string | null;
+};
 
 type CheckinOption = {
   value: number;
@@ -126,6 +131,63 @@ function getSavedItemsLabel(count: number) {
   return `${count} elementos guardados`;
 }
 
+function getLatestMessageContent(
+  messages: MessageSummary[],
+  messageType: MessageSummary["message_type"],
+) {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message?.message_type === messageType) {
+      return message.content.trim() || null;
+    }
+  }
+  return null;
+}
+
+function buildResumeCta(messages: MessageSummary[]): ResumeCta | null {
+  const sourceText = getLatestMessageContent(messages, "source_text");
+  const analysisAction = getLatestMessageContent(messages, "analysis_action");
+  const selectedReply = getLatestMessageContent(messages, "selected_reply");
+
+  if (selectedReply) {
+    return {
+      targetStep: 4,
+      sourceText,
+      analysisAction,
+      selectedReply,
+      ctaLabel: "Abrir consejeros",
+      helperText: "Volver al punto de consejeros con tu respuesta guardada a mano.",
+      previewText: getMessagePreview(selectedReply),
+    };
+  }
+
+  if (analysisAction) {
+    return {
+      targetStep: 3,
+      sourceText,
+      analysisAction,
+      selectedReply: null,
+      ctaLabel: "Seguir desde el análisis",
+      helperText: `Última acción guardada: ${analysisAction}.`,
+      previewText: sourceText ? getMessagePreview(sourceText) : getMessagePreview(analysisAction),
+    };
+  }
+
+  if (sourceText) {
+    return {
+      targetStep: 3,
+      sourceText,
+      analysisAction: null,
+      selectedReply: null,
+      ctaLabel: "Retomar análisis",
+      helperText: "Tienes texto guardado y puedes continuar sin reconstruir el flujo completo.",
+      previewText: getMessagePreview(sourceText),
+    };
+  }
+
+  return null;
+}
+
 function CheckinSliderQuestion({
   title,
   options,
@@ -206,6 +268,7 @@ export function MvpEntryFlow() {
   const [rememberAdvisor, setRememberAdvisor] = useState(false);
   const [preferredAdvisorId, setPreferredAdvisorId] = useState<string | null>(null);
   const [wizardKey, setWizardKey] = useState(0);
+  const [resumeState, setResumeState] = useState<ConversationResumeState | null>(null);
   const [checkinModalOpen, setCheckinModalOpen] = useState(false);
   const [checkinDismissedForVisit, setCheckinDismissedForVisit] = useState(false);
   const [checkinSubmitting, setCheckinSubmitting] = useState(false);
@@ -245,6 +308,7 @@ export function MvpEntryFlow() {
   useEffect(() => {
     function handleNewConversation() {
       setSelectorIntent(null);
+      setResumeState(null);
       setView("entry");
     }
 
@@ -292,10 +356,16 @@ export function MvpEntryFlow() {
     };
   }, [activeConversation, activeConversationMessages]);
 
+  const activeConversationResume = useMemo(
+    () => (activeConversation ? buildResumeCta(activeConversationMessages) : null),
+    [activeConversation, activeConversationMessages],
+  );
+
   const canSubmitCheckin =
     draftMoodLevel !== null && draftConfidenceLevel !== null && draftRecentContact !== null && !checkinSubmitting;
 
   function openSelector(intent: SelectorIntent) {
+    setResumeState(null);
     const storedAdvisorId = readStoredAdvisorId();
     if (storedAdvisorId) {
       setSelectedAdvisorId(storedAdvisorId);
@@ -315,8 +385,12 @@ export function MvpEntryFlow() {
     window.localStorage.removeItem(DEFAULT_ADVISOR_STORAGE_KEY);
   }
 
-  function enterWizard(nextPreferredAdvisorId: string | null) {
+  function enterWizard(
+    nextPreferredAdvisorId: string | null,
+    options?: { resumeState?: ConversationResumeState | null },
+  ) {
     setPreferredAdvisorId(nextPreferredAdvisorId);
+    setResumeState(options?.resumeState ?? null);
     setWizardKey((current) => current + 1);
     setView("wizard");
   }
@@ -342,9 +416,17 @@ export function MvpEntryFlow() {
   }
 
   function handleReturnToEntry() {
+    setResumeState(null);
     setPreferredAdvisorId(null);
     setSelectorIntent(null);
     setView("entry");
+  }
+
+  function handleResumeConversation() {
+    if (!activeConversationResume) return;
+    enterWizard(activeConversation?.advisorId ?? null, {
+      resumeState: activeConversationResume,
+    });
   }
 
   async function handleSaveDailyCheckin() {
@@ -424,6 +506,23 @@ export function MvpEntryFlow() {
                                 {getSavedItemsLabel(activeConversationSummary.count)} · {activeConversationSummary.lastTypeLabel}
                               </p>
                               <p className={styles.historySummaryPreview}>{activeConversationSummary.preview}</p>
+                              {activeConversationResume ? (
+                                <div className={styles.historySummaryActions}>
+                                  <p className={styles.historySummaryHint}>{activeConversationResume.helperText}</p>
+                                  {activeConversationResume.previewText ? (
+                                    <p className={styles.historySummaryResumePreview}>
+                                      {activeConversationResume.previewText}
+                                    </p>
+                                  ) : null}
+                                  <button
+                                    type="button"
+                                    className={styles.historySummaryButton}
+                                    onClick={handleResumeConversation}
+                                  >
+                                    {activeConversationResume.ctaLabel}
+                                  </button>
+                                </div>
+                              ) : null}
                             </>
                           ) : (
                             <p className={styles.historySummaryText}>Todavía no guardaste contenido en esta conversación.</p>
@@ -531,6 +630,7 @@ export function MvpEntryFlow() {
             <WizardScaffold
               key={wizardKey}
               preferredAdvisorId={preferredAdvisorId}
+              resumeState={resumeState}
               onExitToEntry={handleReturnToEntry}
             />
           </div>

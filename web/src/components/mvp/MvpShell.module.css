@@ -1328,6 +1328,82 @@
     linear-gradient(180deg, rgba(17, 32, 51, 0.92) 0%, rgba(10, 21, 32, 0.96) 100%);
 }
 
+.wizardResumeCard {
+  gap: 10px;
+  margin-bottom: 10px;
+  border-color: rgba(82, 193, 255, 0.18);
+  background:
+    radial-gradient(circle at top right, rgba(82, 193, 255, 0.08) 0%, transparent 34%),
+    linear-gradient(180deg, rgba(17, 32, 51, 0.92) 0%, rgba(10, 21, 32, 0.96) 100%);
+}
+
+.wizardResumeHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.wizardResumeTitle {
+  margin-top: 4px;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: rgba(255, 255, 255, 0.96);
+}
+
+.wizardResumeBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  border-radius: 999px;
+  border: 1px solid rgba(82, 193, 255, 0.2);
+  background: rgba(82, 193, 255, 0.12);
+  padding: 0 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(230, 247, 255, 0.92);
+}
+
+.wizardResumeCopy {
+  font-size: 12px;
+  line-height: 1.55;
+  color: rgba(226, 240, 255, 0.78);
+}
+
+.wizardResumeBlock {
+  display: grid;
+  gap: 4px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 10px 12px;
+}
+
+.wizardResumeLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(126, 184, 247, 0.74);
+}
+
+.wizardResumeValue {
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(240, 247, 255, 0.9);
+}
+
+.wizardResumeActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 2px;
+}
+
 .wizardAnalysisCardHeader {
   display: flex;
   align-items: center;

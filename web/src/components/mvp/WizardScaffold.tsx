@@ -79,6 +79,13 @@ type DecisionAction = {
   subtitle: string;
 };
 
+export type ConversationResumeState = {
+  targetStep: 3 | 4;
+  sourceText: string | null;
+  analysisAction: string | null;
+  selectedReply: string | null;
+};
+
 function mapConversationSummaryToSidebar(conversation: {
   id: string;
   title: string;
@@ -218,6 +225,13 @@ function formatConversationBlocksForContext(blocks: ConversationBlock[]): string
     })
     .filter((line): line is string => Boolean(line))
     .join("\n");
+}
+
+function getResumePreviewText(content: string | null, maxLength = 220) {
+  const normalized = content?.replace(/\s+/g, " ").trim() ?? "";
+  if (!normalized) return null;
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, maxLength - 3)}...`;
 }
 
 function looksLikeConversationInput(text: string): boolean {
@@ -855,15 +869,17 @@ function ShellStepSection({
  */
 export function WizardScaffold({
   preferredAdvisorId = null,
+  resumeState = null,
   onExitToEntry,
 }: {
   preferredAdvisorId?: string | null;
+  resumeState?: ConversationResumeState | null;
   onExitToEntry?: () => void;
 }) {
   const { activeConversation, ensureActiveConversation, updateSidebarConversation } = useMvpShell();
   const locale = resolveRuntimeLocale();
   const t = (key: string) => tRuntime(key, locale);
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(resumeState?.targetStep ?? 1);
   const [stepOneInputMode, setStepOneInputMode] = useState<StepOneInputMode>("write");
   const [selectedDecision, setSelectedDecision] = useState<DecisionActionId>("no_reply");
   const [messageText, setMessageText] = useState("");
@@ -1162,7 +1178,7 @@ export function WizardScaffold({
     }
   }
 
-  function syncSidebarConversationSummary() {
+  function syncSidebarConversationSummary(sourceTextOverride?: string) {
     if (typeof window === "undefined") return;
     if (!sidebarConversationStartedAtRef.current) {
       sidebarConversationStartedAtRef.current = new Date().toISOString();
@@ -1171,7 +1187,7 @@ export function WizardScaffold({
       new CustomEvent("mvp:conversation-summary", {
         detail: {
           visible: true,
-          title: buildSidebarConversationTitle(conversationBlocks, messageText),
+          title: buildSidebarConversationTitle(conversationBlocks, sourceTextOverride ?? messageText),
           startedAt: sidebarConversationStartedAtRef.current,
         },
       }),
@@ -1372,11 +1388,8 @@ export function WizardScaffold({
     syncConversationBlocks(updated);
   }
 
-  async function runAnalysis() {
-    const text = getConversationSubmissionText(conversationBlocks, messageText);
+  async function runAnalysisForText(text: string, sourceType: "ocr" | "text") {
     if (!text || loadingAnalysis) return;
-    const sourceType = ocrInfo ? "ocr" : "text";
-
     setLoadingAnalysis(true);
     setAnalysisError(null);
     setAnalysisResult(null);
@@ -1410,12 +1423,22 @@ export function WizardScaffold({
     }
   }
 
-  async function requestAdvisor(params: { quickMode: boolean; analysisId?: string | null }) {
+  async function runAnalysis() {
     const text = getConversationSubmissionText(conversationBlocks, messageText);
-    if (!text || loadingAdvisor) return;
-    const sourceType = ocrInfo ? "ocr" : "text";
+    if (!text) return;
+    await runAnalysisForText(text, ocrInfo ? "ocr" : "text");
+  }
 
-    syncSidebarConversationSummary();
+  async function requestAdvisorForText(
+    text: string,
+    params: {
+      quickMode: boolean;
+      analysisId?: string | null;
+      sourceType: "ocr" | "text";
+    },
+  ) {
+    if (!text || loadingAdvisor) return;
+    syncSidebarConversationSummary(text);
     setLoadingAdvisor(true);
     setAdvisorError(null);
     setAdvisorResult(null);
@@ -1432,7 +1455,7 @@ export function WizardScaffold({
         mode,
         relationship_type: "otro",
         case_id: selectedCaseId ?? undefined,
-        source_type: sourceType,
+        source_type: params.sourceType,
         quick_mode: params.quickMode,
         save_session: true,
         analysis_id: params.analysisId ?? undefined,
@@ -1445,6 +1468,15 @@ export function WizardScaffold({
     } finally {
       setLoadingAdvisor(false);
     }
+  }
+
+  async function requestAdvisor(params: { quickMode: boolean; analysisId?: string | null }) {
+    const text = getConversationSubmissionText(conversationBlocks, messageText);
+    if (!text) return;
+    await requestAdvisorForText(text, {
+      ...params,
+      sourceType: ocrInfo ? "ocr" : "text",
+    });
   }
 
   async function handleQuickResponse() {
@@ -1480,6 +1512,37 @@ export function WizardScaffold({
   async function handleContinueToStep4() {
     if (!analysisId) return;
     await requestAdvisor({ quickMode: false, analysisId });
+  }
+
+  async function handleResumeAnalysisFromSavedText() {
+    const sourceText = resumeState?.sourceText?.trim();
+    if (!sourceText) return;
+    setConversationBlocks([]);
+    setMessageText(sourceText);
+    setStepOneInputMode("write");
+    setOcrInfo(null);
+    setOcrError(null);
+    setOcrStatusMessage(null);
+    setAutoParseError(null);
+    setCurrentStep(3);
+    await runAnalysisForText(sourceText, "text");
+  }
+
+  async function handleResumeAdvisorsFromSavedText() {
+    const sourceText = resumeState?.sourceText?.trim();
+    if (!sourceText) return;
+    setConversationBlocks([]);
+    setMessageText(sourceText);
+    setStepOneInputMode("write");
+    setOcrInfo(null);
+    setOcrError(null);
+    setOcrStatusMessage(null);
+    setAutoParseError(null);
+    setCurrentStep(4);
+    await requestAdvisorForText(sourceText, {
+      quickMode: false,
+      sourceType: "text",
+    });
   }
 
   function handleStartNewConversation() {
@@ -1754,6 +1817,13 @@ export function WizardScaffold({
   const hasConversationInput = messageText.trim().length > 0 || conversationBlocks.length > 0;
   const replyTiming = analysisResult ? getReplyTimingGuidance(analysisResult) : null;
   const topicLabel = getSafeTopicLabel(activeCase?.title, conversationBlocks, messageText);
+  const resumeSourcePreview = getResumePreviewText(resumeState?.sourceText ?? null);
+  const resumeActionPreview = getResumePreviewText(resumeState?.analysisAction ?? null, 120);
+  const resumeReplyPreview = getResumePreviewText(resumeState?.selectedReply ?? null);
+  const showAnalysisResumePanel = Boolean(currentStep === 3 && resumeState?.sourceText && !analysisResult);
+  const showAdvisorResumePanel = Boolean(
+    currentStep === 4 && resumeState?.targetStep === 4 && !advisorResult,
+  );
   const toneChipValue =
     analysisResult?.emotional_context.tone || analysisResult?.tone_detected || "No disponible";
   const urgencyChipValue =
@@ -2220,6 +2290,52 @@ export function WizardScaffold({
             </p>
           </div>
 
+          {showAnalysisResumePanel ? (
+            <section className={`${styles.wizardMobileCard} ${styles.wizardResumeCard}`}>
+              <div className={styles.wizardResumeHeader}>
+                <div>
+                  <p className={styles.wizardAnalysisBlockLabel}>ConversaciÃ³n guardada</p>
+                  <p className={styles.wizardResumeTitle}>Retoma el anÃ¡lisis desde lo persistido</p>
+                </div>
+                <span className={styles.wizardResumeBadge}>Paso 3</span>
+              </div>
+              <p className={styles.wizardResumeCopy}>
+                Entraste en el punto de anÃ¡lisis usando solo lo guardado. No rehidratamos todo el wizard.
+              </p>
+              {resumeActionPreview ? (
+                <div className={styles.wizardResumeBlock}>
+                  <p className={styles.wizardResumeLabel}>Ãšltima acciÃ³n guardada</p>
+                  <p className={styles.wizardResumeValue}>{resumeActionPreview}</p>
+                </div>
+              ) : null}
+              {resumeSourcePreview ? (
+                <div className={styles.wizardResumeBlock}>
+                  <p className={styles.wizardResumeLabel}>Texto base guardado</p>
+                  <p className={styles.wizardResumeValue}>{resumeSourcePreview}</p>
+                </div>
+              ) : null}
+              <div className={styles.wizardResumeActions}>
+                <Button
+                  type="button"
+                  onClick={() => void handleResumeAnalysisFromSavedText()}
+                  disabled={!resumeState?.sourceText || loadingAnalysis}
+                  variant="primary"
+                  className={`${styles.wizardPrimaryButton} h-10 min-w-[170px] text-[13px] hover:bg-[#265cc7]`}
+                >
+                  {loadingAnalysis ? "Analizando..." : "Analizar texto guardado"}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => onExitToEntry?.()}
+                  variant="secondary"
+                  className={`${styles.wizardSecondaryButton} h-10 text-[13px] hover:bg-[rgba(255,255,255,0.12)]`}
+                >
+                  Volver
+                </Button>
+              </div>
+            </section>
+          ) : null}
+
           <div className="min-h-6">
             {loadingAnalysis ? (
               <p className={styles.wizardStepStatus}>Interpretando contexto...</p>
@@ -2374,6 +2490,59 @@ export function WizardScaffold({
               Elige con quien quieres profundizar. Esta pantalla reutiliza exactamente las cards actuales.
             </p>
           </div>
+
+          {showAdvisorResumePanel ? (
+            <section className={`${styles.wizardMobileCard} ${styles.wizardResumeCard}`}>
+              <div className={styles.wizardResumeHeader}>
+                <div>
+                  <p className={styles.wizardAnalysisBlockLabel}>ConversaciÃ³n guardada</p>
+                  <p className={styles.wizardResumeTitle}>Vuelve a consejeros desde lo guardado</p>
+                </div>
+                <span className={styles.wizardResumeBadge}>Paso 4</span>
+              </div>
+              <p className={styles.wizardResumeCopy}>
+                Abrimos el punto de consejeros sin reconstruir el wizard completo. Si quieres, puedes generar
+                de nuevo las respuestas desde el texto guardado.
+              </p>
+              {resumeReplyPreview ? (
+                <div className={styles.wizardResumeBlock}>
+                  <p className={styles.wizardResumeLabel}>Respuesta guardada</p>
+                  <p className={styles.wizardResumeValue}>{resumeReplyPreview}</p>
+                </div>
+              ) : null}
+              {resumeActionPreview ? (
+                <div className={styles.wizardResumeBlock}>
+                  <p className={styles.wizardResumeLabel}>Ãšltima acciÃ³n guardada</p>
+                  <p className={styles.wizardResumeValue}>{resumeActionPreview}</p>
+                </div>
+              ) : null}
+              {resumeSourcePreview ? (
+                <div className={styles.wizardResumeBlock}>
+                  <p className={styles.wizardResumeLabel}>Texto base guardado</p>
+                  <p className={styles.wizardResumeValue}>{resumeSourcePreview}</p>
+                </div>
+              ) : null}
+              <div className={styles.wizardResumeActions}>
+                <Button
+                  type="button"
+                  onClick={() => void handleResumeAdvisorsFromSavedText()}
+                  disabled={!resumeState?.sourceText || loadingAdvisor}
+                  variant="primary"
+                  className={`${styles.wizardPrimaryButton} h-10 min-w-[192px] text-[13px] hover:bg-[#265cc7]`}
+                >
+                  {loadingAdvisor ? "Generando..." : "Generar consejeros otra vez"}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => setCurrentStep(3)}
+                  variant="secondary"
+                  className={`${styles.wizardSecondaryButton} h-10 text-[13px] hover:bg-[rgba(255,255,255,0.12)]`}
+                >
+                  Ir al anÃ¡lisis
+                </Button>
+              </div>
+            </section>
+          ) : null}
 
           <div className="min-h-6">
             {advisorError ? <p className="text-sm text-red-700">{advisorError}</p> : null}
