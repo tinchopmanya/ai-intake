@@ -15,6 +15,7 @@ from app.api.routers import emotional_checkins_router
 from app.api.routers import events_router
 from app.api.routers import incidents_router
 from app.api.routers import metrics_router
+from app.api.routers import messages_router
 from app.api.routers import onboarding_router
 from app.api.routers import ocr_router
 from app.services.i18n_service import i18n_service
@@ -68,6 +69,7 @@ app.include_router(analysis_router)
 app.include_router(advisor_v1_router)
 app.include_router(events_router)
 app.include_router(metrics_router)
+app.include_router(messages_router)
 app.include_router(ocr_router)
 
 

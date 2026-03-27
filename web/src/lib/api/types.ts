@@ -184,6 +184,25 @@ export type ConversationListResponse = {
   conversations: ConversationSummary[];
 };
 
+export type MessageRole = "user" | "system" | "assistant";
+export type MessageType = "source_text" | "analysis_action" | "selected_reply";
+
+export type MessageCreateRequest = {
+  conversation_id: string;
+  role: MessageRole;
+  content: string;
+  message_type: MessageType;
+};
+
+export type MessageSummary = {
+  id: string;
+  conversation_id: string;
+  role: MessageRole;
+  content: string;
+  message_type: MessageType;
+  created_at: string;
+};
+
 export type EmotionalCheckinSummary = {
   id: string;
   created_at: string;

@@ -7,6 +7,7 @@ from .emotional_checkins import router as emotional_checkins_router
 from .events import router as events_router
 from .incidents import router as incidents_router
 from .metrics import router as metrics_router
+from .messages import router as messages_router
 from .onboarding import router as onboarding_router
 from .ocr import router as ocr_router
 
@@ -20,6 +21,7 @@ __all__ = [
     "events_router",
     "incidents_router",
     "metrics_router",
+    "messages_router",
     "onboarding_router",
     "ocr_router",
 ]

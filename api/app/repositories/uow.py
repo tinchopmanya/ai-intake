@@ -7,6 +7,7 @@ from app.repositories.contacts import ContactRepository
 from app.repositories.conversation_memory import ConversationMemoryRepository
 from app.repositories.emotional_checkins import EmotionalCheckinRepository
 from app.repositories.incidents import IncidentRepository
+from app.repositories.messages import MessageRepository
 from app.repositories.mvp_metrics import MvpMetricsRepository
 from app.repositories.protocols import ConnectionFactory
 from app.repositories.protocols import ConnectionProtocol
@@ -26,6 +27,7 @@ class UnitOfWork:
         self.contacts: ContactRepository
         self.conversations: ConversationRepository
         self.emotional_checkins: EmotionalCheckinRepository
+        self.messages: MessageRepository
         self.cases: CaseRepository
         self.analyses: AnalysisResultRepository
         self.sessions: AdvisorSessionRepository
@@ -43,6 +45,7 @@ class UnitOfWork:
         self.contacts = ContactRepository(self._connection)
         self.conversations = ConversationRepository(self._connection)
         self.emotional_checkins = EmotionalCheckinRepository(self._connection)
+        self.messages = MessageRepository(self._connection)
         self.cases = CaseRepository(self._connection)
         self.analyses = AnalysisResultRepository(self._connection)
         self.sessions = AdvisorSessionRepository(self._connection)

@@ -35,6 +35,29 @@ class ConversationRepository:
             rows = cursor.fetchall()
         return [dict(row) for row in rows]
 
+    def get_by_id(
+        self,
+        *,
+        user_id: UUID,
+        conversation_id: UUID,
+    ) -> Mapping[str, Any] | None:
+        query = """
+            SELECT
+                id,
+                user_id,
+                title,
+                title_status,
+                advisor_id,
+                created_at,
+                last_message_at
+            FROM conversations
+            WHERE id = %s AND user_id = %s
+        """
+        with self._connection.cursor() as cursor:
+            cursor.execute(query, (str(conversation_id), str(user_id)))
+            row = cursor.fetchone()
+        return dict(row) if row else None
+
     def create(
         self,
         *,

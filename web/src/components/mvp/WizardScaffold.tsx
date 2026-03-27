@@ -21,6 +21,7 @@ import {
   postAdvisorChat,
   postAnalysis,
   postIncident,
+  postMessage,
   postOcrInterpret,
   postWizardEvent,
 } from "@/lib/api/client";
@@ -910,6 +911,7 @@ export function WizardScaffold({
   const manualInterpretTimerRef = useRef<number | null>(null);
   const conversationListRef = useRef<HTMLDivElement | null>(null);
   const sidebarConversationStartedAtRef = useRef<string | null>(null);
+  const persistedMessageKeysRef = useRef<Set<string>>(new Set());
   const contextVoice = useSpeechToText({
     lang: "es-ES",
     continuous: false,
@@ -1128,6 +1130,35 @@ export function WizardScaffold({
       updateSidebarConversation(mapConversationSummaryToSidebar(updated));
     } catch {
       // Keep the analysis flow resilient if title refresh fails.
+    }
+  }
+
+  async function persistConversationMessage(params: {
+    role: "user" | "system" | "assistant";
+    messageType: "source_text" | "analysis_action" | "selected_reply";
+    content: string;
+  }) {
+    const normalizedContent = params.content.trim();
+    if (!normalizedContent) return;
+
+    const conversation = activeConversation ?? (await ensureActiveConversation({ advisorId: preferredAdvisorId }));
+    if (!conversation) return;
+
+    const key = `${conversation.id}:${params.messageType}`;
+    if (persistedMessageKeysRef.current.has(key)) {
+      return;
+    }
+
+    try {
+      const persisted = await postMessage({
+        conversation_id: conversation.id,
+        role: params.role,
+        content: normalizedContent,
+        message_type: params.messageType,
+      });
+      persistedMessageKeysRef.current.add(`${persisted.conversation_id}:${persisted.message_type}`);
+    } catch {
+      // Keep UX resilient if minimal message persistence fails.
     }
   }
 
@@ -1352,6 +1383,11 @@ export function WizardScaffold({
     setAnalysisId(null);
 
     try {
+      await persistConversationMessage({
+        role: "user",
+        messageType: "source_text",
+        content: text,
+      });
       const result = await postAnalysis({
         message_text: text,
         mode,
@@ -1386,6 +1422,11 @@ export function WizardScaffold({
     setCopiedIndex(null);
 
     try {
+      await persistConversationMessage({
+        role: "user",
+        messageType: "source_text",
+        content: text,
+      });
       const result = await postAdvisor({
         message_text: text,
         mode,
@@ -1464,6 +1505,7 @@ export function WizardScaffold({
     setAutoParseError(null);
     setResponseTone("cordial");
     sidebarConversationStartedAtRef.current = null;
+    persistedMessageKeysRef.current.clear();
     if (typeof window !== "undefined") {
       window.dispatchEvent(
         new CustomEvent("mvp:conversation-summary", {
@@ -1671,6 +1713,11 @@ export function WizardScaffold({
   async function handleCopy(text: string, index: number) {
     try {
       await navigator.clipboard.writeText(text);
+      await persistConversationMessage({
+        role: "assistant",
+        messageType: "selected_reply",
+        content: text,
+      });
       const sessionId = advisorResult?.session_id;
       const advisorId = getAdvisorVisualByIndex(index).id;
       if (sessionId) {
@@ -2268,6 +2315,11 @@ export function WizardScaffold({
                               return;
                             }
                             setSelectedDecision(action.id);
+                            void persistConversationMessage({
+                              role: "system",
+                              messageType: "analysis_action",
+                              content: action.title,
+                            });
                           }}
                           className={`${styles.wizardDecisionOption} ${
                             isActive ? styles.wizardDecisionOptionActive : ""
