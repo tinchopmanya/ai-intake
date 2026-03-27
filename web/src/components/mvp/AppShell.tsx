@@ -44,11 +44,15 @@ function mapConversationSummary(
   };
 }
 
-function isDraftConversation(conversation: SidebarConversationSummary) {
-  return (
-    conversation.titleStatus === "pending" &&
-    conversation.title.trim().toLowerCase() === "nueva conversacion"
-  );
+function hasUsefulConversationContent(conversation: SidebarConversationSummary) {
+  const normalizedTitle = conversation.title.trim().toLowerCase();
+  const hasCustomTitle =
+    normalizedTitle.length > 0 &&
+    normalizedTitle !== "nueva conversacion" &&
+    normalizedTitle !== "nueva conversación";
+  const hasAdvancedTitleState = conversation.titleStatus !== "pending";
+  const hasUpdatedTimestamp = conversation.lastMessageAt !== conversation.startedAt;
+  return hasCustomTitle || hasAdvancedTitleState || hasUpdatedTimestamp;
 }
 
 function getConversationDisplayTitle(conversation: SidebarConversationSummary) {
@@ -58,7 +62,7 @@ function getConversationDisplayTitle(conversation: SidebarConversationSummary) {
 }
 
 function getConversationMetaLabel(conversation: SidebarConversationSummary) {
-  if (isDraftConversation(conversation)) return "Sin contenido todavía";
+  if (!hasUsefulConversationContent(conversation)) return "Borrador actual";
   const parsedDate = new Date(conversation.lastMessageAt);
   if (Number.isNaN(parsedDate.getTime())) return "Conversación reciente";
   return new Intl.DateTimeFormat("es-UY", {
@@ -174,7 +178,7 @@ export function AppShell({ children }: AppShellProps) {
   const visibleConversations = useMemo(
     () =>
       conversations.filter(
-        (conversation) => !isDraftConversation(conversation) || conversation.id === activeConversationId,
+        (conversation) => hasUsefulConversationContent(conversation) || conversation.id === activeConversationId,
       ),
     [activeConversationId, conversations],
   );
@@ -597,7 +601,7 @@ export function AppShell({ children }: AppShellProps) {
                   <div className={styles.shellSessionList}>
                     {visibleConversations.map((conversation) => {
                       const isActive = conversation.id === activeConversationId;
-                      const isDraft = isDraftConversation(conversation);
+                      const isDraft = !hasUsefulConversationContent(conversation);
                       const metaLabel = getConversationMetaLabel(conversation);
                       return (
                         <button
@@ -621,8 +625,6 @@ export function AppShell({ children }: AppShellProps) {
                             <p className={styles.shellSessionTitle}>{getConversationDisplayTitle(conversation)}</p>
                             {isActive ? (
                               <span className={styles.shellSessionBadge}>Activa</span>
-                            ) : isDraft ? (
-                              <span className={styles.shellSessionBadgeMuted}>Vacía</span>
                             ) : null}
                           </div>
                           <p className={styles.shellSessionMeta}>{metaLabel}</p>

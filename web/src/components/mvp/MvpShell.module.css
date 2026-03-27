@@ -321,10 +321,12 @@
   width: 100%;
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.035);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.038) 0%, rgba(255, 255, 255, 0.025) 100%);
   padding: 12px 13px;
   text-align: left;
   cursor: default;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
   transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease, transform 180ms ease;
 }
 
@@ -335,14 +337,20 @@
 }
 
 .shellSessionActive {
-  background: linear-gradient(180deg, rgba(45, 107, 228, 0.16) 0%, rgba(13, 24, 37, 0.98) 100%);
-  border-color: rgba(45, 107, 228, 0.34);
-  box-shadow: inset 0 0 0 1px rgba(45, 107, 228, 0.12);
+  border-color: rgba(126, 184, 247, 0.34);
+  background:
+    radial-gradient(circle at top left, rgba(244, 201, 93, 0.12) 0%, transparent 28%),
+    linear-gradient(180deg, rgba(45, 107, 228, 0.16) 0%, rgba(13, 24, 37, 0.98) 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(126, 184, 247, 0.12),
+    0 12px 26px rgba(0, 0, 0, 0.16);
 }
 
 .shellSessionDraft {
-  border-color: rgba(255, 255, 255, 0.06);
-  background: rgba(255, 255, 255, 0.025);
+  border-color: rgba(244, 201, 93, 0.16);
+  background:
+    radial-gradient(circle at top left, rgba(244, 201, 93, 0.1) 0%, transparent 34%),
+    rgba(255, 255, 255, 0.028);
 }
 
 .shellSessionRow {
@@ -366,6 +374,18 @@
   font-size: 11px;
   letter-spacing: 0.02em;
   color: rgba(255, 255, 255, 0.5);
+}
+
+.shellSessionActive .shellSessionTitle {
+  color: #f4fbff;
+}
+
+.shellSessionActive .shellSessionMeta {
+  color: rgba(214, 233, 255, 0.72);
+}
+
+.shellSessionDraft .shellSessionMeta {
+  color: rgba(244, 218, 152, 0.72);
 }
 
 .shellSessionBadge,
@@ -660,6 +680,10 @@
 
 .wizardStepOneCard {
   gap: 14px;
+  background:
+    radial-gradient(circle at top left, rgba(244, 201, 93, 0.09) 0%, transparent 18%),
+    radial-gradient(circle at 88% 12%, rgba(34, 197, 139, 0.08) 0%, transparent 20%),
+    linear-gradient(180deg, rgba(17, 32, 51, 0.94) 0%, rgba(10, 21, 32, 0.98) 100%);
 }
 
 .wizardReviewCard {
@@ -676,6 +700,10 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 9px;
+  padding: 4px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.025);
 }
 
 .wizardModeTab {
@@ -723,6 +751,10 @@
   align-items: center;
   justify-content: center;
   color: rgba(255, 255, 255, 0.68);
+  width: 28px;
+  height: 28px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .wizardModeTabVoiceIcon {
@@ -742,6 +774,7 @@
 
 .wizardModeTabActive .wizardModeTabIcon {
   color: #ffe6a8;
+  background: rgba(255, 247, 221, 0.12);
 }
 
 .wizardModeTabActive .wizardModeTabVoiceIcon {
@@ -845,7 +878,7 @@
 }
 
 .wizardPrimaryTextarea::placeholder {
-  color: var(--text-muted);
+  color: rgba(202, 217, 233, 0.42);
 }
 
 .wizardPrimaryTextareaCaptured {
@@ -853,6 +886,14 @@
   background:
     radial-gradient(circle at top left, rgba(244, 201, 93, 0.12) 0%, transparent 26%),
     linear-gradient(180deg, rgba(21, 35, 49, 0.98) 0%, rgba(10, 21, 32, 0.99) 100%);
+}
+
+.wizardPrimaryTextarea:focus-visible {
+  border-color: rgba(126, 184, 247, 0.28);
+  box-shadow:
+    0 0 0 4px rgba(126, 184, 247, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.02),
+    inset 0 0 0 1px rgba(7, 18, 28, 0.26);
 }
 
 .wizardAttachButton {
@@ -908,6 +949,9 @@
   background:
     radial-gradient(circle at top left, rgba(34, 197, 139, 0.14) 0%, transparent 32%),
     rgba(255, 255, 255, 0.04);
+  box-shadow:
+    inset 0 0 0 1px rgba(34, 197, 139, 0.08),
+    0 14px 22px rgba(0, 0, 0, 0.12);
 }
 
 .wizardUploadIcon {
@@ -950,10 +994,12 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  background: rgba(255, 255, 255, 0.03);
-  padding: 10px 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(34, 197, 139, 0.18);
+  background:
+    radial-gradient(circle at top left, rgba(34, 197, 139, 0.12) 0%, transparent 34%),
+    rgba(255, 255, 255, 0.035);
+  padding: 11px 12px;
 }
 
 .wizardCaptureLoadedBadge {
@@ -961,20 +1007,20 @@
   align-items: center;
   min-height: 28px;
   border-radius: 999px;
-  border: 1px solid rgba(244, 201, 93, 0.22);
-  background: rgba(244, 201, 93, 0.12);
+  border: 1px solid rgba(34, 197, 139, 0.22);
+  background: rgba(34, 197, 139, 0.12);
   padding: 0 10px;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: rgba(251, 240, 211, 0.94);
+  color: rgba(222, 251, 239, 0.94);
 }
 
 .wizardCaptureResultHint {
   font-size: 12px;
   line-height: 1.5;
-  color: rgba(230, 238, 247, 0.74);
+  color: rgba(219, 243, 233, 0.72);
 }
 
 .wizardContextRow {
@@ -1120,21 +1166,32 @@
 }
 
 .wizardEmptyState {
+  display: grid;
+  place-items: center;
+  min-height: 180px;
+  border-radius: 20px;
+  border: 1px dashed rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(circle at top left, rgba(244, 201, 93, 0.08) 0%, transparent 30%),
+    rgba(255, 255, 255, 0.02);
+  padding: 18px;
+  text-align: center;
   font-size: 12px;
-  color: var(--text-muted);
+  line-height: 1.6;
+  color: rgba(220, 231, 243, 0.62);
 }
 
 .wizardBubble {
   position: relative;
   width: min(100%, 820px);
-  max-width: 92%;
+  max-width: 94%;
   display: grid;
   gap: 9px;
   border-radius: 24px;
   border: 1px solid rgba(255, 255, 255, 0.06);
   padding: 12px 14px 11px;
   overflow: hidden;
-  box-shadow: 0 14px 26px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 16px 28px rgba(0, 0, 0, 0.13);
 }
 
 .wizardBubble::after {
@@ -1155,7 +1212,7 @@
     linear-gradient(180deg, rgba(18, 34, 52, 0.98) 0%, rgba(10, 21, 32, 0.99) 100%);
   color: var(--bubble-adv-text);
   border-color: rgba(126, 184, 247, 0.18);
-  border-radius: 24px 24px 24px 10px;
+  border-radius: 26px 26px 26px 12px;
 }
 
 .wizardBubbleIncoming::after {
@@ -1170,7 +1227,7 @@
   color: #142030;
   font-weight: 500;
   border-color: rgba(236, 186, 62, 0.42);
-  border-radius: 24px 24px 10px 24px;
+  border-radius: 26px 26px 12px 26px;
 }
 
 .wizardBubbleOutgoing::after {
@@ -1180,15 +1237,15 @@
 .wizardBubbleUnknown {
   margin-right: auto;
   background:
-    radial-gradient(circle at top left, rgba(178, 170, 210, 0.14) 0%, transparent 26%),
-    linear-gradient(180deg, rgba(45, 53, 68, 0.94) 0%, rgba(25, 33, 46, 0.99) 100%);
+    radial-gradient(circle at top left, rgba(171, 187, 216, 0.18) 0%, transparent 26%),
+    linear-gradient(180deg, rgba(78, 92, 117, 0.92) 0%, rgba(53, 65, 84, 0.98) 100%);
   color: var(--text-primary);
-  border-color: rgba(178, 170, 210, 0.18);
+  border-color: rgba(171, 187, 216, 0.22);
   border-radius: 24px;
 }
 
 .wizardBubbleUnknown::after {
-  background: linear-gradient(135deg, rgba(178, 170, 210, 0.26) 0%, rgba(178, 170, 210, 0.04) 100%);
+  background: linear-gradient(135deg, rgba(171, 187, 216, 0.28) 0%, rgba(171, 187, 216, 0.06) 100%);
 }
 
 .wizardBubbleHeader {
@@ -1234,13 +1291,13 @@
   justify-content: flex-end;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(8, 17, 26, 0.18);
-  padding: 2px;
+  background: rgba(8, 17, 26, 0.22);
+  padding: 3px;
 }
 
 .wizardSpeakerOption {
   border-radius: 999px;
-  padding: 5px 8px;
+  padding: 6px 9px;
   font-size: 9px;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -1302,7 +1359,7 @@
 
 .wizardStatusStack {
   display: grid;
-  gap: 4px;
+  gap: 6px;
 }
 
 .wizardStepActions {
@@ -1312,7 +1369,7 @@
   justify-content: space-between;
   gap: 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
-  padding-top: 12px;
+  padding-top: 14px;
 }
 
 .wizardStepOneActions {
@@ -1352,12 +1409,14 @@
   align-items: center;
   gap: 8px;
   justify-content: center;
-  border-radius: 12px;
-  background: linear-gradient(180deg, #3f4fd3 0%, #3342b8 100%);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at top left, rgba(244, 201, 93, 0.16) 0%, transparent 26%),
+    linear-gradient(180deg, #3d67d9 0%, #264ea6 100%);
   color: #fff;
-  border: 1px solid rgba(99, 102, 241, 0.34);
+  border: 1px solid rgba(83, 144, 228, 0.34);
   padding: 0 16px;
-  box-shadow: 0 12px 22px rgba(51, 66, 184, 0.18);
+  box-shadow: 0 14px 24px rgba(16, 39, 79, 0.2);
 }
 
 .wizardSecondaryButton {
@@ -1365,7 +1424,7 @@
   align-items: center;
   gap: 8px;
   justify-content: center;
-  border-radius: 12px;
+  border-radius: 14px;
   border: 1px solid var(--btn-secondary-border);
   background: rgba(255, 255, 255, 0.05);
   color: var(--text-primary);
@@ -1412,6 +1471,14 @@
   box-shadow: 0 0 0 3px rgba(45, 107, 228, 0.18);
 }
 
+.wizardPrimaryTextarea:focus-visible {
+  border-color: rgba(126, 184, 247, 0.28);
+  box-shadow:
+    0 0 0 4px rgba(126, 184, 247, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.02),
+    inset 0 0 0 1px rgba(7, 18, 28, 0.26);
+}
+
 .wizardSecondaryButton:hover,
 .wizardTertiaryButton:hover,
 .wizardMutedButton:hover {
@@ -1441,7 +1508,8 @@
   padding: 13px 14px;
   border-color: rgba(255, 255, 255, 0.08);
   background:
-    linear-gradient(180deg, rgba(16, 29, 42, 0.98) 0%, rgba(10, 21, 32, 0.98) 100%);
+    linear-gradient(180deg, rgba(15, 27, 39, 0.98) 0%, rgba(10, 21, 32, 0.98) 100%);
+  box-shadow: none;
 }
 
 .wizardAnalysisMetaCard {
@@ -1451,16 +1519,30 @@
   background:
     radial-gradient(circle at top left, rgba(126, 184, 247, 0.1) 0%, transparent 24%),
     linear-gradient(180deg, rgba(16, 29, 42, 0.98) 0%, rgba(10, 21, 32, 0.98) 100%);
+  box-shadow: none;
 }
 
 .wizardAnalysisActionsCard {
+  position: relative;
   gap: 10px;
   padding: 14px;
-  border-color: rgba(244, 201, 93, 0.18);
+  border-color: rgba(244, 201, 93, 0.22);
   background:
     radial-gradient(circle at top left, rgba(244, 201, 93, 0.16) 0%, transparent 28%),
     radial-gradient(circle at 90% 10%, rgba(34, 197, 139, 0.12) 0%, transparent 24%),
     linear-gradient(180deg, rgba(17, 32, 51, 0.92) 0%, rgba(10, 21, 32, 0.96) 100%);
+  box-shadow:
+    0 18px 28px rgba(4, 11, 20, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.wizardAnalysisActionsCard::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgba(244, 201, 93, 0.04);
+  pointer-events: none;
 }
 
 .wizardResumeCard {
@@ -1608,6 +1690,10 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
+}
+
+.wizardAnalysisActionsCard .wizardAnalysisBlockLabel {
+  color: rgba(248, 222, 155, 0.86);
 }
 
 .wizardAnalysisDecisionTitle {
@@ -1788,6 +1874,17 @@
     box-shadow 180ms ease;
 }
 
+.wizardDecisionOption::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  bottom: 12px;
+  width: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
 .wizardDecisionOption:hover {
   transform: translateY(-1px);
   border-color: rgba(255, 255, 255, 0.18);
@@ -1802,11 +1899,20 @@
   box-shadow: inset 0 0 0 1px rgba(34, 197, 139, 0.08), 0 16px 24px rgba(0, 0, 0, 0.16);
 }
 
+.wizardDecisionOptionActive::after,
+.wizardDecisionOptionAdvisor::after {
+  background: rgba(34, 197, 139, 0.64);
+}
+
 .wizardDecisionOptionSuggested {
   border-color: rgba(244, 201, 93, 0.24);
   background:
     radial-gradient(circle at top left, rgba(244, 201, 93, 0.14) 0%, transparent 34%),
     rgba(255, 255, 255, 0.045);
+}
+
+.wizardDecisionOptionSuggested::after {
+  background: rgba(244, 201, 93, 0.74);
 }
 
 .wizardDecisionOptionAdvisor {
@@ -1822,6 +1928,7 @@
   font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
+  padding-left: 10px;
 }
 
 .wizardDecisionCopy {
@@ -1829,6 +1936,7 @@
   font-size: 11px;
   line-height: 1.48;
   color: rgba(231, 238, 245, 0.66);
+  padding-left: 10px;
 }
 
 .wizardDecisionPreview {
@@ -1867,7 +1975,7 @@
 }
 
 .wizardAdvisorCards {
-  margin-top: -2px;
+  margin-top: -8px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
@@ -1882,7 +1990,7 @@
   background:
     radial-gradient(circle at top left, rgba(244, 201, 93, 0.08) 0%, transparent 22%),
     linear-gradient(180deg, rgba(13, 24, 37, 0.94) 0%, rgba(10, 21, 32, 0.99) 100%);
-  padding: 14px;
+  padding: 13px;
   transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
   box-shadow: 0 18px 34px rgba(0, 0, 0, 0.16);
 }
@@ -1992,7 +2100,7 @@
 }
 
 .wizardAdvisorResponse {
-  margin-top: 10px;
+  margin-top: 8px;
   flex: 1;
   white-space: pre-wrap;
   word-break: break-word;
@@ -2002,7 +2110,7 @@
 }
 
 .wizardAdvisorActions {
-  margin-top: 10px;
+  margin-top: 8px;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -2029,7 +2137,7 @@
   align-items: center;
   gap: 10px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
-  padding-top: 12px;
+  padding-top: 10px;
 }
 
 .wizardReviewFooter {
