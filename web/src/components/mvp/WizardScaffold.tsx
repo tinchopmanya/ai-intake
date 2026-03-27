@@ -1802,6 +1802,8 @@ export function WizardScaffold({
   const analysisStatus = analysisResult ? getAnalysisStatus(analysisResult) : null;
   const analysisQuickChips = analysisResult ? getAnalysisQuickChips(analysisResult) : [];
   const hasConversationInput = messageText.trim().length > 0 || conversationBlocks.length > 0;
+  const hasCapturedDraft =
+    stepOneInputMode === "capture" && (messageText.trim().length > 0 || Boolean(ocrInfo) || Boolean(ocrStatusMessage));
   const replyTiming = analysisResult ? getReplyTimingGuidance(analysisResult) : null;
   const topicLabel = getSafeTopicLabel(activeCase?.title, conversationBlocks, messageText);
   const resumeSourcePreview = getResumePreviewText(resumeState?.sourceText ?? null);
@@ -1956,13 +1958,17 @@ export function WizardScaffold({
                   rows={6}
                   placeholder="Pegá el mensaje que recibiste o copiá la conversación completa."
                   spellCheck={false}
-                  className={`${styles.wizardPrimaryTextarea} ${styles.wizardPrimaryTextareaCompact}`}
+                  className={`${styles.wizardPrimaryTextarea} ${styles.wizardPrimaryTextareaCompact} ${
+                    hasCapturedDraft ? styles.wizardPrimaryTextareaCaptured : ""
+                  }`}
                 />
               </div>
             ) : null}
 
             {stepOneInputMode === "capture" ? (
-              <div className={styles.wizardInputGroup}>
+              <div
+                className={`${styles.wizardInputGroup} ${hasCapturedDraft ? styles.wizardCaptureGroupActive : ""}`}
+              >
                 <div>
                   <h4 className={styles.wizardPanelTitle}>Captura</h4>
                   <p className={styles.wizardPanelHint}>Adjuntá una imagen y reutilizamos el OCR actual.</p>
@@ -1982,7 +1988,7 @@ export function WizardScaffold({
                     input?.click();
                   }}
                   disabled={ocrCapabilities?.available === false || ocrCapabilitiesLoading}
-                  className={styles.wizardUploadCard}
+                  className={`${styles.wizardUploadCard} ${hasCapturedDraft ? styles.wizardUploadCardActive : ""}`}
                 >
                   <span className={styles.wizardUploadIcon} aria-hidden="true">
                     <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none">
@@ -2000,6 +2006,12 @@ export function WizardScaffold({
                     <span className={styles.wizardUploadCopy}>PNG, JPG o WebP. Luego puedes corregir el texto.</span>
                   </span>
                 </button>
+                {hasCapturedDraft ? (
+                  <div className={styles.wizardCaptureResultHeader}>
+                    <span className={styles.wizardCaptureLoadedBadge}>Texto detectado</span>
+                    <p className={styles.wizardCaptureResultHint}>Revisa el OCR antes de pasar al analisis.</p>
+                  </div>
+                ) : null}
                 <Textarea
                   id="wizard-primary-input"
                   value={messageText}
