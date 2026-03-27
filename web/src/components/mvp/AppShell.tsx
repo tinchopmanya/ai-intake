@@ -165,6 +165,12 @@ export function AppShell({ children }: AppShellProps) {
     [],
   );
 
+  const updateSidebarConversation = useCallback((conversation: SidebarConversationSummary) => {
+    setConversations((previous) =>
+      previous.map((item) => (item.id === conversation.id ? { ...item, ...conversation } : item)),
+    );
+  }, []);
+
   const ensureActiveConversation = useCallback(
     async (options?: { advisorId?: string | null }) => {
       if (activeConversation) return activeConversation;
@@ -303,6 +309,7 @@ export function AppShell({ children }: AppShellProps) {
         activeConversation,
         ensureActiveConversation,
         createSidebarConversation,
+        updateSidebarConversation,
         setActiveConversationId,
         openAdvisorConversation,
       }}

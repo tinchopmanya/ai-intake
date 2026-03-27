@@ -20,6 +20,7 @@ type MvpShellContextValue = {
   activeConversation: SidebarConversationSummary | null;
   ensureActiveConversation: (options?: { advisorId?: string | null }) => Promise<SidebarConversationSummary | null>;
   createSidebarConversation: (options?: { advisorId?: string | null }) => Promise<SidebarConversationSummary | null>;
+  updateSidebarConversation: (conversation: SidebarConversationSummary) => void;
   setActiveConversationId: (conversationId: string | null) => void;
   openAdvisorConversation: (advisorId: string) => void;
 };

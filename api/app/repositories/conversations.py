@@ -74,3 +74,39 @@ class ConversationRepository:
             )
             row = cursor.fetchone()
         return dict(row)
+
+    def update_title(
+        self,
+        *,
+        user_id: UUID,
+        conversation_id: UUID,
+        title: str,
+        title_status: str,
+    ) -> Mapping[str, Any] | None:
+        query = """
+            UPDATE conversations
+            SET
+                title = %s,
+                title_status = %s
+            WHERE id = %s AND user_id = %s
+            RETURNING
+                id,
+                user_id,
+                title,
+                title_status,
+                advisor_id,
+                created_at,
+                last_message_at
+        """
+        with self._connection.cursor() as cursor:
+            cursor.execute(
+                query,
+                (
+                    title,
+                    title_status,
+                    str(conversation_id),
+                    str(user_id),
+                ),
+            )
+            row = cursor.fetchone()
+        return dict(row) if row else None

@@ -17,6 +17,7 @@ from main import app
 class FakeConversationRepository:
     def __init__(self) -> None:
         self.created_payloads: list[dict[str, object]] = []
+        self.updated_payloads: list[dict[str, object]] = []
         self.rows = [
             {
                 "id": uuid4(),
@@ -60,6 +61,34 @@ class FakeConversationRepository:
         self.created_payloads.append(created)
         self.rows.insert(0, created)
         return created
+
+    def update_title(
+        self,
+        *,
+        user_id: UUID,
+        conversation_id: UUID,
+        title: str,
+        title_status: str,
+    ):
+        self.updated_payloads.append(
+            {
+                "user_id": user_id,
+                "conversation_id": conversation_id,
+                "title": title,
+                "title_status": title_status,
+            },
+        )
+        for index, row in enumerate(self.rows):
+            if row["id"] != conversation_id or row["user_id"] != user_id:
+                continue
+            updated = {
+                **row,
+                "title": title,
+                "title_status": title_status,
+            }
+            self.rows[index] = updated
+            return updated
+        return None
 
 
 class FakeUow:
@@ -108,6 +137,26 @@ class TestConversationsRouter(unittest.TestCase):
         self.assertEqual(body["advisor_id"], "robert")
         self.assertEqual(
             self.fake_uow.conversations.created_payloads[-1]["user_id"],
+            uuid5(NAMESPACE_URL, "user-a"),
+        )
+
+    def test_patch_conversation_updates_title_with_safe_label(self):
+        conversation_id = str(self.fake_uow.conversations.rows[0]["id"])
+
+        response = self.client.patch(
+            f"/v1/conversations/{conversation_id}",
+            json={
+                "source_text": "Necesito coordinar los horarios de retiro y entrega de los chicos.",
+                "analysis_summary": "Hay una necesidad concreta de organizacion y coordinacion.",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["title"], "Coordinacion de horarios")
+        self.assertEqual(body["title_status"], "fallback")
+        self.assertEqual(
+            self.fake_uow.conversations.updated_payloads[-1]["user_id"],
             uuid5(NAMESPACE_URL, "user-a"),
         )
 

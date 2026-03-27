@@ -1,3 +1,4 @@
+from uuid import UUID
 from typing import Annotated
 
 from fastapi import APIRouter
@@ -12,7 +13,9 @@ from app.repositories import UnitOfWork
 from app.schemas.conversations import ConversationCreateRequest
 from app.schemas.conversations import ConversationListResponse
 from app.schemas.conversations import ConversationSummary
+from app.schemas.conversations import ConversationUpdateRequest
 from app.services.auth_service import AuthenticatedUser
+from app.services.conversation_titles import get_safe_conversation_title
 
 router = APIRouter(prefix="/v1/conversations", tags=["conversations"])
 
@@ -62,3 +65,32 @@ async def create_conversation(
         advisor_id=payload.advisor_id.strip() if payload.advisor_id and payload.advisor_id.strip() else None,
     )
     return _to_conversation_summary(dict(created))
+
+
+@router.patch("/{conversation_id}", response_model=ConversationSummary, status_code=status.HTTP_200_OK)
+async def update_conversation(
+    conversation_id: UUID,
+    payload: ConversationUpdateRequest,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    uow: Annotated[UnitOfWork | None, Depends(get_uow)],
+) -> ConversationSummary:
+    if uow is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="conversation_persistence_unavailable",
+        )
+
+    safe_title = get_safe_conversation_title(
+        source_text=payload.source_text,
+        case_title=payload.case_title,
+        analysis_summary=payload.analysis_summary,
+    )
+    updated = uow.conversations.update_title(
+        user_id=current_user.id,
+        conversation_id=conversation_id,
+        title=safe_title,
+        title_status="fallback",
+    )
+    if updated is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="conversation_not_found")
+    return _to_conversation_summary(dict(updated))

@@ -174,6 +174,12 @@ export type ConversationCreateRequest = {
   advisor_id?: string | null;
 };
 
+export type ConversationUpdateRequest = {
+  source_text: string;
+  case_title?: string | null;
+  analysis_summary?: string | null;
+};
+
 export type ConversationListResponse = {
   conversations: ConversationSummary[];
 };

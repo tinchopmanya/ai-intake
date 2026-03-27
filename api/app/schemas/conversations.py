@@ -9,6 +9,12 @@ class ConversationCreateRequest(BaseModel):
     advisor_id: str | None = Field(default=None, max_length=80)
 
 
+class ConversationUpdateRequest(BaseModel):
+    source_text: str = Field(min_length=1, max_length=6000)
+    case_title: str | None = Field(default=None, max_length=160)
+    analysis_summary: str | None = Field(default=None, max_length=1200)
+
+
 class ConversationSummary(BaseModel):
     id: UUID
     title: str

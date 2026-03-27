@@ -6,6 +6,7 @@ import Image from "next/image";
 import { AdvisorChatModal } from "@/components/mvp/AdvisorChatModal";
 import { AdvisorProfileModal } from "@/components/mvp/AdvisorProfileModal";
 import { useMvpShell } from "@/components/mvp/MvpShellContext";
+import type { SidebarConversationSummary } from "@/components/mvp/MvpShellContext";
 import styles from "@/components/mvp/MvpShell.module.css";
 import { VoicePlaybackButton } from "@/components/mvp/VoiceControls";
 import { Button, Panel, Textarea } from "@/components/mvp/ui";
@@ -15,6 +16,7 @@ import { hasStoredSession } from "@/lib/auth/client";
 import { toUiErrorMessage } from "@/lib/api/errors";
 import {
   getCases,
+  patchConversation,
   postAdvisor,
   postAdvisorChat,
   postAnalysis,
@@ -75,6 +77,24 @@ type DecisionAction = {
   title: string;
   subtitle: string;
 };
+
+function mapConversationSummaryToSidebar(conversation: {
+  id: string;
+  title: string;
+  title_status: string;
+  advisor_id: string | null;
+  created_at: string;
+  last_message_at: string;
+}): SidebarConversationSummary {
+  return {
+    id: conversation.id,
+    title: conversation.title,
+    titleStatus: conversation.title_status as SidebarConversationSummary["titleStatus"],
+    advisorId: conversation.advisor_id,
+    startedAt: conversation.created_at,
+    lastMessageAt: conversation.last_message_at,
+  };
+}
 
 type DecisionSignals = {
   hasConcreteQuestion: boolean;
@@ -839,7 +859,7 @@ export function WizardScaffold({
   preferredAdvisorId?: string | null;
   onExitToEntry?: () => void;
 }) {
-  const { activeConversation, ensureActiveConversation } = useMvpShell();
+  const { activeConversation, ensureActiveConversation, updateSidebarConversation } = useMvpShell();
   const locale = resolveRuntimeLocale();
   const t = (key: string) => tRuntime(key, locale);
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
@@ -1084,6 +1104,33 @@ export function WizardScaffold({
     }
   }
 
+  async function refreshConversationTitle(params: {
+    sourceText: string;
+    analysisSummary: string;
+  }) {
+    const conversation = activeConversation ?? (await ensureActiveConversation({ advisorId: preferredAdvisorId }));
+    if (!conversation) return;
+
+    const normalizedCurrentTitle = conversation.title.trim().toLowerCase();
+    const canUpdateTitle =
+      conversation.titleStatus === "pending" ||
+      normalizedCurrentTitle === "nueva conversacion" ||
+      normalizedCurrentTitle === "sin tema claro";
+
+    if (!canUpdateTitle) return;
+
+    try {
+      const updated = await patchConversation(conversation.id, {
+        source_text: params.sourceText,
+        case_title: activeCase?.title ?? undefined,
+        analysis_summary: params.analysisSummary,
+      });
+      updateSidebarConversation(mapConversationSummaryToSidebar(updated));
+    } catch {
+      // Keep the analysis flow resilient if title refresh fails.
+    }
+  }
+
   function syncSidebarConversationSummary() {
     if (typeof window === "undefined") return;
     if (!sidebarConversationStartedAtRef.current) {
@@ -1316,6 +1363,10 @@ export function WizardScaffold({
       });
       setAnalysisResult(result);
       setAnalysisId(result.analysis_id);
+      void refreshConversationTitle({
+        sourceText: text,
+        analysisSummary: result.summary,
+      });
     } catch (exc) {
       setAnalysisError(toUiErrorMessage(exc, "No se pudo ejecutar el analisis."));
     } finally {

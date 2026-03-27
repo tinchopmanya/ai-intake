@@ -14,6 +14,7 @@ import type { CaseUpdateRequest } from "@/lib/api/types";
 import type { ConversationCreateRequest } from "@/lib/api/types";
 import type { ConversationListResponse } from "@/lib/api/types";
 import type { ConversationSummary } from "@/lib/api/types";
+import type { ConversationUpdateRequest } from "@/lib/api/types";
 import type { EmotionalCheckinCreateRequest } from "@/lib/api/types";
 import type { EmotionalCheckinSummary } from "@/lib/api/types";
 import type { EmotionalCheckinTodayResponse } from "@/lib/api/types";
@@ -161,6 +162,13 @@ export function getConversations(): Promise<ConversationListResponse> {
 
 export function postConversation(payload: ConversationCreateRequest = {}): Promise<ConversationSummary> {
   return postJson<ConversationSummary>("/v1/conversations", payload);
+}
+
+export function patchConversation(
+  conversationId: string,
+  payload: ConversationUpdateRequest,
+): Promise<ConversationSummary> {
+  return patchJson<ConversationSummary>(`/v1/conversations/${conversationId}`, payload);
 }
 
 export function getEmotionalCheckinToday(): Promise<EmotionalCheckinTodayResponse> {
