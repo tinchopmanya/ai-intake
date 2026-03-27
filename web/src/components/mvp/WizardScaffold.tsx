@@ -1004,12 +1004,6 @@ export function WizardScaffold({
   }, []);
 
   useEffect(() => {
-    if (currentStep !== 1) return;
-    if (activeConversation) return;
-    void ensureActiveConversation({ advisorId: preferredAdvisorId });
-  }, [activeConversation, currentStep, ensureActiveConversation, preferredAdvisorId]);
-
-  useEffect(() => {
     function handleExternalNewConversation() {
       handleStartNewConversation();
     }
@@ -1491,14 +1485,7 @@ export function WizardScaffold({
     setAnalysisError(null);
     setAdvisorResult(null);
     setAdvisorError(null);
-
-    if (conversationBlocks.length > 0) {
-      setCurrentStep(2);
-      return;
-    }
-
-    setCurrentStep(3);
-    await runAnalysis();
+    setCurrentStep(2);
   }
 
   async function handleContinueFromReviewStep() {

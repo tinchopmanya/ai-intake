@@ -21,6 +21,12 @@ type ResumeCta = ConversationResumeState & {
   helperText: string;
   previewText: string | null;
 };
+type HistoryEntry = {
+  id: string;
+  label: string;
+  content: string;
+  timestamp: string;
+};
 
 type CheckinOption = {
   value: number;
@@ -155,7 +161,7 @@ function buildResumeCta(messages: MessageSummary[]): ResumeCta | null {
       sourceText,
       analysisAction,
       selectedReply,
-      ctaLabel: "Abrir consejeros",
+      ctaLabel: "Volver a consejeros",
       helperText: "Volver al punto de consejeros con tu respuesta guardada a mano.",
       previewText: getMessagePreview(selectedReply),
     };
@@ -186,6 +192,28 @@ function buildResumeCta(messages: MessageSummary[]): ResumeCta | null {
   }
 
   return null;
+}
+
+function formatMessageTimestamp(createdAt: string) {
+  const parsed = new Date(createdAt);
+  if (Number.isNaN(parsed.getTime())) return "Sin fecha";
+  return new Intl.DateTimeFormat("es-UY", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(parsed);
+}
+
+function buildHistoryEntries(messages: MessageSummary[]): HistoryEntry[] {
+  return messages
+    .filter((message) => message.content.trim().length > 0)
+    .map((message) => ({
+      id: message.id,
+      label: getMessageTypeLabel(message.message_type),
+      content: message.content.trim(),
+      timestamp: formatMessageTimestamp(message.created_at),
+    }));
 }
 
 function CheckinSliderQuestion({
@@ -269,6 +297,7 @@ export function MvpEntryFlow() {
   const [preferredAdvisorId, setPreferredAdvisorId] = useState<string | null>(null);
   const [wizardKey, setWizardKey] = useState(0);
   const [resumeState, setResumeState] = useState<ConversationResumeState | null>(null);
+  const [historyPanelOpen, setHistoryPanelOpen] = useState(false);
   const [checkinModalOpen, setCheckinModalOpen] = useState(false);
   const [checkinDismissedForVisit, setCheckinDismissedForVisit] = useState(false);
   const [checkinSubmitting, setCheckinSubmitting] = useState(false);
@@ -277,6 +306,12 @@ export function MvpEntryFlow() {
   const [draftMoodLevel, setDraftMoodLevel] = useState<number | null>(null);
   const [draftConfidenceLevel, setDraftConfidenceLevel] = useState<number | null>(null);
   const [draftRecentContact, setDraftRecentContact] = useState<boolean | null>(null);
+
+  function syncCheckinDrafts(checkin: EmotionalCheckinSummary | null) {
+    setDraftMoodLevel(checkin?.mood_level ?? null);
+    setDraftConfidenceLevel(checkin?.confidence_level ?? null);
+    setDraftRecentContact(checkin?.recent_contact ?? null);
+  }
 
   useEffect(() => {
     const storedAdvisorId = readStoredAdvisorId();
@@ -292,11 +327,14 @@ export function MvpEntryFlow() {
       try {
         const response = await getEmotionalCheckinToday();
         if (!mounted) return;
-        setTodayCheckin(response.today_checkin ?? null);
-        setCheckinModalOpen(!response.has_checkin_today && !checkinDismissedForVisit);
+        const existingCheckin = response.today_checkin ?? null;
+        setTodayCheckin(existingCheckin);
+        syncCheckinDrafts(existingCheckin);
+        setCheckinModalOpen(!checkinDismissedForVisit);
       } catch {
         if (!mounted) return;
-        setCheckinModalOpen(false);
+        syncCheckinDrafts(null);
+        setCheckinModalOpen(!checkinDismissedForVisit);
       }
     }
     void loadTodayCheckin();
@@ -308,6 +346,7 @@ export function MvpEntryFlow() {
   useEffect(() => {
     function handleNewConversation() {
       setSelectorIntent(null);
+      setHistoryPanelOpen(false);
       setResumeState(null);
       setView("entry");
     }
@@ -315,6 +354,20 @@ export function MvpEntryFlow() {
     window.addEventListener("mvp:new-conversation", handleNewConversation);
     return () => {
       window.removeEventListener("mvp:new-conversation", handleNewConversation);
+    };
+  }, []);
+
+  useEffect(() => {
+    function handleConversationSelected() {
+      setSelectorIntent(null);
+      setHistoryPanelOpen(false);
+      setResumeState(null);
+      setView("entry");
+    }
+
+    window.addEventListener("mvp:conversation-selected", handleConversationSelected);
+    return () => {
+      window.removeEventListener("mvp:conversation-selected", handleConversationSelected);
     };
   }, []);
 
@@ -361,8 +414,17 @@ export function MvpEntryFlow() {
     [activeConversation, activeConversationMessages],
   );
 
+  const activeConversationHistory = useMemo(
+    () => buildHistoryEntries(activeConversationMessages),
+    [activeConversationMessages],
+  );
+
   const canSubmitCheckin =
     draftMoodLevel !== null && draftConfidenceLevel !== null && draftRecentContact !== null && !checkinSubmitting;
+
+  useEffect(() => {
+    setHistoryPanelOpen(false);
+  }, [activeConversation?.id]);
 
   function openSelector(intent: SelectorIntent) {
     setResumeState(null);
@@ -429,6 +491,18 @@ export function MvpEntryFlow() {
     });
   }
 
+  function handleOpenCheckinEditor() {
+    syncCheckinDrafts(todayCheckin);
+    setCheckinError(null);
+    setCheckinDismissedForVisit(false);
+    setCheckinModalOpen(true);
+  }
+
+  function handleOpenHistoryPanel() {
+    if (activeConversationHistory.length === 0) return;
+    setHistoryPanelOpen(true);
+  }
+
   async function handleSaveDailyCheckin() {
     if (!canSubmitCheckin) return;
     setCheckinSubmitting(true);
@@ -440,6 +514,7 @@ export function MvpEntryFlow() {
         recent_contact: draftRecentContact,
       });
       setTodayCheckin(created);
+      syncCheckinDrafts(created);
       setCheckinModalOpen(false);
     } catch (error) {
       setCheckinError(toUiErrorMessage(error, "No pudimos guardar tu check-in por ahora."));
@@ -475,7 +550,16 @@ export function MvpEntryFlow() {
                       <div className={styles.daySummaryCard}>
                         <span className={styles.daySummaryDot} aria-hidden="true" />
                         <div className={styles.contextSummaryTextBlock}>
-                          <p className={styles.contextSummaryLabel}>Resumen de hoy</p>
+                          <div className={styles.summaryCardHeaderRow}>
+                            <p className={styles.contextSummaryLabel}>Resumen de hoy</p>
+                            <button
+                              type="button"
+                              className={styles.summaryInlineButton}
+                              onClick={handleOpenCheckinEditor}
+                            >
+                              Editar
+                            </button>
+                          </div>
                           <p className={styles.daySummaryText}>{checkinSummaryLine}</p>
                         </div>
                       </div>
@@ -514,13 +598,22 @@ export function MvpEntryFlow() {
                                       {activeConversationResume.previewText}
                                     </p>
                                   ) : null}
-                                  <button
-                                    type="button"
-                                    className={styles.historySummaryButton}
-                                    onClick={handleResumeConversation}
-                                  >
-                                    {activeConversationResume.ctaLabel}
-                                  </button>
+                                  <div className={styles.historySummaryButtonRow}>
+                                    <button
+                                      type="button"
+                                      className={styles.historySummaryButton}
+                                      onClick={handleResumeConversation}
+                                    >
+                                      {activeConversationResume.ctaLabel}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={styles.historySummarySecondaryButton}
+                                      onClick={handleOpenHistoryPanel}
+                                    >
+                                      Ver historial
+                                    </button>
+                                  </div>
                                 </div>
                               ) : null}
                             </>
@@ -728,6 +821,64 @@ export function MvpEntryFlow() {
               </button>
             </div>
           </section>
+        </div>
+      ) : null}
+
+      {historyPanelOpen && view === "entry" ? (
+        <div className={styles.historyDrawerBackdrop} role="presentation" onClick={() => setHistoryPanelOpen(false)}>
+          <aside
+            className={styles.historyDrawer}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="conversation-history-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className={styles.historyDrawerHeader}>
+              <div>
+                <p className={styles.historyDrawerEyebrow}>Historial</p>
+                <h2 id="conversation-history-title" className={styles.historyDrawerTitle}>
+                  {activeConversation?.title?.trim() &&
+                  activeConversation.title.trim().toLowerCase() !== "nueva conversacion"
+                    ? activeConversation.title
+                    : "Conversación seleccionada"}
+                </h2>
+              </div>
+              <button
+                type="button"
+                className={styles.historyDrawerClose}
+                aria-label="Cerrar historial"
+                onClick={() => setHistoryPanelOpen(false)}
+              >
+                <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
+                  <path
+                    d="M6 6l8 8M14 6l-8 8"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="1.8"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            {activeConversationMessagesLoading ? (
+              <p className={styles.historyDrawerEmpty}>Cargando historial...</p>
+            ) : activeConversationHistory.length > 0 ? (
+              <div className={styles.historyTimeline}>
+                {activeConversationHistory.map((entry) => (
+                  <article key={entry.id} className={styles.historyTimelineItem}>
+                    <div className={styles.historyTimelineMeta}>
+                      <p className={styles.historyTimelineLabel}>{entry.label}</p>
+                      <p className={styles.historyTimelineTimestamp}>{entry.timestamp}</p>
+                    </div>
+                    <p className={styles.historyTimelineContent}>{entry.content}</p>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <p className={styles.historyDrawerEmpty}>Todavía no hay historial útil para mostrar.</p>
+            )}
+          </aside>
         </div>
       ) : null}
 

@@ -104,6 +104,35 @@
   color: rgba(238, 242, 255, 0.84);
 }
 
+.summaryCardHeaderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.summaryInlineButton {
+  min-height: 26px;
+  border-radius: 999px;
+  border: 1px solid rgba(129, 140, 248, 0.24);
+  background: rgba(129, 140, 248, 0.12);
+  color: rgba(238, 242, 255, 0.92);
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    background 160ms ease,
+    border-color 160ms ease;
+}
+
+.summaryInlineButton:hover {
+  transform: translateY(-1px);
+  background: rgba(129, 140, 248, 0.16);
+  border-color: rgba(129, 140, 248, 0.3);
+}
+
 .sessionCard {
   display: flex;
   align-items: flex-start;
@@ -173,6 +202,12 @@
   margin-top: 4px;
 }
 
+.historySummaryButtonRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .historySummaryHint {
   font-size: 11px;
   line-height: 1.45;
@@ -213,6 +248,32 @@
   transform: translateY(-1px);
   background: rgba(82, 193, 255, 0.16);
   border-color: rgba(82, 193, 255, 0.3);
+}
+
+.historySummarySecondaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  width: fit-content;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(238, 248, 255, 0.84);
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+  transition:
+    transform 160ms ease,
+    background 160ms ease,
+    border-color 160ms ease;
+  cursor: pointer;
+}
+
+.historySummarySecondaryButton:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.16);
 }
 
 .contextSummaryTextBlock {
@@ -350,6 +411,129 @@
   color: inherit;
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+.historyDrawerBackdrop {
+  position: fixed;
+  inset: 56px 0 0 0;
+  z-index: 30;
+  display: flex;
+  justify-content: flex-end;
+  background: rgba(3, 9, 17, 0.52);
+  backdrop-filter: blur(6px);
+}
+
+.historyDrawer {
+  width: min(100%, 440px);
+  height: 100%;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(circle at top left, rgba(45, 107, 228, 0.08) 0%, transparent 28%),
+    linear-gradient(180deg, rgba(13, 24, 37, 0.99) 0%, rgba(10, 21, 32, 0.99) 100%);
+  box-shadow: -24px 0 60px rgba(0, 0, 0, 0.28);
+  display: flex;
+  flex-direction: column;
+  padding: 20px 18px 18px;
+}
+
+.historyDrawerHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 14px;
+}
+
+.historyDrawerEyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(126, 184, 247, 0.76);
+}
+
+.historyDrawerTitle {
+  margin-top: 6px;
+  font-size: 22px;
+  line-height: 1.2;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.96);
+}
+
+.historyDrawerClose {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.76);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    background 160ms ease,
+    border-color 160ms ease;
+}
+
+.historyDrawerClose:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.historyTimeline {
+  display: grid;
+  gap: 10px;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(126, 184, 247, 0.3) transparent;
+}
+
+.historyTimelineItem {
+  display: grid;
+  gap: 8px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.035);
+  padding: 13px 14px;
+}
+
+.historyTimelineMeta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.historyTimelineLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(126, 184, 247, 0.78);
+}
+
+.historyTimelineTimestamp {
+  font-size: 11px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.46);
+}
+
+.historyTimelineContent {
+  font-size: 13px;
+  line-height: 1.55;
+  color: rgba(238, 248, 255, 0.88);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.historyDrawerEmpty {
+  font-size: 13px;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.62);
 }
 
 .checkinBackdrop {

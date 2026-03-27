@@ -171,7 +171,15 @@ export function AppShell({ children }: AppShellProps) {
     [activeConversationId, conversations],
   );
 
-  const sidebarConversation = activeConversation ?? conversations[0] ?? null;
+  const visibleConversations = useMemo(
+    () =>
+      conversations.filter(
+        (conversation) => !isDraftConversation(conversation) || conversation.id === activeConversationId,
+      ),
+    [activeConversationId, conversations],
+  );
+
+  const sidebarConversation = activeConversation ?? visibleConversations[0] ?? null;
 
   useEffect(() => {
     if (!activeConversationId) {
@@ -585,9 +593,9 @@ export function AppShell({ children }: AppShellProps) {
               <div className={styles.shellSidebarBody}>
                 {conversationsLoading ? (
                   <p className={styles.shellSidebarEmpty}>Cargando conversaciones...</p>
-                ) : conversations.length > 0 ? (
+                ) : visibleConversations.length > 0 ? (
                   <div className={styles.shellSessionList}>
-                    {conversations.map((conversation) => {
+                    {visibleConversations.map((conversation) => {
                       const isActive = conversation.id === activeConversationId;
                       const isDraft = isDraftConversation(conversation);
                       const metaLabel = getConversationMetaLabel(conversation);
@@ -598,7 +606,16 @@ export function AppShell({ children }: AppShellProps) {
                           className={`${styles.shellSessionItem} ${
                             isActive ? styles.shellSessionActive : ""
                           } ${isDraft ? styles.shellSessionDraft : ""}`}
-                          onClick={() => setActiveConversationId(conversation.id)}
+                          onClick={() => {
+                            setActiveConversationId(conversation.id);
+                            if (typeof window !== "undefined") {
+                              window.dispatchEvent(
+                                new CustomEvent("mvp:conversation-selected", {
+                                  detail: { conversationId: conversation.id },
+                                }),
+                              );
+                            }
+                          }}
                         >
                           <div className={styles.shellSessionRow}>
                             <p className={styles.shellSessionTitle}>{getConversationDisplayTitle(conversation)}</p>
