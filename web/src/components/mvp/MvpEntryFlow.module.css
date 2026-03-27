@@ -43,7 +43,7 @@
   z-index: 1;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 16px;
   padding: 24px;
 }
 
@@ -66,17 +66,24 @@
 
 .subcopy {
   margin-top: 6px;
-  max-width: 620px;
+  max-width: 640px;
   font-size: 14px;
-  line-height: 1.6;
+  line-height: 1.55;
   color: rgba(255, 255, 255, 0.62);
+}
+
+.contextSummaryGrid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .daySummaryCard {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 9px;
-  padding: 10px 13px;
+  min-height: 64px;
+  padding: 11px 13px;
   border-radius: 14px;
   border: 1px solid rgba(79, 70, 229, 0.2);
   background: rgba(79, 70, 229, 0.08);
@@ -99,8 +106,9 @@
 
 .sessionCard {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 9px;
+  min-height: 64px;
   padding: 11px 13px;
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -119,7 +127,21 @@
   flex: 1;
   font-size: 12px;
   line-height: 1.45;
-  color: rgba(255, 255, 255, 0.62);
+  color: rgba(255, 255, 255, 0.76);
+}
+
+.contextSummaryTextBlock {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.contextSummaryLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(126, 184, 247, 0.68);
 }
 
 .actionsHeader {
@@ -131,15 +153,14 @@
 .actionsKicker {
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: rgba(126, 184, 247, 0.76);
+  letter-spacing: 0.08em;
+  color: rgba(220, 233, 255, 0.72);
 }
 
 .actions {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .primaryAction,
@@ -170,6 +191,8 @@
 }
 
 .primaryAction {
+  grid-column: 1 / -1;
+  min-height: 92px;
   border: 1px solid rgba(79, 70, 229, 0.38);
   background: linear-gradient(180deg, rgba(79, 70, 229, 0.9) 0%, rgba(55, 48, 163, 0.96) 100%);
   color: #f8fbff;
@@ -218,15 +241,15 @@
 .actionTitle {
   display: block;
   font-size: 14px;
-  line-height: 1.35;
+  line-height: 1.32;
 }
 
 .actionCopy {
   display: block;
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 1.45;
   font-weight: 400;
-  color: rgba(255, 255, 255, 0.62);
+  color: rgba(255, 255, 255, 0.68);
 }
 
 .disclaimer {
@@ -347,56 +370,122 @@
   color: rgba(255, 255, 255, 0.93);
 }
 
-.checkinOptionGrid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+.checkinSliderHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 10px;
 }
 
-.checkinOptionButton {
-  min-height: 92px;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.025);
-  padding: 12px 10px;
-  display: grid;
-  align-content: start;
-  gap: 8px;
-  text-align: left;
-  cursor: pointer;
-  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
-}
-
-.checkinOptionButton:hover {
-  transform: translateY(-1px);
-  border-color: rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.checkinOptionButtonActive {
-  border-color: rgba(99, 102, 241, 0.34);
-  background: rgba(79, 70, 229, 0.12);
-  box-shadow: inset 0 0 0 1px rgba(129, 140, 248, 0.12);
-}
-
-.checkinOptionValue {
+.checkinSliderValue {
   display: inline-flex;
-  width: 28px;
-  height: 28px;
   align-items: center;
-  justify-content: center;
+  min-height: 28px;
+  padding: 0 10px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.88);
-  font-size: 12px;
-  font-weight: 700;
+  border: 1px solid rgba(99, 102, 241, 0.28);
+  background: rgba(79, 70, 229, 0.12);
+  color: rgba(230, 236, 255, 0.92);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
-.checkinOptionLabel {
-  font-size: 12px;
-  line-height: 1.45;
-  color: rgba(255, 255, 255, 0.7);
+.checkinSliderWrap {
+  position: relative;
+  padding: 4px 2px 0;
+}
+
+.checkinSliderWrap::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: 50%;
+  height: 4px;
+  border-radius: 999px;
+  transform: translateY(-50%);
+  background: linear-gradient(
+    90deg,
+    rgba(99, 102, 241, 0.64) 0%,
+    rgba(99, 102, 241, 0.64) var(--checkin-slider-fill),
+    rgba(255, 255, 255, 0.12) var(--checkin-slider-fill),
+    rgba(255, 255, 255, 0.12) 100%
+  );
+}
+
+.checkinSlider {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 26px;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.checkinSlider::-webkit-slider-runnable-track {
+  height: 4px;
+  background: transparent;
+}
+
+.checkinSlider::-moz-range-track {
+  height: 4px;
+  background: transparent;
+}
+
+.checkinSlider::-webkit-slider-thumb {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: -7px;
+  border-radius: 999px;
+  border: 2px solid rgba(230, 236, 255, 0.92);
+  background: #7eb8f7;
+  box-shadow: 0 0 0 4px rgba(126, 184, 247, 0.12);
+}
+
+.checkinSlider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 2px solid rgba(230, 236, 255, 0.92);
+  background: #7eb8f7;
+  box-shadow: 0 0 0 4px rgba(126, 184, 247, 0.12);
+}
+
+.checkinSliderLabels {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.checkinSliderLabelButton {
+  min-height: 42px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 6px 4px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.54);
+  cursor: pointer;
+  transition: color 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.checkinSliderLabelButton:hover {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.checkinSliderLabelButtonActive {
+  border-color: rgba(99, 102, 241, 0.18);
+  background: rgba(79, 70, 229, 0.08);
+  color: rgba(239, 244, 255, 0.92);
+}
+
+.checkinSliderLabelText {
+  display: block;
+  font-size: 11px;
+  line-height: 1.35;
 }
 
 .binaryOptionRow {
@@ -788,6 +877,10 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .contextSummaryGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .sheetBackdrop {
     inset: 56px 0 0 0;
     padding: 14px;
@@ -804,8 +897,8 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .checkinOptionGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .checkinSliderLabels {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }
 
@@ -870,12 +963,13 @@
     padding: 14px;
   }
 
-  .checkinOptionGrid {
-    grid-template-columns: minmax(0, 1fr);
+  .checkinSliderHeader {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
-  .checkinOptionButton {
-    min-height: 74px;
+  .checkinSliderLabels {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .binaryOptionRow {

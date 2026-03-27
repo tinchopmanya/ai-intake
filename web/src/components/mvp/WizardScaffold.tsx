@@ -454,7 +454,7 @@ function getIgnoreGuidance(analysisResult: AnalysisResponse) {
       .map((flag) => humanizeFlag(flag))
       .join(". ");
   }
-  return "No hay alertas adicionales relevantes en este analisis; quedate con el pedido concreto.";
+  return "No hay alertas adicionales relevantes en este análisis; quédate con el pedido concreto.";
 }
 
 function resolveAdvisorResponseIndex(
@@ -673,13 +673,13 @@ function getSafeTopicLabel(
     return "Tema familiar";
   }
   if (/(coordina|horario|agenda|turno|visita|retiro|entrega|fin de semana)/.test(source)) {
-    return "Coordinaci\u00f3n";
+    return "Coordinación";
   }
   if (/(gasto|pago|transferencia|cuota|reintegro|documento|permiso|papeles|firma|viaje|vacaciones)/.test(source)) {
-    return "Log\u00edstica";
+    return "Logística";
   }
-  if (/(limite|l\u00edmite|presion|presi\u00f3n|respeto|control|amenaz|agres)/.test(source)) {
-    return "L\u00edmites";
+  if (/(limite|límite|presion|presión|respeto|control|amenaz|agres)/.test(source)) {
+    return "Límites";
   }
   return "Sin tema claro";
 }
@@ -1404,7 +1404,7 @@ export function WizardScaffold({
         analysisSummary: result.summary,
       });
     } catch (exc) {
-      setAnalysisError(toUiErrorMessage(exc, "No se pudo ejecutar el analisis."));
+      setAnalysisError(toUiErrorMessage(exc, "No se pudo ejecutar el análisis."));
     } finally {
       setLoadingAnalysis(false);
     }
@@ -1763,12 +1763,13 @@ export function WizardScaffold({
   const orderedDecisionActions = [...decisionActions].sort(
     (left, right) => DECISION_DISPLAY_ORDER[left.id] - DECISION_DISPLAY_ORDER[right.id],
   );
+  const primaryDecisionId = orderedDecisionActions.find((action) => action.id !== "advisor_help")?.id ?? null;
 
   return (
     <Panel className={styles.wizardPanel}>
       <ShellStepper
         currentStep={currentStep}
-        labels={["Entrada", "Revision", "Analisis", "Consejeros"]}
+        labels={["Entrada", "Revisión", "Análisis", "Consejeros"]}
       />
 
       {currentStep === 1 ? (
@@ -2203,7 +2204,7 @@ export function WizardScaffold({
                   strokeWidth="1.8"
                 />
               </svg>
-              {loadingAnalysis ? t("wizard.button.analyzing") : "Ver analisis"}
+              {loadingAnalysis ? t("wizard.button.analyzing") : "Ver análisis"}
             </Button>
           </div>
         </div>
@@ -2213,9 +2214,9 @@ export function WizardScaffold({
         <div className={`${styles.wizardStepBody} ${styles.wizardStepBodyScroll}`}>
           <div className={styles.wizardStepHeader}>
             <p className={styles.wizardStepKicker}>Paso 3</p>
-            <h3 className={styles.wizardStepIntroTitle}>Analisis</h3>
+            <h3 className={styles.wizardStepIntroTitle}>Análisis</h3>
             <p className={styles.wizardStepIntroCopy}>
-              Solo lo esencial para decidir si responder, esperar o consultar con un consejero.
+              Lo esencial para decidir si conviene responder, esperar o pedir ayuda.
             </p>
           </div>
 
@@ -2233,7 +2234,7 @@ export function WizardScaffold({
                 <div className={styles.wizardAnalysisColumn}>
                   <section className={`${styles.wizardMobileCard} ${styles.wizardAnalysisCompactCard}`}>
                     <div className={styles.wizardAnalysisCardHeader}>
-                      <div className={styles.wizardAnalysisBlockLabel}>Recomendacion principal</div>
+                      <div className={styles.wizardAnalysisBlockLabel}>Recomendación principal</div>
                       <span
                         className={`${styles.wizardAnalysisDecisionBadge} ${
                           analysisStatus?.kind === "risk"
@@ -2257,7 +2258,7 @@ export function WizardScaffold({
                   </section>
 
                   <section className={`${styles.wizardMobileCard} ${styles.wizardAnalysisCompactCard}`}>
-                    <div className={styles.wizardAnalysisBlockLabel}>Lo que realmente dice</div>
+                    <div className={styles.wizardAnalysisBlockLabel}>Qué está pasando</div>
                     <p className={styles.wizardAnalysisLongform}>{analysisResult.summary}</p>
                     {analysisResult.emotional_context.intent_guess ? (
                       <div className={styles.wizardInsightRow}>
@@ -2282,15 +2283,15 @@ export function WizardScaffold({
                   <section className={`${styles.wizardMobileCard} ${styles.wizardAnalysisMetaCard}`}>
                     <div className={styles.wizardAnalysisBlockLabel}>Metadata</div>
                     <div className={styles.wizardAnalysisMetaGrid}>
-                      <span className={styles.wizardAnalysisMetaItem}>
+                      <span className={`${styles.wizardAnalysisMetaItem} ${styles.wizardAnalysisMetaItemTone}`}>
                         <span className={styles.wizardAnalysisMetaLabel}>Tono</span>
                         <span className={styles.wizardAnalysisMetaValue}>{toneChipValue}</span>
                       </span>
-                      <span className={styles.wizardAnalysisMetaItem}>
+                      <span className={`${styles.wizardAnalysisMetaItem} ${styles.wizardAnalysisMetaItemUrgency}`}>
                         <span className={styles.wizardAnalysisMetaLabel}>Urgencia</span>
                         <span className={styles.wizardAnalysisMetaValue}>{urgencyChipValue}</span>
                       </span>
-                      <span className={styles.wizardAnalysisMetaItem}>
+                      <span className={`${styles.wizardAnalysisMetaItem} ${styles.wizardAnalysisMetaItemTopic}`}>
                         <span className={styles.wizardAnalysisMetaLabel}>Tema</span>
                         <span className={styles.wizardAnalysisMetaValue}>{topicLabel}</span>
                       </span>
@@ -2299,11 +2300,12 @@ export function WizardScaffold({
                 </div>
 
                 <section className={`${styles.wizardMobileCard} ${styles.wizardAnalysisActionsCard}`}>
-                  <div className={styles.wizardAnalysisBlockLabel}>Que queres hacer?</div>
+                  <div className={styles.wizardAnalysisBlockLabel}>Qué quieres hacer</div>
                   <div className={styles.wizardDecisionListCompact}>
                     {orderedDecisionActions.map((action) => {
                       const isAdvisorAction = action.id === "advisor_help";
                       const isActive = !isAdvisorAction && selectedDecision === action.id;
+                      const isPrimaryAction = !isAdvisorAction && action.id === primaryDecisionId;
 
                       return (
                         <button
@@ -2323,7 +2325,9 @@ export function WizardScaffold({
                           }}
                           className={`${styles.wizardDecisionOption} ${
                             isActive ? styles.wizardDecisionOptionActive : ""
-                          } ${isAdvisorAction ? styles.wizardDecisionOptionAdvisor : ""}`}
+                          } ${isAdvisorAction ? styles.wizardDecisionOptionAdvisor : ""} ${
+                            isPrimaryAction ? styles.wizardDecisionOptionSuggested : ""
+                          }`}
                           disabled={isAdvisorAction && (!analysisId || loadingAdvisor)}
                         >
                           <span className={styles.wizardDecisionTitle}>

@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 
@@ -41,7 +42,7 @@ const DAILY_CONFIDENCE_OPTIONS: CheckinOption[] = [
 const ADVISOR_MICROCOPY: Record<string, string> = {
   laura: "Espacio breve para bajar intensidad y ordenar lo que sientes.",
   robert: "Mirada clara para poner foco y recuperar perspectiva.",
-  lidia: "Acompanamiento concreto para descargar sin dar mas vueltas.",
+  lidia: "Acompañamiento concreto para descargar sin dar más vueltas.",
 };
 
 const ADVISOR_STYLE_LABEL: Record<string, string> = {
@@ -58,7 +59,7 @@ const ADVISOR_CARD_VARIANT: Record<string, SelectorCardVariant> = {
 
 function getGreetingLabel() {
   const hour = new Date().getHours();
-  if (hour < 12) return "Buen dia";
+  if (hour < 12) return "Buen día";
   if (hour < 20) return "Buenas tardes";
   return "Buenas noches";
 }
@@ -107,7 +108,7 @@ function getConfidenceSummaryLabel(level: number | null | undefined) {
   return DAILY_CONFIDENCE_OPTIONS.find((option) => option.value === level)?.label ?? null;
 }
 
-function CheckinQuestion({
+function CheckinSliderQuestion({
   title,
   options,
   value,
@@ -118,20 +119,47 @@ function CheckinQuestion({
   value: number | null;
   onChange: (nextValue: number) => void;
 }) {
+  const normalizedValue = value ?? 2;
+  const fillPercent = `${(normalizedValue / (options.length - 1)) * 100}%`;
+  const activeLabel = value === null ? "Elige un nivel" : options[normalizedValue]?.label ?? "";
+
   return (
     <section className={styles.checkinQuestionBlock}>
-      <p className={styles.checkinQuestionTitle}>{title}</p>
-      <div className={styles.checkinOptionGrid}>
+      <div className={styles.checkinSliderHeader}>
+        <p className={styles.checkinQuestionTitle}>{title}</p>
+        <span className={styles.checkinSliderValue}>{activeLabel}</span>
+      </div>
+      <div
+        className={styles.checkinSliderWrap}
+        style={
+          {
+            "--checkin-slider-fill": fillPercent,
+          } as CSSProperties
+        }
+      >
+        <input
+          type="range"
+          min={0}
+          max={options.length - 1}
+          step={1}
+          value={normalizedValue}
+          onChange={(event) => onChange(Number(event.target.value))}
+          className={styles.checkinSlider}
+          aria-label={title}
+        />
+      </div>
+      <div className={styles.checkinSliderLabels}>
         {options.map((option) => (
           <button
             key={option.value}
             type="button"
             onClick={() => onChange(option.value)}
-            className={`${styles.checkinOptionButton} ${value === option.value ? styles.checkinOptionButtonActive : ""}`}
+            className={`${styles.checkinSliderLabelButton} ${
+              value === option.value ? styles.checkinSliderLabelButtonActive : ""
+            }`}
             aria-pressed={value === option.value}
           >
-            <span className={styles.checkinOptionValue}>{option.value}</span>
-            <span className={styles.checkinOptionLabel}>{option.label}</span>
+            <span className={styles.checkinSliderLabelText}>{option.label}</span>
           </button>
         ))}
       </div>
@@ -219,8 +247,14 @@ export function MvpEntryFlow() {
     const moodLabel = getMoodSummaryLabel(todayCheckin.mood_level);
     const confidenceLabel = getConfidenceSummaryLabel(todayCheckin.confidence_level);
     if (!moodLabel || !confidenceLabel) return null;
-    return `Hoy: animo ${moodLabel} \u00b7 confianza ${confidenceLabel}`;
+    return `Hoy: ánimo ${moodLabel.toLowerCase()} · confianza ${confidenceLabel.toLowerCase()}`;
   }, [todayCheckin]);
+
+  const sessionTitleLabel =
+    sidebarConversation?.title.trim() &&
+    sidebarConversation.title.trim().toLowerCase() !== "nueva conversacion"
+      ? sidebarConversation.title
+      : "Borrador reciente";
 
   const canSubmitCheckin =
     draftMoodLevel !== null && draftConfidenceLevel !== null && draftRecentContact !== null && !checkinSubmitting;
@@ -311,30 +345,40 @@ export function MvpEntryFlow() {
               <div className={styles.entryBody}>
                 <div>
                   <p className={styles.eyebrow}>{greeting}</p>
-                  <h1 className={styles.headline}>\u00bfComo quieres empezar hoy?</h1>
+                  <h1 className={styles.headline}>¿Cómo quieres avanzar hoy?</h1>
                   <p className={styles.subcopy}>
-                    Usa ExReply para descargar, analizar una conversacion o preparar mejor tu siguiente mensaje.
+                    Puedes descargar, analizar una conversación o preparar tu próximo mensaje.
                   </p>
                 </div>
 
-                {checkinSummaryLine ? (
-                  <div className={styles.daySummaryCard}>
-                    <span className={styles.daySummaryDot} aria-hidden="true" />
-                    <p className={styles.daySummaryText}>{checkinSummaryLine}</p>
-                  </div>
-                ) : null}
+                {checkinSummaryLine || (sidebarConversation && lastSessionMeta) ? (
+                  <div className={styles.contextSummaryGrid}>
+                    {checkinSummaryLine ? (
+                      <div className={styles.daySummaryCard}>
+                        <span className={styles.daySummaryDot} aria-hidden="true" />
+                        <div className={styles.contextSummaryTextBlock}>
+                          <p className={styles.contextSummaryLabel}>Resumen de hoy</p>
+                          <p className={styles.daySummaryText}>{checkinSummaryLine}</p>
+                        </div>
+                      </div>
+                    ) : null}
 
-                {sidebarConversation && lastSessionMeta ? (
-                  <div className={styles.sessionCard}>
-                    <span className={styles.sessionDot} aria-hidden="true" />
-                    <p className={styles.sessionText}>
-                      Ultima sesion: {lastSessionMeta} - {sidebarConversation.title}
-                    </p>
+                    {sidebarConversation && lastSessionMeta ? (
+                      <div className={styles.sessionCard}>
+                        <span className={styles.sessionDot} aria-hidden="true" />
+                        <div className={styles.contextSummaryTextBlock}>
+                          <p className={styles.contextSummaryLabel}>Última sesión</p>
+                          <p className={styles.sessionText}>
+                            {sessionTitleLabel} · {lastSessionMeta}
+                          </p>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
 
                 <div className={styles.actionsHeader}>
-                  <p className={styles.actionsKicker}>Quiero empezar por...</p>
+                  <p className={styles.actionsKicker}>Elige cómo quieres usar ExReply hoy</p>
                 </div>
 
                 <div className={styles.actions}>
@@ -352,7 +396,7 @@ export function MvpEntryFlow() {
                     </span>
                     <span className={styles.actionTextBlock}>
                       <span className={styles.actionTitle}>Solo quiero desahogarme</span>
-                      <span className={styles.actionCopy}>Abrir directo un espacio breve para descargar y ordenar.</span>
+                      <span className={styles.actionCopy}>Entrar rápido a un espacio breve para descargar y ordenar.</span>
                     </span>
                   </button>
                   <button type="button" className={styles.secondaryAction} onClick={handleAnalyzeConversation}>
@@ -374,8 +418,8 @@ export function MvpEntryFlow() {
                       </svg>
                     </span>
                     <span className={styles.actionTextBlock}>
-                      <span className={styles.actionTitle}>Tengo una conversacion para analizar</span>
-                      <span className={styles.actionCopy}>Entrar directo al wizard actual con el flujo existente.</span>
+                      <span className={styles.actionTitle}>Tengo una conversación para analizar</span>
+                      <span className={styles.actionCopy}>Revisar contexto, ver el análisis y decidir con más claridad.</span>
                     </span>
                   </button>
                   <button
@@ -396,15 +440,15 @@ export function MvpEntryFlow() {
                     </span>
                     <span className={styles.actionTextBlock}>
                       <span className={styles.actionTitle}>Quiero escribirle a mi ex</span>
-                      <span className={styles.actionCopy}>Elegir consejero y luego seguir con la escritura guiada.</span>
+                      <span className={styles.actionCopy}>Elegir consejero y después preparar mejor tu próximo mensaje.</span>
                     </span>
                   </button>
                 </div>
 
                 <p className={styles.disclaimer}>
-                  No guardamos conversaciones por defecto - La IA puede equivocarse
+                  Guardamos el contexto mínimo para que puedas retomar tu proceso. La IA puede equivocarse.
                   <br />
-                  No reemplaza apoyo <a href="#" className={styles.disclaimerLink}>psicologico</a>, legal ni atencion de emergencia
+                  No reemplaza apoyo <a href="#" className={styles.disclaimerLink}>psicológico</a>, legal ni atención de emergencia.
                 </p>
               </div>
             </section>
@@ -416,11 +460,11 @@ export function MvpEntryFlow() {
             <section className={styles.intentNotice}>
               <p className={styles.intentLabel}>Escritura guiada</p>
               <p className={styles.intentTitle}>
-                Entraras al flujo actual de analisis y despues podras afinar con{" "}
+                Entrarás al flujo actual de análisis y después podrás afinar con{" "}
                 {ADVISOR_PROFILES.find((advisor) => advisor.id === preferredAdvisorId)?.name ?? "tu consejero"}.
               </p>
               <p className={styles.intentText}>
-                No creamos un flujo nuevo: estamos reutilizando el wizard actual y marcando tu consejero
+                No creamos un flujo nuevo: reutilizamos el wizard actual y dejamos marcado tu consejero
                 elegido para la parte de respuesta.
               </p>
             </section>
@@ -464,23 +508,23 @@ export function MvpEntryFlow() {
             <div className={styles.checkinHeader}>
               <p className={styles.checkinEyebrow}>Check-in diario</p>
               <h2 id="daily-checkin-title" className={styles.checkinTitle}>
-                Antes de empezar, \u00bfcomo estas hoy?
+                Antes de empezar, ¿cómo estás hoy?
               </h2>
               <p className={styles.checkinSubtitle}>
-                Esto nos ayuda a acompa\u00f1arte mejor y a sugerirte cu\u00e1ndo conviene responder y cu\u00e1ndo no.
+                Esto nos ayuda a acompañarte mejor y a sugerirte cuándo conviene responder y cuándo no.
               </p>
             </div>
 
             <div className={styles.checkinBody}>
-              <CheckinQuestion
-                title="\u00bfComo estas emocionalmente para afrontar el dia?"
+              <CheckinSliderQuestion
+                title="¿Cómo estás emocionalmente hoy?"
                 options={DAILY_MOOD_OPTIONS}
                 value={draftMoodLevel}
                 onChange={setDraftMoodLevel}
               />
 
-              <CheckinQuestion
-                title="\u00bfComo sientes tu confianza hoy?"
+              <CheckinSliderQuestion
+                title="¿Cómo sientes tu confianza hoy?"
                 options={DAILY_CONFIDENCE_OPTIONS}
                 value={draftConfidenceLevel}
                 onChange={setDraftConfidenceLevel}
@@ -488,7 +532,7 @@ export function MvpEntryFlow() {
 
               <section className={styles.checkinQuestionBlock}>
                 <p className={styles.checkinQuestionTitle}>
-                  \u00bfTuviste contacto con tu ex en las ultimas 12 horas?
+                  ¿Tuviste contacto con tu ex en las últimas 12 horas?
                 </p>
                 <div className={styles.binaryOptionRow}>
                   <button
@@ -497,7 +541,7 @@ export function MvpEntryFlow() {
                     onClick={() => setDraftRecentContact(true)}
                     aria-pressed={draftRecentContact === true}
                   >
-                    Si
+                    Sí
                   </button>
                   <button
                     type="button"
@@ -550,12 +594,12 @@ export function MvpEntryFlow() {
               <div>
                 <h2 id="advisor-selector-title" className={styles.sheetTitle}>
                   {selectorIntent === "vent"
-                    ? "\u00bfCon quien quieres hablar ahora?"
-                    : "\u00bfCon quien quieres escribir?"}
+                    ? "¿Con quién quieres hablar ahora?"
+                    : "¿Con quién quieres escribir?"}
                 </h2>
                 <p className={styles.sheetSubtitle}>
                   {selectorIntent === "vent"
-                    ? "Elige una perspectiva y entra directo al espacio de conversacion."
+                    ? "Elige una perspectiva y entra directo al espacio de conversación."
                     : "Elige el consejero que quieres priorizar cuando pases al flujo actual de respuesta."}
                 </p>
               </div>

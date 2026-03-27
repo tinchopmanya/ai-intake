@@ -1245,30 +1245,33 @@
 
 .wizardAnalysisLayout {
   display: grid;
-  gap: 7px;
-  grid-template-columns: minmax(0, 1.08fr) minmax(280px, 0.92fr);
+  gap: 10px;
+  grid-template-columns: minmax(0, 1.08fr) minmax(286px, 0.92fr);
   align-items: start;
 }
 
 .wizardAnalysisColumn {
   display: grid;
-  gap: 7px;
+  gap: 8px;
   min-width: 0;
 }
 
 .wizardAnalysisCompactCard {
-  gap: 6px;
-  padding: 9px 10px;
+  gap: 8px;
+  padding: 11px 12px;
 }
 
 .wizardAnalysisMetaCard {
-  gap: 6px;
-  padding: 9px 10px;
+  gap: 7px;
+  padding: 11px 12px;
 }
 
 .wizardAnalysisActionsCard {
-  gap: 7px;
-  padding: 9px 10px;
+  gap: 8px;
+  padding: 11px 12px;
+  background:
+    radial-gradient(circle at top right, rgba(45, 107, 228, 0.08) 0%, transparent 34%),
+    linear-gradient(180deg, rgba(17, 32, 51, 0.92) 0%, rgba(10, 21, 32, 0.96) 100%);
 }
 
 .wizardAnalysisCardHeader {
@@ -1280,13 +1283,13 @@
 
 .wizardAnalysisSummaryStack {
   display: grid;
-  gap: 2px;
+  gap: 4px;
 }
 
 .wizardAnalysisBlockLabel {
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0.13em;
+  letter-spacing: 0.11em;
   text-transform: uppercase;
   color: rgba(126, 184, 247, 0.76);
 }
@@ -1299,11 +1302,26 @@
 
 .wizardAnalysisMetaItem {
   display: grid;
-  gap: 2px;
+  gap: 3px;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.03);
-  padding: 6px 8px;
+  padding: 7px 9px;
+}
+
+.wizardAnalysisMetaItemTone {
+  border-color: rgba(96, 165, 250, 0.12);
+  background: rgba(45, 107, 228, 0.05);
+}
+
+.wizardAnalysisMetaItemUrgency {
+  border-color: rgba(245, 158, 11, 0.12);
+  background: rgba(245, 158, 11, 0.05);
+}
+
+.wizardAnalysisMetaItemTopic {
+  border-color: rgba(148, 163, 184, 0.12);
+  background: rgba(148, 163, 184, 0.05);
 }
 
 .wizardAnalysisMetaLabel {
@@ -1328,16 +1346,16 @@
 }
 
 .wizardAnalysisDecisionTitle {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
-  line-height: 1.14;
+  line-height: 1.2;
   color: rgba(255, 255, 255, 0.95);
 }
 
 .wizardAnalysisDecisionText {
   font-size: 11px;
-  line-height: 1.4;
-  color: rgba(255, 255, 255, 0.62);
+  line-height: 1.46;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .wizardAnalysisDecisionBadge {
@@ -1369,8 +1387,8 @@
 
 .wizardAnalysisLongform {
   font-size: 11px;
-  line-height: 1.42;
-  color: rgba(255, 255, 255, 0.86);
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.84);
 }
 
 .wizardRiskMeter {
@@ -1463,10 +1481,10 @@
   border-radius: 12px;
   border: 1px solid rgba(45, 107, 228, 0.14);
   background: rgba(45, 107, 228, 0.06);
-  padding: 8px 9px;
+  padding: 9px 10px;
   color: var(--text-primary);
   font-size: 10px;
-  line-height: 1.35;
+  line-height: 1.42;
 }
 
 .wizardInsightIcon {
@@ -1481,17 +1499,17 @@
 
 .wizardDecisionListCompact {
   display: grid;
-  gap: 5px;
+  gap: 6px;
 }
 
 .wizardDecisionOption {
   display: grid;
-  gap: 2px;
+  gap: 3px;
   width: 100%;
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.04);
-  padding: 8px 9px;
+  padding: 10px 11px;
   text-align: left;
   cursor: pointer;
   transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;
@@ -1504,27 +1522,34 @@
 
 .wizardDecisionOptionActive {
   border-color: rgba(126, 184, 247, 0.34);
-  background: rgba(45, 107, 228, 0.08);
-  box-shadow: inset 0 0 0 1px rgba(126, 184, 247, 0.08);
+  background: rgba(45, 107, 228, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(126, 184, 247, 0.08), 0 10px 20px rgba(0, 0, 0, 0.08);
+}
+
+.wizardDecisionOptionSuggested {
+  border-color: rgba(126, 184, 247, 0.18);
+  background: rgba(45, 107, 228, 0.05);
 }
 
 .wizardDecisionOptionAdvisor {
-  border-color: rgba(5, 150, 105, 0.18);
-  background: rgba(5, 150, 105, 0.06);
+  border-color: rgba(5, 150, 105, 0.24);
+  background:
+    linear-gradient(180deg, rgba(5, 150, 105, 0.08) 0%, rgba(8, 17, 26, 0.28) 100%),
+    rgba(255, 255, 255, 0.04);
 }
 
 .wizardDecisionTitle {
   display: block;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-primary);
 }
 
 .wizardDecisionCopy {
   display: block;
-  font-size: 9px;
-  line-height: 1.3;
-  color: var(--text-secondary);
+  font-size: 10px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.62);
 }
 
 .wizardDecisionPreview {

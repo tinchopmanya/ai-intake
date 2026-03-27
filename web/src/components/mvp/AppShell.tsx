@@ -46,6 +46,7 @@ export function AppShell({ children }: AppShellProps) {
   const router = useRouter();
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const advisorDropdownRef = useRef<HTMLDivElement | null>(null);
+  const createConversationPromiseRef = useRef<Promise<SidebarConversationSummary | null> | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [advisorMenuOpen, setAdvisorMenuOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -146,23 +147,51 @@ export function AppShell({ children }: AppShellProps) {
     return parts.map((part) => part[0]!.toUpperCase()).join("");
   }, [displayName]);
 
+  const findReusableDraftConversation = useCallback(
+    (advisorId?: string | null) =>
+      conversations.find((conversation) => {
+        if (conversation.titleStatus !== "pending") return false;
+        if (conversation.title.trim().toLowerCase() !== "nueva conversacion") return false;
+        if (!advisorId) return true;
+        return conversation.advisorId === advisorId;
+      }) ?? null,
+    [conversations],
+  );
+
   const createSidebarConversation = useCallback(
     async (options?: { advisorId?: string | null }) => {
-      try {
-        const created = mapConversationSummary(
-          await postConversation({
-            advisor_id: options?.advisorId ?? undefined,
-          }),
-        );
-        setConversations((previous) => [created, ...previous.filter((item) => item.id !== created.id)]);
-        setActiveConversationId(created.id);
-        return created;
-      } catch (error) {
-        console.error("sidebar_conversation_create_failed", error);
-        return null;
+      const reusableDraft = findReusableDraftConversation(options?.advisorId ?? null);
+      if (reusableDraft) {
+        setActiveConversationId(reusableDraft.id);
+        return reusableDraft;
       }
+
+      if (createConversationPromiseRef.current) {
+        return createConversationPromiseRef.current;
+      }
+
+      const pendingPromise = (async () => {
+        try {
+          const created = mapConversationSummary(
+            await postConversation({
+              advisor_id: options?.advisorId ?? undefined,
+            }),
+          );
+          setConversations((previous) => [created, ...previous.filter((item) => item.id !== created.id)]);
+          setActiveConversationId(created.id);
+          return created;
+        } catch (error) {
+          console.error("sidebar_conversation_create_failed", error);
+          return null;
+        } finally {
+          createConversationPromiseRef.current = null;
+        }
+      })();
+
+      createConversationPromiseRef.current = pendingPromise;
+      return pendingPromise;
     },
-    [],
+    [findReusableDraftConversation],
   );
 
   const updateSidebarConversation = useCallback((conversation: SidebarConversationSummary) => {
