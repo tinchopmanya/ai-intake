@@ -9,6 +9,7 @@ from uuid import uuid5
 from fastapi.testclient import TestClient
 
 from app.api.deps import get_current_user
+from app.api.deps import get_ai_provider
 from app.api.deps import get_uow
 from app.services.auth_service import AuthenticatedUser
 from main import app
@@ -94,6 +95,19 @@ class FakeConversationRepository:
 class FakeUow:
     def __init__(self) -> None:
         self.conversations = FakeConversationRepository()
+        self.cases = type(
+            "FakeCasesRepo",
+            (),
+            {"get_default_for_user": lambda self, *, user_id: {"contact_name": "Martin"}},
+        )()
+        self.memory_items = type(
+            "FakeMemoryItemsRepo",
+            (),
+            {
+                "__init__": lambda self: setattr(self, "saved", []),
+                "upsert_by_source_reference": lambda self, **kwargs: self.saved.append(kwargs) or kwargs,
+            },
+        )()
 
 
 class TestConversationsRouter(unittest.TestCase):
@@ -111,8 +125,15 @@ class TestConversationsRouter(unittest.TestCase):
             country_code="UY",
             language_code="es",
             onboarding_completed=False,
+            ex_partner_name="Martin",
+            relationship_mode="coparenting",
         )
         app.dependency_overrides[get_uow] = lambda: self.fake_uow
+        app.dependency_overrides[get_ai_provider] = lambda: type(
+            "FallbackProvider",
+            (),
+            {"generate_answer": lambda self, message: "Gemini no esta configurado."},
+        )()
         self.client = TestClient(app)
 
     def tearDown(self) -> None:
@@ -159,6 +180,11 @@ class TestConversationsRouter(unittest.TestCase):
             self.fake_uow.conversations.updated_payloads[-1]["user_id"],
             uuid5(NAMESPACE_URL, "user-a"),
         )
+        self.assertEqual(len(self.fake_uow.memory_items.saved), 1)
+        persisted_memory = self.fake_uow.memory_items.saved[0]
+        self.assertEqual(persisted_memory["memory_type"], "coparenting_exchange_summary")
+        self.assertEqual(persisted_memory["source_reference_id"], UUID(conversation_id))
+        self.assertNotIn("Martin", persisted_memory["safe_summary"])
 
 
 if __name__ == "__main__":

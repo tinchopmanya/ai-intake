@@ -335,7 +335,7 @@ async def create_advisor_response(
 
     orchestrator = AdvisorOrchestrator(provider=provider)
     try:
-        response = orchestrator.run(payload, uow=uow)
+        response = orchestrator.run(payload, current_user=current_user, uow=uow)
         if payload.case_id is not None and uow is not None:
             preview = response.responses[0].text if response.responses else ""
             snippet = preview[:220].strip()

@@ -12,6 +12,9 @@ from app.schemas.emotional_checkins import EmotionalCheckinCreateRequest
 from app.schemas.emotional_checkins import EmotionalCheckinSummary
 from app.schemas.emotional_checkins import EmotionalCheckinTodayStatusResponse
 from app.services.auth_service import AuthenticatedUser
+from app.services.safe_memory import SafeMemoryService
+from app.api.deps import get_ai_provider
+from providers.base import AIProvider
 
 router = APIRouter(prefix="/v1/emotional-checkins", tags=["emotional_checkins"])
 
@@ -52,6 +55,7 @@ async def create_emotional_checkin(
     payload: EmotionalCheckinCreateRequest,
     current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
     uow: Annotated[UnitOfWork | None, Depends(get_uow)],
+    provider: Annotated[AIProvider, Depends(get_ai_provider)],
 ) -> EmotionalCheckinSummary:
     if uow is None:
         raise HTTPException(
@@ -64,5 +68,25 @@ async def create_emotional_checkin(
         mood_level=payload.mood_level,
         confidence_level=payload.confidence_level,
         recent_contact=payload.recent_contact,
+    )
+    safe_memory_service = SafeMemoryService(provider)
+    memory_item = safe_memory_service.build_checkin_memory(
+        mood_level=payload.mood_level,
+        confidence_level=payload.confidence_level,
+        recent_contact=payload.recent_contact,
+    )
+    uow.memory_items.upsert_by_source_reference(
+        user_id=current_user.id,
+        conversation_id=None,
+        memory_type=memory_item.memory_type,
+        safe_title=memory_item.safe_title,
+        safe_summary=memory_item.safe_summary,
+        tone=memory_item.tone,
+        risk_level=memory_item.risk_level,
+        recommended_next_step=memory_item.recommended_next_step,
+        source_kind=memory_item.source_kind,
+        is_sensitive=memory_item.is_sensitive,
+        source_reference_id=created["id"],
+        memory_metadata=memory_item.metadata,
     )
     return _to_checkin_summary(dict(created))

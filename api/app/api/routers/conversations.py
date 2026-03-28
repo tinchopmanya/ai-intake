@@ -7,6 +7,7 @@ from fastapi import HTTPException
 from fastapi import Query
 from fastapi import status
 
+from app.api.deps import get_ai_provider
 from app.api.deps import get_current_user
 from app.api.deps import get_uow
 from app.repositories import UnitOfWork
@@ -18,8 +19,24 @@ from app.schemas.messages import MessageListResponse
 from app.schemas.messages import MessageSummary
 from app.services.auth_service import AuthenticatedUser
 from app.services.conversation_titles import get_safe_conversation_title
+from app.services.safe_memory import SafeMemoryService
+from providers.base import AIProvider
 
 router = APIRouter(prefix="/v1/conversations", tags=["conversations"])
+
+
+def _infer_memory_source_kind(source_text: str, requested_source_kind: str | None) -> str:
+    normalized_kind = (requested_source_kind or "").strip().lower()
+    if normalized_kind in {"ex_chat_capture", "ex_chat_pasted", "draft_analysis"}:
+        return normalized_kind
+
+    normalized_text = source_text.strip()
+    line_count = len([line for line in normalized_text.splitlines() if line.strip()])
+    if line_count >= 5 or any(char.isdigit() for char in normalized_text[:80]) and ":" in normalized_text:
+        return "ex_chat_capture"
+    if line_count <= 2 and len(normalized_text) <= 220:
+        return "ex_chat_pasted"
+    return "draft_analysis"
 
 
 def _to_conversation_summary(row: dict) -> ConversationSummary:
@@ -113,6 +130,7 @@ async def update_conversation(
     payload: ConversationUpdateRequest,
     current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
     uow: Annotated[UnitOfWork | None, Depends(get_uow)],
+    provider: Annotated[AIProvider, Depends(get_ai_provider)],
 ) -> ConversationSummary:
     if uow is None:
         raise HTTPException(
@@ -133,4 +151,31 @@ async def update_conversation(
     )
     if updated is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="conversation_not_found")
+
+    safe_memory_service = SafeMemoryService(provider)
+    source_kind = _infer_memory_source_kind(payload.source_text, payload.source_kind)
+    default_case = uow.cases.get_default_for_user(user_id=current_user.id)
+    case_contact_name = str(default_case.get("contact_name") or "").strip() if default_case else None
+    memory_item = safe_memory_service.build_exchange_memory(
+        source_text=payload.source_text,
+        analysis_summary=payload.analysis_summary,
+        current_user=current_user,
+        source_kind=source_kind,
+        case_contact_name=case_contact_name or None,
+        child_names=payload.child_names,
+    )
+    uow.memory_items.upsert_by_source_reference(
+        user_id=current_user.id,
+        conversation_id=conversation_id,
+        memory_type=memory_item.memory_type,
+        safe_title=memory_item.safe_title,
+        safe_summary=memory_item.safe_summary,
+        tone=memory_item.tone,
+        risk_level=memory_item.risk_level,
+        recommended_next_step=memory_item.recommended_next_step,
+        source_kind=memory_item.source_kind,
+        is_sensitive=memory_item.is_sensitive,
+        source_reference_id=conversation_id,
+        memory_metadata=memory_item.metadata,
+    )
     return _to_conversation_summary(dict(updated))

@@ -34,6 +34,7 @@ class FakeSessionsRepo:
         self.completed = 0
         self.errors = 0
         self.updated_steps = 0
+        self.saved_results = 0
 
     def create_started(self, **kwargs):
         self.created += 1
@@ -49,6 +50,10 @@ class FakeSessionsRepo:
 
     def mark_error(self, **kwargs):
         self.errors += 1
+        return {"ok": True}
+
+    def save_advisor_result(self, **kwargs):
+        self.saved_results += 1
         return {"ok": True}
 
 
@@ -70,6 +75,15 @@ class FakeMemoryRepo:
         return []
 
 
+class FakeMemoryItemsRepo:
+    def __init__(self) -> None:
+        self.upsert_calls = 0
+
+    def upsert_by_source_reference(self, **kwargs):
+        self.upsert_calls += 1
+        return kwargs
+
+
 class FakeTrackingRepo:
     def __init__(self) -> None:
         self.events: list[str] = []
@@ -89,6 +103,7 @@ class FakeUow:
         self.sessions = FakeSessionsRepo()
         self.outputs = FakeOutputsRepo()
         self.memory = FakeMemoryRepo()
+        self.memory_items = FakeMemoryItemsRepo()
         self.tracking = FakeTrackingRepo()
         self.contacts = FakeContactsRepo()
 
@@ -108,6 +123,7 @@ class TestAppMvpAdvisorFlow(unittest.TestCase):
             language_code="es",
             onboarding_completed=False,
         )
+        app.dependency_overrides[get_uow] = lambda: None
         self.client = TestClient(app)
         with analysis_registry._lock:  # noqa: SLF001 - test-only cleanup
             analysis_registry._items.clear()  # noqa: SLF001 - test-only cleanup
@@ -277,6 +293,40 @@ class TestAppMvpAdvisorFlow(unittest.TestCase):
         self.assertFalse(body["persistence"]["memory_persisted"])
         self.assertEqual(fake_uow.outputs.create_calls, 0)
         self.assertEqual(fake_uow.memory.upsert_calls, 0)
+        self.assertEqual(fake_uow.memory_items.upsert_calls, 0)
+
+    def test_save_session_true_and_memory_opt_in_persists_safe_memory_item(self):
+        provider = StaticProvider(
+            '{"responses":[{"advisor":"laura","text":"L"},{"advisor":"robert","text":"R"},{"advisor":"lidia","text":"I"}]}'
+        )
+        fake_uow = FakeUow()
+        app.dependency_overrides[get_ai_provider] = lambda: provider
+        app.dependency_overrides[get_uow] = lambda: fake_uow
+        app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(
+            id=uuid5(NAMESPACE_URL, "user-a"),
+            email="flow@example.com",
+            name="Flow User",
+            memory_opt_in=True,
+            locale="es-LA",
+            picture_url=None,
+            country_code="UY",
+            language_code="es",
+            onboarding_completed=False,
+        )
+
+        response = self._post_advisor(
+            user_id="user-a",
+            save_session=True,
+            memory_opt_in=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertTrue(body["persistence"]["outputs_persisted"])
+        self.assertTrue(body["persistence"]["memory_persisted"])
+        self.assertGreaterEqual(fake_uow.outputs.create_calls, 1)
+        self.assertEqual(fake_uow.memory.upsert_calls, 1)
+        self.assertEqual(fake_uow.memory_items.upsert_calls, 1)
 
 
 if __name__ == "__main__":

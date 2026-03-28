@@ -13,6 +13,8 @@ class ConversationUpdateRequest(BaseModel):
     source_text: str = Field(min_length=1, max_length=6000)
     case_title: str | None = Field(default=None, max_length=160)
     analysis_summary: str | None = Field(default=None, max_length=1200)
+    source_kind: str | None = Field(default=None, max_length=40)
+    child_names: list[str] = Field(default_factory=list, max_length=5)
 
 
 class ConversationSummary(BaseModel):

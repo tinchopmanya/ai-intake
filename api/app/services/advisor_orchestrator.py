@@ -19,9 +19,11 @@ from app.schemas.advisor import AnalysisSnapshot
 from app.schemas.advisor import PersistenceMetadata
 from app.schemas.advisor import SuggestedResponse
 from app.schemas.rewrite import SafeRewriteRequest
+from app.services.auth_service import AuthenticatedUser
 from app.services.analysis_registry import AnalysisOwnershipError
 from app.services.analysis_registry import analysis_registry
 from app.services.emotional_linter import run_emotional_linter
+from app.services.safe_memory import SafeMemoryService
 from app.services.safe_rewrite_engine import SafeRewriteEngine
 from app.services.user_identity import resolve_user_id
 from providers.base import AIProvider
@@ -53,7 +55,13 @@ class AdvisorOrchestrator:
     def __init__(self, provider: AIProvider) -> None:
         self._provider = provider
 
-    def run(self, payload: AdvisorRequest, *, uow: UnitOfWork | None) -> AdvisorResponse:
+    def run(
+        self,
+        payload: AdvisorRequest,
+        *,
+        current_user: AuthenticatedUser,
+        uow: UnitOfWork | None,
+    ) -> AdvisorResponse:
         started_at = datetime.now(UTC)
         sanitized_text = _sanitize_message(payload.message_text)
         context = self._build_context(payload, uow=uow)
@@ -114,6 +122,7 @@ class AdvisorOrchestrator:
                 payload=payload,
                 session_id=session_id,
                 user_id=context.user_id,
+                current_user=current_user,
                 responses=responses,
                 analysis=analysis,
                 context=context,
@@ -374,6 +383,7 @@ class AdvisorOrchestrator:
         payload: AdvisorRequest,
         session_id: UUID,
         user_id: UUID,
+        current_user: AuthenticatedUser,
         responses: list[SuggestedResponse],
         analysis: AnalysisSnapshot | None,
         context: OrchestrationContext,
@@ -416,6 +426,27 @@ class AdvisorOrchestrator:
                 contact_id=payload.contact_id,
                 session_id=session_id,
                 items=memory_items,
+            )
+            safe_memory_service = SafeMemoryService(self._provider)
+            advisor_memory = safe_memory_service.build_advisor_session_memory(
+                original_input_text=payload.message_text,
+                suggested_responses=[item.text for item in responses],
+                analysis_summary=analysis.summary if analysis else None,
+                current_user=current_user,
+            )
+            uow.memory_items.upsert_by_source_reference(
+                user_id=user_id,
+                conversation_id=None,
+                memory_type=advisor_memory.memory_type,
+                safe_title=advisor_memory.safe_title,
+                safe_summary=advisor_memory.safe_summary,
+                tone=advisor_memory.tone,
+                risk_level=advisor_memory.risk_level,
+                recommended_next_step=advisor_memory.recommended_next_step,
+                source_kind=advisor_memory.source_kind,
+                is_sensitive=advisor_memory.is_sensitive,
+                source_reference_id=session_id,
+                memory_metadata=advisor_memory.metadata,
             )
             persistence.memory_persisted = True
         except Exception:
