@@ -264,6 +264,36 @@ function getDrawerRiskBadgeLabel(value: string | null | undefined) {
   return "Riesgo medio";
 }
 
+function getQuickReadingCopy(tone: string | null | undefined, risk: string | null | undefined) {
+  const normalizedTone = tone?.trim().toLowerCase();
+  const riskBucket = getRiskLevelBucket(risk);
+
+  if (riskBucket === "low") {
+    if (normalizedTone === "acompanado") {
+      return "Esta fue una situacion de baja tension, con espacio para mirar lo que paso con mas perspectiva.";
+    }
+    if (normalizedTone === "firm") {
+      return "Esta fue una situacion contenida, donde hizo falta firmeza sin entrar en conflicto abierto.";
+    }
+    return "Esta fue una situacion de baja tension, donde el foco estuvo mas en ordenar que en pelear.";
+  }
+
+  if (riskBucket === "high") {
+    if (normalizedTone === "firm") {
+      return "Esta fue una situacion delicada, donde sostener limites sin reaccionar de mas hace una gran diferencia.";
+    }
+    return "Esta fue una situacion sensible, con señales de que podria escalar si se responde desde la tension.";
+  }
+
+  if (normalizedTone === "neutral" || normalizedTone === "calm") {
+    return "Esta fue una situacion intermedia, donde todavia hay margen para mantener claridad y evitar roces innecesarios.";
+  }
+  if (normalizedTone === "acompanado") {
+    return "Esta fue una situacion que pide calma y criterio, mas que una respuesta inmediata.";
+  }
+  return "Esta fue una situacion con algo de tension, donde conviene priorizar claridad antes que reaccion.";
+}
+
 function getToneInterpretation(value: string | null | undefined) {
   const normalized = value?.trim().toLowerCase();
   if (!normalized) {
@@ -281,15 +311,34 @@ function getToneInterpretation(value: string | null | undefined) {
   return `El tono fue ${normalizeSafeLabel(normalized, "sereno").toLowerCase()} y ayuda a leer la situacion con mas perspectiva.`;
 }
 
-function getRiskInterpretation(value: string | null | undefined) {
+function getImportantInsightCopy(value: string | null | undefined) {
   const riskBucket = getRiskLevelBucket(value);
   if (riskBucket === "low") {
-    return "Esto indica que la situacion es manejable si se mantiene el enfoque actual.";
+    return "No es un conflicto en si, sino una diferencia de enfoque que se puede ordenar bien.";
   }
   if (riskBucket === "high") {
-    return "Esto sugiere que conviene bajar el ritmo y priorizar una respuesta muy cuidada.";
+    return "Es una situacion que puede escalar si no se maneja con cuidado.";
   }
-  return "Esto indica que hay que responder con cuidado para no escalar innecesariamente.";
+  return "Hay potencial de malentendido si se responde impulsivamente.";
+}
+
+function humanizeRecommendation(value: string) {
+  const normalized = value.trim();
+  if (!normalized) {
+    return "En este caso, lo mejor seria bajar el ritmo y responder solo cuando tengas claro el foco.";
+  }
+
+  const lower = normalized.toLowerCase();
+  if (
+    lower.startsWith("mantener ") ||
+    lower.startsWith("responder ") ||
+    lower.startsWith("esperar ") ||
+    lower.startsWith("revisar ") ||
+    lower.startsWith("sostener ")
+  ) {
+    return `En tu lugar, ${lower}.`;
+  }
+  return `En tu lugar, lo mejor seria ${lower.charAt(0).toLowerCase()}${lower.slice(1)}.`;
 }
 
 function getLearningCopy(value: string | null | undefined) {
@@ -924,12 +973,22 @@ export function AppShell({ children }: AppShellProps) {
 
   const selectedProcessInterpretation = useMemo(() => {
     if (!selectedProcessItem) return "";
-    return `${getToneInterpretation(selectedProcessItem.toneValue)} ${getRiskInterpretation(selectedProcessItem.riskValue)}`;
+    return getQuickReadingCopy(selectedProcessItem.toneValue, selectedProcessItem.riskValue);
+  }, [selectedProcessItem]);
+
+  const selectedProcessImportantInsight = useMemo(() => {
+    if (!selectedProcessItem) return "";
+    return `${getImportantInsightCopy(selectedProcessItem.riskValue)} ${getToneInterpretation(selectedProcessItem.toneValue)}`;
   }, [selectedProcessItem]);
 
   const selectedProcessLearning = useMemo(() => {
     if (!selectedProcessItem) return "";
     return getLearningCopy(selectedProcessItem.riskValue);
+  }, [selectedProcessItem]);
+
+  const selectedProcessRecommendation = useMemo(() => {
+    if (!selectedProcessItem) return "";
+    return humanizeRecommendation(selectedProcessItem.recommendationLabel);
   }, [selectedProcessItem]);
 
   const selectedProcessRiskBadgeLabel = useMemo(() => {
@@ -1614,7 +1673,7 @@ export function AppShell({ children }: AppShellProps) {
 
             <div className={styles.historyReportBody}>
               <section className={styles.processDrawerBlock}>
-                <p className={styles.processDrawerBlockTitle}>Que paso</p>
+                <p className={styles.processDrawerBlockTitle}>Qué pasó</p>
                 {selectedProcessItem.section === "advisor" && selectedProcessItem.advisorName ? (
                   <p className={styles.processDrawerInlineNote}>Lo revisaste con {selectedProcessItem.advisorName}.</p>
                 ) : null}
@@ -1623,21 +1682,28 @@ export function AppShell({ children }: AppShellProps) {
               </section>
 
               <section className={styles.processDrawerBlock}>
-                <p className={styles.processDrawerBlockTitle}>Como interpretar esto</p>
+                <p className={styles.processDrawerBlockTitle}>Lectura rápida</p>
                 <div className={styles.processDrawerInterpretationCard}>
                   <p className={styles.processDrawerBodyCopy}>{selectedProcessInterpretation}</p>
                 </div>
               </section>
 
               <section className={styles.processDrawerBlock}>
-                <p className={styles.processDrawerBlockTitle}>Que te conviene hacer</p>
-                <div className={styles.processDrawerRecommendationCard}>
-                  <p className={styles.processDrawerRecommendationCopy}>{selectedProcessItem.recommendationLabel}</p>
+                <p className={styles.processDrawerBlockTitle}>Lo importante aquí</p>
+                <div className={styles.processDrawerInsightCard}>
+                  <p className={styles.processDrawerBodyCopy}>{selectedProcessImportantInsight}</p>
                 </div>
               </section>
 
               <section className={styles.processDrawerBlock}>
-                <p className={styles.processDrawerBlockTitle}>Para tener en cuenta</p>
+                <p className={styles.processDrawerBlockTitle}>Qué haría en tu lugar</p>
+                <div className={styles.processDrawerRecommendationCard}>
+                  <p className={styles.processDrawerRecommendationCopy}>{selectedProcessRecommendation}</p>
+                </div>
+              </section>
+
+              <section className={styles.processDrawerBlock}>
+                <p className={styles.processDrawerBlockTitle}>Si te vuelve a pasar algo así</p>
                 <div className={styles.processDrawerLearningCard}>
                   <p className={styles.processDrawerBodyCopy}>{selectedProcessLearning}</p>
                 </div>

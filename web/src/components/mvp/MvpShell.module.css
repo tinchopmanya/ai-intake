@@ -1191,12 +1191,19 @@
 }
 
 .processDrawerInterpretationCard,
+.processDrawerInsightCard,
 .processDrawerLearningCard {
   display: grid;
   gap: 10px;
   border-radius: 20px;
   background: linear-gradient(180deg, rgba(17, 32, 51, 0.84) 0%, rgba(10, 21, 32, 0.9) 100%);
   padding: 18px;
+}
+
+.processDrawerInsightCard {
+  background:
+    radial-gradient(circle at top left, rgba(244, 201, 93, 0.1) 0%, transparent 28%),
+    linear-gradient(180deg, rgba(28, 38, 52, 0.9) 0%, rgba(14, 25, 36, 0.94) 100%);
 }
 
 .processDrawerRecommendationCard {
@@ -3101,6 +3108,7 @@
 
   .processDrawerRecommendationCard,
   .processDrawerInterpretationCard,
+  .processDrawerInsightCard,
   .processDrawerLearningCard {
     padding: 16px;
   }
