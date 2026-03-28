@@ -245,48 +245,142 @@ function looksLikeConversationInput(text: string): boolean {
   return /\d{1,2}:\d{2}/.test(normalized) && lines.length >= 2;
 }
 
+function stripTrailingMessageTimestamp(text: string): string {
+  return text
+    .replace(/\s+\d{1,2}:\d{2}(?:\s*[ap]\.?\s*m\.?)?$/i, "")
+    .trim();
+}
+
+function detectExplicitSpeaker(
+  text: string,
+): { speaker: ConversationBlock["speaker"]; content: string } | null {
+  const marker = text.match(
+    /^(yo|me|mi|mí|tu|tú|vos|ex|expareja|ex pareja|ella|el|él)\s*[:\-]\s*(.+)$/i,
+  );
+  if (!marker) return null;
+
+  const label = marker[1].toLowerCase();
+  const content = marker[2].trim();
+  if (!content) return null;
+
+  if (["yo", "me", "mi", "mí", "tu", "tú", "vos"].includes(label)) {
+    return { speaker: "user", content };
+  }
+  if (["ex", "expareja", "ex pareja", "ella", "el", "él"].includes(label)) {
+    return { speaker: "ex_partner", content };
+  }
+  return null;
+}
+
+function looksLikeShortReply(text: string): boolean {
+  const normalized = text.trim();
+  if (!normalized) return false;
+  const words = normalized.split(/\s+/).filter(Boolean).length;
+  const lineCount = normalized.split(/\r?\n/).filter((line) => line.trim().length > 0).length;
+  return normalized.length <= 72 || words <= 12 || (lineCount === 1 && normalized.length <= 92);
+}
+
+function looksLikeLongMessage(text: string): boolean {
+  const normalized = text.trim();
+  if (!normalized) return false;
+  const words = normalized.split(/\s+/).filter(Boolean).length;
+  const lineCount = normalized.split(/\r?\n/).filter((line) => line.trim().length > 0).length;
+  const sentenceCount = normalized
+    .split(/[.!?…]+/)
+    .map((item) => item.trim())
+    .filter(Boolean).length;
+  return normalized.length >= 140 || words >= 24 || lineCount >= 3 || sentenceCount >= 2;
+}
+
+function splitConversationChunks(text: string): string[] {
+  const paragraphChunks = text
+    .split(/\r?\n\s*\r?\n+/)
+    .map((chunk) =>
+      chunk
+        .split(/\r?\n/)
+        .map((line) => stripTrailingMessageTimestamp(line.trim()))
+        .filter(Boolean)
+        .join("\n")
+        .trim(),
+    )
+    .filter(Boolean);
+
+  if (paragraphChunks.length > 1) {
+    return paragraphChunks;
+  }
+
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => stripTrailingMessageTimestamp(line.trim()))
+    .filter(Boolean);
+  if (lines.length <= 1) {
+    return lines;
+  }
+
+  const chunks: string[] = [];
+  let currentChunk: string[] = [];
+
+  for (const line of lines) {
+    const explicitSpeaker = detectExplicitSpeaker(line);
+    const normalizedLine = explicitSpeaker?.content ?? line;
+    const currentText = currentChunk.join("\n").trim();
+    const shouldStartNewChunk =
+      currentChunk.length > 0 &&
+      (
+        explicitSpeaker !== null ||
+        (looksLikeShortReply(normalizedLine) && looksLikeLongMessage(currentText)) ||
+        (looksLikeLongMessage(normalizedLine) && looksLikeShortReply(currentText)) ||
+        (currentChunk.length >= 2 && looksLikeShortReply(normalizedLine))
+      );
+
+    if (shouldStartNewChunk) {
+      chunks.push(currentChunk.join("\n").trim());
+      currentChunk = [line];
+      continue;
+    }
+
+    currentChunk.push(line);
+  }
+
+  if (currentChunk.length > 0) {
+    chunks.push(currentChunk.join("\n").trim());
+  }
+
+  return chunks.filter(Boolean);
+}
+
+function inferSpeakerFromChunk(text: string): ConversationBlock["speaker"] {
+  const explicitSpeaker = detectExplicitSpeaker(text);
+  if (explicitSpeaker) return explicitSpeaker.speaker;
+  if (looksLikeShortReply(text)) return "user";
+  if (looksLikeLongMessage(text)) return "ex_partner";
+  return "unknown";
+}
+
+function shouldPreferHeuristicBlocks(
+  primaryBlocks: ConversationBlock[],
+  fallbackBlocks: ConversationBlock[],
+): boolean {
+  if (fallbackBlocks.length <= 1) return false;
+  if (primaryBlocks.length <= 1) return true;
+
+  const primarySpeakers = new Set(primaryBlocks.map((block) => block.speaker));
+  const fallbackSpeakers = new Set(fallbackBlocks.map((block) => block.speaker));
+  return primarySpeakers.size === 1 && fallbackBlocks.length > primaryBlocks.length && fallbackSpeakers.size >= 1;
+}
+
 function heuristicSegmentConversation(
   text: string,
   source: ConversationBlock["source"],
 ): ConversationBlock[] {
-  const lines = text
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-  if (lines.length === 0) return [];
-
-  const blocks: ConversationBlock[] = [];
-  let currentSpeaker: ConversationBlock["speaker"] = "ex_partner";
-  let currentLines: string[] = [];
-
-  for (const line of lines) {
-    const cleaned = line.replace(/\s+\d{1,2}:\d{2}(?:\s*[ap]\.?\s*m\.?)?$/i, "").trim();
-    if (!cleaned) continue;
-
-    const marker = cleaned.match(
-      /^(yo|me|mi|tu|vos|ex|expareja|ex pareja|ella|el)\s*[:\-]\s*(.+)$/i,
-    );
-    let speaker: ConversationBlock["speaker"] = currentSpeaker;
-    let content = cleaned;
-
-    if (marker) {
-      const label = marker[1].toLowerCase();
-      speaker = ["yo", "me", "mi", "tu", "vos"].includes(label) ? "user" : "ex_partner";
-      content = marker[2].trim();
-    }
-
-    if (currentLines.length > 0 && speaker !== currentSpeaker) {
-      blocks.push(createConversationBlock(currentSpeaker, currentLines.join(" "), source));
-      currentLines = [];
-    }
-    currentSpeaker = speaker;
-    currentLines.push(content);
-  }
-
-  if (currentLines.length > 0) {
-    blocks.push(createConversationBlock(currentSpeaker, currentLines.join(" "), source));
-  }
-  return blocks.filter((block) => block.content.length > 0);
+  return splitConversationChunks(text)
+    .map((chunk) => {
+      const explicitSpeaker = detectExplicitSpeaker(chunk);
+      const content = explicitSpeaker?.content ?? chunk.trim();
+      const speaker = explicitSpeaker?.speaker ?? inferSpeakerFromChunk(content);
+      return createConversationBlock(speaker, content, source);
+    })
+    .filter((block) => block.content.length > 0);
 }
 
 function getLatestExPartnerMessage(blocks: ConversationBlock[]): string | null {
@@ -1321,7 +1415,10 @@ export function WizardScaffold({
             )
             .filter((block) => block.content.length > 0)
         : [];
-      const resolvedBlocks = apiBlocks.length > 0 ? apiBlocks : legacyBlocks;
+      const primaryBlocks = apiBlocks.length > 0 ? apiBlocks : legacyBlocks;
+      const resolvedBlocks = shouldPreferHeuristicBlocks(primaryBlocks, localFallback)
+        ? localFallback
+        : primaryBlocks;
       if (resolvedBlocks.length > 0) {
         syncConversationBlocks(resolvedBlocks);
         return;
@@ -1389,7 +1486,10 @@ export function WizardScaffold({
           )
           .filter((block) => block.content.length > 0);
         if (blocksFromOcr.length > 0) {
-          syncConversationBlocks(blocksFromOcr);
+          const localFallback = heuristicSegmentConversation(payload.extracted_text, "ocr");
+          syncConversationBlocks(
+            shouldPreferHeuristicBlocks(blocksFromOcr, localFallback) ? localFallback : blocksFromOcr,
+          );
         } else {
           await interpretConversationText(payload.extracted_text, "ocr");
         }
