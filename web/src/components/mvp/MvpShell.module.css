@@ -235,7 +235,7 @@
 }
 
 .shellSidebarExpanded {
-  width: 260px;
+  width: 320px;
 }
 
 .shellSidebarHeader {
@@ -315,6 +315,255 @@
   font-size: 12px;
   line-height: 1.5;
   color: rgba(255, 255, 255, 0.44);
+}
+
+.shellHistoryList {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.shellHistorySection {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.shellHistorySectionToggle,
+.shellHistorySubsectionToggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(17, 32, 51, 0.92) 100%);
+  color: rgba(255, 255, 255, 0.88);
+  padding: 12px 13px;
+  text-align: left;
+  transition: background 180ms ease, border-color 180ms ease, transform 180ms ease;
+}
+
+.shellHistorySectionToggle:hover,
+.shellHistorySubsectionToggle:hover {
+  transform: translateY(-1px);
+  border-color: rgba(126, 184, 247, 0.26);
+  background: linear-gradient(180deg, rgba(45, 107, 228, 0.1) 0%, rgba(17, 32, 51, 0.96) 100%);
+}
+
+.shellHistorySectionHeading {
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.shellHistorySectionMeta {
+  font-size: 11px;
+  color: rgba(173, 216, 255, 0.7);
+}
+
+.shellHistorySectionBody {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.shellHistorySectionBody::-webkit-scrollbar {
+  width: 6px;
+}
+
+.shellHistorySectionBody::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(45, 107, 228, 0.34);
+}
+
+.shellHistorySubsection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.shellHistoryCountPill {
+  display: inline-flex;
+  min-width: 26px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0 8px;
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.shellHistoryItemList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.shellHistoryItem,
+.shellHistoryItemButton {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(circle at top left, rgba(244, 201, 93, 0.07) 0%, transparent 26%),
+    linear-gradient(180deg, rgba(17, 32, 51, 0.96) 0%, rgba(10, 21, 32, 0.98) 100%);
+  padding: 12px;
+  text-align: left;
+}
+
+.shellHistoryItemButton {
+  cursor: pointer;
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.shellHistoryItemButton:hover {
+  transform: translateY(-1px);
+  border-color: rgba(126, 184, 247, 0.28);
+  box-shadow: 0 14px 24px rgba(0, 0, 0, 0.16);
+}
+
+.shellHistoryItemButtonActive {
+  border-color: rgba(126, 184, 247, 0.38);
+  box-shadow:
+    inset 0 0 0 1px rgba(126, 184, 247, 0.1),
+    0 16px 28px rgba(0, 0, 0, 0.18);
+}
+
+.shellHistoryItemHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.shellHistoryItemTitle {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.shellHistoryItemTimestamp {
+  margin-top: 2px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.48);
+}
+
+.shellHistoryTagRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.shellHistoryTag,
+.shellHistoryTagMuted {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.shellHistoryTag {
+  border: 1px solid rgba(45, 107, 228, 0.18);
+  background: rgba(45, 107, 228, 0.12);
+  color: rgba(170, 214, 255, 0.9);
+}
+
+.shellHistoryTagMuted {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.shellHistoryItemSummary {
+  font-size: 12px;
+  line-height: 1.55;
+  color: rgba(229, 239, 249, 0.72);
+}
+
+.shellHistoryMetaGrid,
+.shellHistoryMetricsGrid {
+  display: grid;
+  gap: 8px;
+}
+
+.shellHistoryMetaGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.shellHistoryMetricsGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.shellHistoryMetaItem,
+.shellHistoryMetric {
+  display: grid;
+  gap: 3px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.035);
+  padding: 8px;
+}
+
+.shellHistoryMetaLabel,
+.shellHistoryMetricLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.shellHistoryMetaValue,
+.shellHistoryMetricValue {
+  font-size: 12px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.shellHistoryRecommendation {
+  font-size: 11px;
+  line-height: 1.5;
+  color: rgba(244, 218, 152, 0.86);
+}
+
+.shellHistoryReportButton {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  border: 1px solid rgba(244, 201, 93, 0.24);
+  background: linear-gradient(180deg, rgba(244, 201, 93, 0.12) 0%, rgba(43, 34, 17, 0.92) 100%);
+  color: rgba(255, 235, 190, 0.92);
+  padding: 11px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
+}
+
+.shellHistoryReportButton:hover {
+  transform: translateY(-1px);
+  border-color: rgba(244, 201, 93, 0.38);
+  background: linear-gradient(180deg, rgba(244, 201, 93, 0.18) 0%, rgba(59, 45, 18, 0.96) 100%);
 }
 
 .shellSessionItem {
@@ -466,6 +715,189 @@
   align-items: stretch;
   overflow: hidden;
   padding: 24px;
+}
+
+.historyReportBackdrop {
+  position: fixed;
+  inset: 56px 0 0 0;
+  z-index: 28;
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-end;
+  background: rgba(6, 12, 18, 0.62);
+  backdrop-filter: blur(4px);
+}
+
+.historyReportPanel {
+  width: min(100%, 540px);
+  height: calc(100vh - 56px);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(circle at top left, rgba(244, 201, 93, 0.12) 0%, transparent 24%),
+    linear-gradient(180deg, rgba(13, 24, 37, 0.98) 0%, rgba(8, 17, 26, 0.99) 100%);
+  padding: 22px;
+  box-shadow: -26px 0 48px rgba(0, 0, 0, 0.26);
+}
+
+.historyReportHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.historyReportEyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(244, 218, 152, 0.78);
+}
+
+.historyReportTitle {
+  margin-top: 6px;
+  font-size: 22px;
+  line-height: 1.2;
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.historyReportClose {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(17, 32, 51, 0.9);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 22px;
+  line-height: 1;
+  transition: border-color 180ms ease, color 180ms ease, background 180ms ease;
+}
+
+.historyReportClose:hover {
+  border-color: rgba(126, 184, 247, 0.26);
+  background: rgba(28, 43, 58, 0.96);
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.historyReportBody {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.historyReportBody::-webkit-scrollbar {
+  width: 6px;
+}
+
+.historyReportBody::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(45, 107, 228, 0.34);
+}
+
+.historyReportHero {
+  display: grid;
+  gap: 10px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(circle at top left, rgba(244, 201, 93, 0.08) 0%, transparent 26%),
+    linear-gradient(180deg, rgba(17, 32, 51, 0.95) 0%, rgba(10, 21, 32, 0.98) 100%);
+  padding: 16px;
+}
+
+.historyReportHeroPill {
+  display: inline-flex;
+  width: fit-content;
+  border-radius: 999px;
+  border: 1px solid rgba(244, 201, 93, 0.18);
+  background: rgba(244, 201, 93, 0.12);
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 235, 190, 0.9);
+}
+
+.historyReportSummary {
+  font-size: 14px;
+  line-height: 1.65;
+  color: rgba(229, 239, 249, 0.76);
+}
+
+.historyReportGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.historyReportCard {
+  display: grid;
+  gap: 10px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(17, 32, 51, 0.92) 0%, rgba(10, 21, 32, 0.98) 100%);
+  padding: 15px;
+}
+
+.historyReportCardTitle {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.48);
+}
+
+.historyReportLead {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.historyReportChipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.historyReportChip {
+  display: inline-flex;
+  border-radius: 999px;
+  border: 1px solid rgba(45, 107, 228, 0.16);
+  background: rgba(45, 107, 228, 0.12);
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(170, 214, 255, 0.92);
+}
+
+.historyReportRecommendationList {
+  display: grid;
+  gap: 8px;
+}
+
+.historyReportRecommendationItem {
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 10px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: rgba(229, 239, 249, 0.78);
+}
+
+.historyReportMuted {
+  font-size: 12px;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.5);
 }
 
 .shellMobileBackdrop {
@@ -2185,7 +2617,7 @@
     left: 0;
     bottom: 0;
     z-index: 20;
-    width: 260px;
+    width: 320px;
     transform: translateX(-100%);
   }
 
@@ -2195,6 +2627,21 @@
 
   .shellContent {
     padding: 14px;
+  }
+
+  .historyReportBackdrop {
+    inset: 56px 0 0 0;
+    justify-content: stretch;
+  }
+
+  .historyReportPanel {
+    width: 100%;
+    padding: 18px 16px 24px;
+  }
+
+  .historyReportGrid,
+  .shellHistoryMetricsGrid {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .wizardPanel {
@@ -2237,6 +2684,18 @@
 @media (max-width: 639px) {
   .shellContent {
     padding: 12px;
+  }
+
+  .shellSidebar {
+    width: min(100vw, 340px);
+  }
+
+  .shellHistoryMetaGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .historyReportTitle {
+    font-size: 20px;
   }
 
   .wizardPanel {

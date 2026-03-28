@@ -11,10 +11,12 @@ import type { SidebarConversationSummary } from "@/components/mvp/MvpShellContex
 import styles from "@/components/mvp/MvpShell.module.css";
 import { ADVISOR_PROFILES } from "@/data/advisors";
 import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
+import { getEmotionalCheckinToday } from "@/lib/api/client";
 import { getConversationMessages } from "@/lib/api/client";
 import { getConversations, postConversation } from "@/lib/api/client";
 import { postAdvisorChat } from "@/lib/api/client";
 import { toUiErrorMessage } from "@/lib/api/errors";
+import type { EmotionalCheckinSummary } from "@/lib/api/types";
 import type { MessageSummary } from "@/lib/api/types";
 import { getCurrentUser, logoutSession } from "@/lib/auth/client";
 
@@ -23,6 +25,43 @@ type AppShellProps = {
 };
 
 const ACTIVE_CONVERSATION_STORAGE_KEY = "mvp-active-conversation-id";
+
+const MOOD_LABELS = ["Muy agotado/a", "Con poco", "Normal", "Bastante bien", "Con fuerza"] as const;
+const CONFIDENCE_LABELS = [
+  "Dudando mucho",
+  "Un poco inseguro/a",
+  "Estable",
+  "Bastante firme",
+  "Muy firme",
+] as const;
+
+type HistorySectionKey = "mood" | "advisor" | "ex";
+
+type SafeConversationEntry = {
+  id: string;
+  timestampLabel: string;
+  timestampRaw: string;
+  kind: "advisor" | "ex_partner";
+  safeTitle: string;
+  safeSummary: string;
+  advisorName?: string | null;
+  originLabel?: string | null;
+  toneLabel?: string | null;
+  riskLabel?: string | null;
+  recommendationLabel?: string | null;
+  topicLabel?: string | null;
+  statusLabel?: string | null;
+  isActive: boolean;
+};
+
+type HistoricalReport = {
+  totalCount: number;
+  predominantTone: string;
+  predominantRisk: string;
+  topTopics: string[];
+  recurringRecommendations: string[];
+  globalSummary: string;
+};
 
 function getAdvisorAvatar(
   advisor: (typeof ADVISOR_PROFILES)[number] | undefined,
@@ -75,11 +114,249 @@ function getConversationMetaLabel(conversation: SidebarConversationSummary) {
   }).format(parsedDate);
 }
 
+function formatHistoryTimestamp(value: string) {
+  const parsedDate = new Date(value);
+  if (Number.isNaN(parsedDate.getTime())) return "Sin fecha";
+  return new Intl.DateTimeFormat("es-UY", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(parsedDate);
+}
+
+function getMoodSummaryLabel(level: number | null | undefined) {
+  return typeof level === "number" ? MOOD_LABELS[level] ?? null : null;
+}
+
+function getConfidenceSummaryLabel(level: number | null | undefined) {
+  return typeof level === "number" ? CONFIDENCE_LABELS[level] ?? null : null;
+}
+
+function getLatestMessageByType(messages: MessageSummary[], messageType: MessageSummary["message_type"]) {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message?.message_type === messageType) {
+      return message;
+    }
+  }
+  return null;
+}
+
+function getSourceTextConversationTitle(sourceText: string) {
+  const normalized = sourceText.toLowerCase();
+  if (!normalized.trim()) return "Intercambio en revision";
+  if (/(gasto|gastos|pago|pagos|dinero|plata|transferencia|cuota|reintegro|deuda)/.test(normalized)) {
+    return "Diferencia por gastos";
+  }
+  if (/(visita|visitas|retiro|entrega|buscar|llevar|fin de semana)/.test(normalized)) {
+    return "Coordinacion sobre visitas";
+  }
+  if (/(horario|horarios|hora|horas|turno|turnos|agenda|calendario)/.test(normalized)) {
+    return "No acuerdo sobre horarios";
+  }
+  if (/(colegio|escuela|medico|doctor|vacuna|rutina|hijo|hija|hijos|familia)/.test(normalized)) {
+    return "Consulta sobre organizacion familiar";
+  }
+  if (/(documento|documentos|permiso|papeles|firma|formulario)/.test(normalized)) {
+    return "Consulta sobre documentacion";
+  }
+  if (/(vacaciones|viaje|viajes)/.test(normalized)) {
+    return "Coordinacion de vacaciones";
+  }
+  return "Tema en revision";
+}
+
+function getSafeTopicLabel(sourceText: string, fallbackTitle: string) {
+  const normalized = `${sourceText}\n${fallbackTitle}`.toLowerCase();
+  if (!normalized.trim()) return "Sin tema claro";
+  if (/(famil|hijo|hija|custodia|coparent|colegio|escuela|medico|vacuna)/.test(normalized)) {
+    return "Tema familiar";
+  }
+  if (/(coordina|horario|agenda|turno|visita|retiro|entrega|fin de semana)/.test(normalized)) {
+    return "Coordinacion";
+  }
+  if (/(gasto|pago|transferencia|cuota|reintegro|documento|permiso|papeles|firma|viaje|vacaciones)/.test(normalized)) {
+    return "Logistica";
+  }
+  if (/(limite|presion|respeto|control|amenaz|agres)/.test(normalized)) {
+    return "Limites";
+  }
+  return "Sin tema claro";
+}
+
+function inferConversationOrigin(sourceText: string, hasReplyDraft: boolean) {
+  const normalized = sourceText.trim();
+  if (!normalized && hasReplyDraft) return "Borrador propio";
+  if (!normalized) return "Texto pegado";
+
+  const lineCount = normalized.split(/\r?\n/).filter((line) => line.trim().length > 0).length;
+  if (/\d{1,2}:\d{2}/.test(normalized) || lineCount >= 5) {
+    return "Captura";
+  }
+  if (lineCount <= 2 && normalized.length <= 220) {
+    return "Texto pegado";
+  }
+  return hasReplyDraft ? "Borrador propio" : "Texto pegado";
+}
+
+function getActionPresentation(actionTitle: string | null) {
+  const normalized = actionTitle?.trim().toLowerCase() ?? "";
+  if (normalized.includes("no responder")) {
+    return {
+      toneLabel: "Pausa estrategica",
+      riskLabel: "Atencion elevada",
+      recommendationLabel: "Mantener distancia y evitar reaccion inmediata.",
+      statusLabel: "Decision tomada",
+    };
+  }
+  if (normalized.includes("breve y neutro")) {
+    return {
+      toneLabel: "Neutral",
+      riskLabel: "Bajo a moderado",
+      recommendationLabel: "Responder solo con hechos y sin abrir frentes nuevos.",
+      statusLabel: "Decision tomada",
+    };
+  }
+  if (normalized.includes("limite")) {
+    return {
+      toneLabel: "Firme",
+      riskLabel: "Moderado",
+      recommendationLabel: "Sostener un limite claro y breve.",
+      statusLabel: "Decision tomada",
+    };
+  }
+  if (normalized.includes("mas tarde")) {
+    return {
+      toneLabel: "Cautela",
+      riskLabel: "Moderado",
+      recommendationLabel: "Esperar a bajar intensidad antes de responder.",
+      statusLabel: "Decision tomada",
+    };
+  }
+  if (normalized.includes("consejero")) {
+    return {
+      toneLabel: "Acompanamiento",
+      riskLabel: "En observacion",
+      recommendationLabel: "Revisar la decision con apoyo externo antes de enviar.",
+      statusLabel: "Acompanado",
+    };
+  }
+  return {
+    toneLabel: "En revision",
+    riskLabel: "Sin clasificar",
+    recommendationLabel: "Volver sobre el caso solo si necesitas contexto.",
+    statusLabel: "En proceso",
+  };
+}
+
+function buildSafeConversationEntry(params: {
+  conversation: SidebarConversationSummary;
+  messages: MessageSummary[];
+  isActive: boolean;
+}): SafeConversationEntry {
+  const { conversation, messages, isActive } = params;
+  const sourceMessage = getLatestMessageByType(messages, "source_text");
+  const analysisAction = getLatestMessageByType(messages, "analysis_action");
+  const selectedReply = getLatestMessageByType(messages, "selected_reply");
+  const actionPresentation = getActionPresentation(analysisAction?.content ?? null);
+  const safeTimestamp = formatHistoryTimestamp(conversation.lastMessageAt);
+
+  if (conversation.advisorId) {
+    const advisor = ADVISOR_PROFILES.find((profile) => profile.id === conversation.advisorId);
+    return {
+      id: conversation.id,
+      timestampLabel: safeTimestamp,
+      timestampRaw: conversation.lastMessageAt,
+      kind: "advisor",
+      safeTitle: `Sesion con ${advisor?.name ?? "consejero"}`,
+      safeSummary: selectedReply
+        ? "Quedo una respuesta afinada con acompanamiento, sin exponer el chat completo."
+        : analysisAction
+          ? "Se reviso una decision estrategica con apoyo guiado."
+          : "Conversacion de apoyo para ordenar la situacion.",
+      advisorName: advisor?.name ?? "Consejero",
+      toneLabel: actionPresentation.toneLabel,
+      riskLabel: actionPresentation.riskLabel,
+      recommendationLabel: actionPresentation.recommendationLabel,
+      statusLabel: actionPresentation.statusLabel,
+      isActive,
+    };
+  }
+
+  const sourceText = sourceMessage?.content ?? "";
+  return {
+    id: conversation.id,
+    timestampLabel: safeTimestamp,
+    timestampRaw: conversation.lastMessageAt,
+    kind: "ex_partner",
+    safeTitle: getSourceTextConversationTitle(sourceText || conversation.title),
+    safeSummary: selectedReply
+      ? "Se trabajo una respuesta sugerida y quedo guardada para revisarla con calma."
+      : analysisAction
+        ? "Ya hay una accion elegida para responder con estrategia."
+        : "Quedo un intercambio registrado para revisar sin mostrar texto literal.",
+    originLabel: inferConversationOrigin(sourceText, Boolean(selectedReply)),
+    toneLabel: actionPresentation.toneLabel,
+    riskLabel: actionPresentation.riskLabel,
+    recommendationLabel: actionPresentation.recommendationLabel,
+    topicLabel: getSafeTopicLabel(sourceText, conversation.title),
+    statusLabel: actionPresentation.statusLabel,
+    isActive,
+  };
+}
+
+function pickMostFrequent(values: Array<string | null | undefined>, fallback: string) {
+  const counts = new Map<string, number>();
+  for (const value of values) {
+    const normalized = value?.trim();
+    if (!normalized) continue;
+    counts.set(normalized, (counts.get(normalized) ?? 0) + 1);
+  }
+  const sorted = [...counts.entries()].sort((left, right) => right[1] - left[1]);
+  return sorted[0]?.[0] ?? fallback;
+}
+
+function buildHistoricalReport(entries: SafeConversationEntry[]): HistoricalReport | null {
+  if (entries.length === 0) return null;
+
+  const topTopics = [...new Map(
+    entries
+      .filter((entry) => entry.topicLabel)
+      .map((entry) => [entry.topicLabel as string, true]),
+  ).keys()].slice(0, 3);
+  const recurringRecommendations = [...new Map(
+    entries
+      .filter((entry) => entry.recommendationLabel)
+      .map((entry) => [entry.recommendationLabel as string, true]),
+  ).keys()].slice(0, 3);
+  const predominantTone = pickMostFrequent(
+    entries.map((entry) => entry.toneLabel),
+    "En revision",
+  );
+  const predominantRisk = pickMostFrequent(
+    entries.map((entry) => entry.riskLabel),
+    "Sin clasificar",
+  );
+  const latestTimestamp = entries[0]?.timestampLabel ?? "sin fecha reciente";
+  const leadingTopic = topTopics[0] ?? "temas en revision";
+
+  return {
+    totalCount: entries.length,
+    predominantTone,
+    predominantRisk,
+    topTopics,
+    recurringRecommendations,
+    globalSummary: `ExReply ya registra ${entries.length} intercambio(s) revisado(s). Predominan ${leadingTopic.toLowerCase()} y un tono ${predominantTone.toLowerCase()}. Ultima actividad util: ${latestTimestamp}.`,
+  };
+}
+
 export function AppShell({ children }: AppShellProps) {
   const router = useRouter();
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const advisorDropdownRef = useRef<HTMLDivElement | null>(null);
   const createConversationPromiseRef = useRef<Promise<SidebarConversationSummary | null> | null>(null);
+  const prefetchedConversationIdsRef = useRef<Set<string>>(new Set());
   const [menuOpen, setMenuOpen] = useState(false);
   const [advisorMenuOpen, setAdvisorMenuOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -98,6 +375,15 @@ export function AppShell({ children }: AppShellProps) {
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [activeConversationMessages, setActiveConversationMessages] = useState<MessageSummary[]>([]);
   const [activeConversationMessagesLoading, setActiveConversationMessagesLoading] = useState(false);
+  const [conversationMessagesById, setConversationMessagesById] = useState<Record<string, MessageSummary[]>>({});
+  const [todayCheckin, setTodayCheckin] = useState<EmotionalCheckinSummary | null>(null);
+  const [historyReportOpen, setHistoryReportOpen] = useState(false);
+  const [historyExpanded, setHistoryExpanded] = useState(true);
+  const [sectionExpanded, setSectionExpanded] = useState<Record<HistorySectionKey, boolean>>({
+    mood: true,
+    advisor: true,
+    ex: true,
+  });
   const [shellFetchNotice, setShellFetchNotice] = useState<string | null>(null);
   const speechSynthesis = useSpeechSynthesis({ lang: "es-ES" });
 
@@ -130,6 +416,22 @@ export function AppShell({ children }: AppShellProps) {
       .finally(() => {
         if (!mounted) return;
         setConversationsLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    void getEmotionalCheckinToday()
+      .then((response) => {
+        if (!mounted) return;
+        setTodayCheckin(response.today_checkin ?? null);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setTodayCheckin(null);
       });
     return () => {
       mounted = false;
@@ -191,6 +493,42 @@ export function AppShell({ children }: AppShellProps) {
   const sidebarConversation = activeConversation ?? visibleConversations[0] ?? null;
 
   useEffect(() => {
+    let cancelled = false;
+    const prefetchedIds = prefetchedConversationIdsRef.current;
+    const targets = visibleConversations
+      .filter((conversation) => hasUsefulConversationContent(conversation))
+      .filter((conversation) => conversation.id !== activeConversationId)
+      .filter((conversation) => conversationMessagesById[conversation.id] === undefined)
+      .filter((conversation) => !prefetchedIds.has(conversation.id));
+
+    targets.forEach((conversation) => {
+      prefetchedIds.add(conversation.id);
+      void getConversationMessages(conversation.id)
+        .then((response) => {
+          if (cancelled) return;
+          setConversationMessagesById((previous) => ({
+            ...previous,
+            [conversation.id]: response.messages,
+          }));
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setConversationMessagesById((previous) => ({
+            ...previous,
+            [conversation.id]: [],
+          }));
+        })
+        .finally(() => {
+          prefetchedIds.delete(conversation.id);
+        });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeConversationId, conversationMessagesById, visibleConversations]);
+
+  useEffect(() => {
     if (typeof window === "undefined") return;
     if (!activeConversationId) {
       window.sessionStorage.removeItem(ACTIVE_CONVERSATION_STORAGE_KEY);
@@ -249,6 +587,14 @@ export function AppShell({ children }: AppShellProps) {
     };
   }, [activeConversationId]);
 
+  useEffect(() => {
+    if (!activeConversationId) return;
+    setConversationMessagesById((previous) => ({
+      ...previous,
+      [activeConversationId]: activeConversationMessages,
+    }));
+  }, [activeConversationId, activeConversationMessages]);
+
   const initials = useMemo(() => {
     const parts = displayName
       .split(" ")
@@ -257,6 +603,71 @@ export function AppShell({ children }: AppShellProps) {
     if (parts.length === 0) return "U";
     return parts.map((part) => part[0]!.toUpperCase()).join("");
   }, [displayName]);
+
+  const moodHistoryItems = useMemo(() => {
+    if (!todayCheckin) return [];
+    return [
+      {
+        id: todayCheckin.id,
+        timestampLabel: formatHistoryTimestamp(todayCheckin.created_at),
+        moodLabel: getMoodSummaryLabel(todayCheckin.mood_level) ?? "Sin definir",
+        confidenceLabel: getConfidenceSummaryLabel(todayCheckin.confidence_level) ?? "Sin definir",
+        recentContactLabel: todayCheckin.recent_contact ? "Si" : "No",
+      },
+    ];
+  }, [todayCheckin]);
+
+  const historicalEntries = useMemo(
+    () =>
+      visibleConversations
+        .filter((conversation) => hasUsefulConversationContent(conversation))
+        .map((conversation) =>
+          buildSafeConversationEntry({
+            conversation,
+            messages:
+              conversation.id === activeConversationId
+                ? activeConversationMessages
+                : (conversationMessagesById[conversation.id] ?? []),
+            isActive: conversation.id === activeConversationId,
+          }),
+        )
+        .sort((left, right) => right.timestampRaw.localeCompare(left.timestampRaw)),
+    [activeConversationId, activeConversationMessages, conversationMessagesById, visibleConversations],
+  );
+
+  const advisorHistoryEntries = useMemo(
+    () => historicalEntries.filter((entry) => entry.kind === "advisor"),
+    [historicalEntries],
+  );
+
+  const exPartnerHistoryEntries = useMemo(
+    () => historicalEntries.filter((entry) => entry.kind === "ex_partner"),
+    [historicalEntries],
+  );
+
+  const historicalReport = useMemo(
+    () => buildHistoricalReport(exPartnerHistoryEntries),
+    [exPartnerHistoryEntries],
+  );
+
+  function toggleHistorySection(section: HistorySectionKey) {
+    setSectionExpanded((previous) => ({
+      ...previous,
+      [section]: !previous[section],
+    }));
+  }
+
+  function handleSelectHistoryConversation(conversationId: string) {
+    setActiveConversationId(conversationId);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("mvp:conversation-selected", {
+          detail: { conversationId },
+        }),
+      );
+    }
+    if (!isDesktop) setSidebarOpen(false);
+  }
 
   const findReusableDraftConversation = useCallback(
     (advisorId?: string | null) =>
@@ -599,10 +1010,10 @@ export function AppShell({ children }: AppShellProps) {
 
         <aside
           className={`${styles.shellSidebar} ${sidebarOpen ? styles.shellSidebarExpanded : ""}`}
-          aria-label="Conversaciones"
+          aria-label="Historico"
         >
           <div className={styles.shellSidebarHeader}>
-            {sidebarOpen ? <span className={styles.shellSidebarTitle}>Conversaciones</span> : <span />}
+            {sidebarOpen ? <span className={styles.shellSidebarTitle}>Historico</span> : <span />}
             <button
               type="button"
               className={styles.shellSidebarToggle}
@@ -652,7 +1063,191 @@ export function AppShell({ children }: AppShellProps) {
                 {shellFetchNotice ? <p className={styles.shellSidebarEmpty}>{shellFetchNotice}</p> : null}
                 {conversationsLoading ? (
                   <p className={styles.shellSidebarEmpty}>Cargando conversaciones...</p>
-                ) : visibleConversations.length > 0 ? (
+                ) : historicalEntries.length > 0 || moodHistoryItems.length > 0 ? (
+                  <div className={styles.shellHistoryList}>
+                    <section className={styles.shellHistorySection}>
+                      <button
+                        type="button"
+                        className={styles.shellHistorySectionToggle}
+                        onClick={() => setHistoryExpanded((previous) => !previous)}
+                        aria-expanded={historyExpanded}
+                      >
+                        <span className={styles.shellHistorySectionHeading}>Historico</span>
+                        <span className={styles.shellHistorySectionMeta}>
+                          {historicalEntries.length + moodHistoryItems.length} registro(s)
+                        </span>
+                      </button>
+
+                      {historyExpanded ? (
+                        <div className={styles.shellHistorySectionBody}>
+                          <div className={styles.shellHistorySubsection}>
+                            <button
+                              type="button"
+                              className={styles.shellHistorySubsectionToggle}
+                              onClick={() => toggleHistorySection("mood")}
+                              aria-expanded={sectionExpanded.mood}
+                            >
+                              <span>Estado de animo</span>
+                              <span className={styles.shellHistoryCountPill}>{moodHistoryItems.length}</span>
+                            </button>
+                            {sectionExpanded.mood ? (
+                              moodHistoryItems.length > 0 ? (
+                                <div className={styles.shellHistoryItemList}>
+                                  {moodHistoryItems.map((item) => (
+                                    <article key={item.id} className={styles.shellHistoryItem}>
+                                      <div className={styles.shellHistoryItemHeader}>
+                                        <p className={styles.shellHistoryItemTitle}>Check-in diario</p>
+                                        <span className={styles.shellHistoryItemTimestamp}>{item.timestampLabel}</span>
+                                      </div>
+                                      <div className={styles.shellHistoryMetricsGrid}>
+                                        <div className={styles.shellHistoryMetric}>
+                                          <span className={styles.shellHistoryMetricLabel}>Animo</span>
+                                          <span className={styles.shellHistoryMetricValue}>{item.moodLabel}</span>
+                                        </div>
+                                        <div className={styles.shellHistoryMetric}>
+                                          <span className={styles.shellHistoryMetricLabel}>Confianza</span>
+                                          <span className={styles.shellHistoryMetricValue}>{item.confidenceLabel}</span>
+                                        </div>
+                                        <div className={styles.shellHistoryMetric}>
+                                          <span className={styles.shellHistoryMetricLabel}>Contacto reciente</span>
+                                          <span className={styles.shellHistoryMetricValue}>{item.recentContactLabel}</span>
+                                        </div>
+                                      </div>
+                                    </article>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className={styles.shellSidebarEmpty}>Todavia no hay check-ins guardados.</p>
+                              )
+                            ) : null}
+                          </div>
+
+                          <div className={styles.shellHistorySubsection}>
+                            <button
+                              type="button"
+                              className={styles.shellHistorySubsectionToggle}
+                              onClick={() => toggleHistorySection("advisor")}
+                              aria-expanded={sectionExpanded.advisor}
+                            >
+                              <span>Conversaciones con consejeros</span>
+                              <span className={styles.shellHistoryCountPill}>{advisorHistoryEntries.length}</span>
+                            </button>
+                            {sectionExpanded.advisor ? (
+                              advisorHistoryEntries.length > 0 ? (
+                                <div className={styles.shellHistoryItemList}>
+                                  {advisorHistoryEntries.map((entry) => (
+                                    <button
+                                      key={entry.id}
+                                      type="button"
+                                      className={`${styles.shellHistoryItemButton} ${
+                                        entry.isActive ? styles.shellHistoryItemButtonActive : ""
+                                      }`}
+                                      onClick={() => handleSelectHistoryConversation(entry.id)}
+                                    >
+                                      <div className={styles.shellHistoryItemHeader}>
+                                        <div>
+                                          <p className={styles.shellHistoryItemTitle}>{entry.safeTitle}</p>
+                                          <p className={styles.shellHistoryItemTimestamp}>{entry.timestampLabel}</p>
+                                        </div>
+                                        {entry.isActive ? (
+                                          <span className={styles.shellSessionBadge}>Activa</span>
+                                        ) : null}
+                                      </div>
+                                      <div className={styles.shellHistoryTagRow}>
+                                        <span className={styles.shellHistoryTag}>Consejero: {entry.advisorName}</span>
+                                        {entry.statusLabel ? (
+                                          <span className={styles.shellHistoryTagMuted}>{entry.statusLabel}</span>
+                                        ) : null}
+                                      </div>
+                                      <p className={styles.shellHistoryItemSummary}>{entry.safeSummary}</p>
+                                    </button>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className={styles.shellSidebarEmpty}>
+                                  Todavia no hay conversaciones guiadas para mostrar.
+                                </p>
+                              )
+                            ) : null}
+                          </div>
+
+                          <div className={styles.shellHistorySubsection}>
+                            <button
+                              type="button"
+                              className={styles.shellHistorySubsectionToggle}
+                              onClick={() => toggleHistorySection("ex")}
+                              aria-expanded={sectionExpanded.ex}
+                            >
+                              <span>Conversaciones con expareja</span>
+                              <span className={styles.shellHistoryCountPill}>{exPartnerHistoryEntries.length}</span>
+                            </button>
+                            {sectionExpanded.ex ? (
+                              exPartnerHistoryEntries.length > 0 ? (
+                                <>
+                                  <div className={styles.shellHistoryItemList}>
+                                    {exPartnerHistoryEntries.map((entry) => (
+                                      <button
+                                        key={entry.id}
+                                        type="button"
+                                        className={`${styles.shellHistoryItemButton} ${
+                                          entry.isActive ? styles.shellHistoryItemButtonActive : ""
+                                        }`}
+                                        onClick={() => handleSelectHistoryConversation(entry.id)}
+                                      >
+                                        <div className={styles.shellHistoryItemHeader}>
+                                          <div>
+                                            <p className={styles.shellHistoryItemTitle}>{entry.safeTitle}</p>
+                                            <p className={styles.shellHistoryItemTimestamp}>{entry.timestampLabel}</p>
+                                          </div>
+                                          {entry.isActive ? (
+                                            <span className={styles.shellSessionBadge}>Activa</span>
+                                          ) : null}
+                                        </div>
+                                        <div className={styles.shellHistoryTagRow}>
+                                          {entry.originLabel ? (
+                                            <span className={styles.shellHistoryTag}>Origen: {entry.originLabel}</span>
+                                          ) : null}
+                                          {entry.topicLabel ? (
+                                            <span className={styles.shellHistoryTagMuted}>{entry.topicLabel}</span>
+                                          ) : null}
+                                        </div>
+                                        <p className={styles.shellHistoryItemSummary}>{entry.safeSummary}</p>
+                                        <div className={styles.shellHistoryMetaGrid}>
+                                          <div className={styles.shellHistoryMetaItem}>
+                                            <span className={styles.shellHistoryMetaLabel}>Tono</span>
+                                            <span className={styles.shellHistoryMetaValue}>{entry.toneLabel}</span>
+                                          </div>
+                                          <div className={styles.shellHistoryMetaItem}>
+                                            <span className={styles.shellHistoryMetaLabel}>Riesgo</span>
+                                            <span className={styles.shellHistoryMetaValue}>{entry.riskLabel}</span>
+                                          </div>
+                                        </div>
+                                        {entry.recommendationLabel ? (
+                                          <p className={styles.shellHistoryRecommendation}>{entry.recommendationLabel}</p>
+                                        ) : null}
+                                      </button>
+                                    ))}
+                                  </div>
+                                  <button
+                                    type="button"
+                                    className={styles.shellHistoryReportButton}
+                                    onClick={() => setHistoryReportOpen(true)}
+                                  >
+                                    Ver informe historico
+                                  </button>
+                                </>
+                              ) : (
+                                <p className={styles.shellSidebarEmpty}>
+                                  Todavia no hay intercambios con expareja listos para resumir.
+                                </p>
+                              )
+                            ) : null}
+                          </div>
+                        </div>
+                      ) : null}
+                    </section>
+                  </div>
+                ) : false ? (
                   <div className={styles.shellSessionList}>
                     {visibleConversations.map((conversation) => {
                       const isActive = conversation.id === activeConversationId;
@@ -699,6 +1294,90 @@ export function AppShell({ children }: AppShellProps) {
 
         <section className={styles.shellContent}>{children}</section>
       </div>
+
+      {historyReportOpen ? (
+        <div className={styles.historyReportBackdrop} role="presentation" onClick={() => setHistoryReportOpen(false)}>
+          <section
+            className={styles.historyReportPanel}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="historical-report-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className={styles.historyReportHeader}>
+              <div>
+                <p className={styles.historyReportEyebrow}>Informe historico</p>
+                <h2 id="historical-report-title" className={styles.historyReportTitle}>
+                  Interacciones consolidadas con expareja
+                </h2>
+              </div>
+              <button
+                type="button"
+                className={styles.historyReportClose}
+                aria-label="Cerrar informe historico"
+                onClick={() => setHistoryReportOpen(false)}
+              >
+                ×
+              </button>
+            </div>
+
+            {historicalReport ? (
+              <div className={styles.historyReportBody}>
+                <div className={styles.historyReportHero}>
+                  <span className={styles.historyReportHeroPill}>{historicalReport.totalCount} caso(s) utiles</span>
+                  <p className={styles.historyReportSummary}>{historicalReport.globalSummary}</p>
+                </div>
+
+                <div className={styles.historyReportGrid}>
+                  <article className={styles.historyReportCard}>
+                    <p className={styles.historyReportCardTitle}>Temas frecuentes</p>
+                    <div className={styles.historyReportChipRow}>
+                      {historicalReport.topTopics.length > 0 ? (
+                        historicalReport.topTopics.map((topic) => (
+                          <span key={topic} className={styles.historyReportChip}>
+                            {topic}
+                          </span>
+                        ))
+                      ) : (
+                        <span className={styles.historyReportMuted}>Sin patron suficiente aun.</span>
+                      )}
+                    </div>
+                  </article>
+
+                  <article className={styles.historyReportCard}>
+                    <p className={styles.historyReportCardTitle}>Tono habitual</p>
+                    <p className={styles.historyReportLead}>{historicalReport.predominantTone}</p>
+                    <p className={styles.historyReportMuted}>Etiqueta consolidada sin exponer mensajes literales.</p>
+                  </article>
+
+                  <article className={styles.historyReportCard}>
+                    <p className={styles.historyReportCardTitle}>Riesgo predominante</p>
+                    <p className={styles.historyReportLead}>{historicalReport.predominantRisk}</p>
+                    <p className={styles.historyReportMuted}>Sirve para orientar la revision, no como diagnostico final.</p>
+                  </article>
+
+                  <article className={styles.historyReportCard}>
+                    <p className={styles.historyReportCardTitle}>Recomendaciones recurrentes</p>
+                    <div className={styles.historyReportRecommendationList}>
+                      {historicalReport.recurringRecommendations.length > 0 ? (
+                        historicalReport.recurringRecommendations.map((recommendation) => (
+                          <p key={recommendation} className={styles.historyReportRecommendationItem}>
+                            {recommendation}
+                          </p>
+                        ))
+                      ) : (
+                        <p className={styles.historyReportMuted}>Aun no hay recomendaciones repetidas para destacar.</p>
+                      )}
+                    </div>
+                  </article>
+                </div>
+              </div>
+            ) : (
+              <p className={styles.shellSidebarEmpty}>Todavia no hay historial suficiente para consolidar.</p>
+            )}
+          </section>
+        </div>
+      ) : null}
 
       <AdvisorChatModal
         isOpen={advisorChatOpen}
