@@ -22,6 +22,8 @@ type AppShellProps = {
   children: ReactNode;
 };
 
+const ACTIVE_CONVERSATION_STORAGE_KEY = "mvp-active-conversation-id";
+
 function getAdvisorAvatar(
   advisor: (typeof ADVISOR_PROFILES)[number] | undefined,
   variant: "64" | "128",
@@ -96,6 +98,7 @@ export function AppShell({ children }: AppShellProps) {
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [activeConversationMessages, setActiveConversationMessages] = useState<MessageSummary[]>([]);
   const [activeConversationMessagesLoading, setActiveConversationMessagesLoading] = useState(false);
+  const [shellFetchNotice, setShellFetchNotice] = useState<string | null>(null);
   const speechSynthesis = useSpeechSynthesis({ lang: "es-ES" });
 
   useEffect(() => {
@@ -117,10 +120,12 @@ export function AppShell({ children }: AppShellProps) {
       .then((response) => {
         if (!mounted) return;
         setConversations(response.conversations.map(mapConversationSummary));
+        setShellFetchNotice(null);
       })
-      .catch(() => {
+      .catch((error) => {
         if (!mounted) return;
         setConversations([]);
+        setShellFetchNotice(toUiErrorMessage(error, "No pudimos sincronizar las conversaciones por ahora."));
       })
       .finally(() => {
         if (!mounted) return;
@@ -186,6 +191,34 @@ export function AppShell({ children }: AppShellProps) {
   const sidebarConversation = activeConversation ?? visibleConversations[0] ?? null;
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!activeConversationId) {
+      window.sessionStorage.removeItem(ACTIVE_CONVERSATION_STORAGE_KEY);
+      return;
+    }
+    const persistedConversation = conversations.find((conversation) => conversation.id === activeConversationId) ?? null;
+    if (!persistedConversation || !hasUsefulConversationContent(persistedConversation)) {
+      window.sessionStorage.removeItem(ACTIVE_CONVERSATION_STORAGE_KEY);
+      return;
+    }
+    window.sessionStorage.setItem(ACTIVE_CONVERSATION_STORAGE_KEY, activeConversationId);
+  }, [activeConversationId, conversations]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (activeConversationId || conversations.length === 0) return;
+    const storedConversationId = window.sessionStorage.getItem(ACTIVE_CONVERSATION_STORAGE_KEY);
+    if (!storedConversationId) return;
+    const persistedConversation =
+      conversations.find((conversation) => conversation.id === storedConversationId) ?? null;
+    if (!persistedConversation || !hasUsefulConversationContent(persistedConversation)) {
+      window.sessionStorage.removeItem(ACTIVE_CONVERSATION_STORAGE_KEY);
+      return;
+    }
+    setActiveConversationId(persistedConversation.id);
+  }, [activeConversationId, conversations]);
+
+  useEffect(() => {
     if (!activeConversationId) {
       setActiveConversationMessages([]);
       setActiveConversationMessagesLoading(false);
@@ -198,11 +231,13 @@ export function AppShell({ children }: AppShellProps) {
       .then((response) => {
         if (cancelled) return;
         setActiveConversationMessages(response.messages);
+        setShellFetchNotice(null);
       })
       .catch((error) => {
         if (cancelled) return;
         console.error("conversation_messages_load_failed", error);
         setActiveConversationMessages([]);
+        setShellFetchNotice(toUiErrorMessage(error, "No pudimos cargar el detalle de la conversación."));
       })
       .finally(() => {
         if (cancelled) return;
@@ -273,6 +308,25 @@ export function AppShell({ children }: AppShellProps) {
   const updateSidebarConversation = useCallback((conversation: SidebarConversationSummary) => {
     setConversations((previous) =>
       previous.map((item) => (item.id === conversation.id ? { ...item, ...conversation } : item)),
+    );
+  }, []);
+
+  const upsertActiveConversationMessage = useCallback((message: MessageSummary) => {
+    setActiveConversationMessages((previous) => {
+      const nextMessages = previous.filter((item) => item.id !== message.id);
+      nextMessages.push(message);
+      nextMessages.sort((left, right) => left.created_at.localeCompare(right.created_at));
+      return nextMessages;
+    });
+    setConversations((previous) =>
+      previous.map((conversation) =>
+        conversation.id === message.conversation_id
+          ? {
+              ...conversation,
+              lastMessageAt: message.created_at,
+            }
+          : conversation,
+      ),
     );
   }, []);
 
@@ -417,6 +471,7 @@ export function AppShell({ children }: AppShellProps) {
         ensureActiveConversation,
         createSidebarConversation,
         updateSidebarConversation,
+        upsertActiveConversationMessage,
         setActiveConversationId,
         openAdvisorConversation,
       }}
@@ -579,13 +634,12 @@ export function AppShell({ children }: AppShellProps) {
                   type="button"
                   className={styles.shellNewConversation}
                   onClick={() => {
-                    void createSidebarConversation().then((created) => {
-                      if (!created) return;
-                      if (typeof window !== "undefined") {
-                        window.dispatchEvent(new Event("mvp:new-conversation"));
-                      }
-                      if (!isDesktop) setSidebarOpen(false);
-                    });
+                    setActiveConversationId(null);
+                    if (typeof window !== "undefined") {
+                      window.sessionStorage.removeItem(ACTIVE_CONVERSATION_STORAGE_KEY);
+                      window.dispatchEvent(new Event("mvp:new-conversation"));
+                    }
+                    if (!isDesktop) setSidebarOpen(false);
                   }}
                 >
                   <span className={styles.shellNewConversationIcon} aria-hidden="true">
@@ -595,6 +649,7 @@ export function AppShell({ children }: AppShellProps) {
                 </button>
               </div>
               <div className={styles.shellSidebarBody}>
+                {shellFetchNotice ? <p className={styles.shellSidebarEmpty}>{shellFetchNotice}</p> : null}
                 {conversationsLoading ? (
                   <p className={styles.shellSidebarEmpty}>Cargando conversaciones...</p>
                 ) : visibleConversations.length > 0 ? (

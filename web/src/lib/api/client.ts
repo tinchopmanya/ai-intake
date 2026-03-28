@@ -155,12 +155,7 @@ export function patchCase(caseId: string, payload: CaseUpdateRequest): Promise<C
 }
 
 export function getConversations(): Promise<ConversationListResponse> {
-  return getJson<ConversationListResponse>("/v1/conversations").catch((error) => {
-    if (isNetworkUnavailableError(error)) {
-      return { conversations: [] };
-    }
-    throw error;
-  });
+  return getJson<ConversationListResponse>("/v1/conversations");
 }
 
 export function postConversation(payload: ConversationCreateRequest = {}): Promise<ConversationSummary> {
@@ -195,12 +190,7 @@ export function postMessage(payload: MessageCreateRequest): Promise<MessageSumma
 }
 
 export function getConversationMessages(conversationId: string): Promise<MessageListResponse> {
-  return getJson<MessageListResponse>(`/v1/conversations/${conversationId}/messages`).catch((error) => {
-    if (isNetworkUnavailableError(error)) {
-      return { messages: [] };
-    }
-    throw error;
-  });
+  return getJson<MessageListResponse>(`/v1/conversations/${conversationId}/messages`);
 }
 
 export function postIncident(payload: IncidentCreateRequest): Promise<IncidentSummary> {

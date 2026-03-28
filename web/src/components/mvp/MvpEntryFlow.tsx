@@ -34,6 +34,7 @@ type CheckinOption = {
 };
 
 const DEFAULT_ADVISOR_STORAGE_KEY = "exreply-default-advisor-id";
+const WIZARD_VIEW_STORAGE_KEY = "mvp-wizard-view";
 
 const DAILY_MOOD_OPTIONS: CheckinOption[] = [
   { value: 0, label: "Muy agotado/a" },
@@ -299,7 +300,7 @@ export function MvpEntryFlow() {
   const [resumeState, setResumeState] = useState<ConversationResumeState | null>(null);
   const [historyPanelOpen, setHistoryPanelOpen] = useState(false);
   const [checkinModalOpen, setCheckinModalOpen] = useState(false);
-  const [checkinDismissedForVisit, setCheckinDismissedForVisit] = useState(false);
+  const [, setCheckinDismissedForVisit] = useState(false);
   const [checkinSubmitting, setCheckinSubmitting] = useState(false);
   const [checkinError, setCheckinError] = useState<string | null>(null);
   const [todayCheckin, setTodayCheckin] = useState<EmotionalCheckinSummary | null>(null);
@@ -330,25 +331,29 @@ export function MvpEntryFlow() {
         const existingCheckin = response.today_checkin ?? null;
         setTodayCheckin(existingCheckin);
         syncCheckinDrafts(existingCheckin);
-        setCheckinModalOpen(!checkinDismissedForVisit);
+        setCheckinModalOpen(true);
       } catch {
         if (!mounted) return;
         syncCheckinDrafts(null);
-        setCheckinModalOpen(!checkinDismissedForVisit);
+        setCheckinModalOpen(true);
       }
     }
     void loadTodayCheckin();
     return () => {
       mounted = false;
     };
-  }, [checkinDismissedForVisit]);
+  }, []);
 
   useEffect(() => {
     function handleNewConversation() {
       setSelectorIntent(null);
       setHistoryPanelOpen(false);
       setResumeState(null);
+      setPreferredAdvisorId(null);
       setView("entry");
+      if (typeof window !== "undefined") {
+        window.sessionStorage.removeItem(WIZARD_VIEW_STORAGE_KEY);
+      }
     }
 
     window.addEventListener("mvp:new-conversation", handleNewConversation);
@@ -362,7 +367,11 @@ export function MvpEntryFlow() {
       setSelectorIntent(null);
       setHistoryPanelOpen(false);
       setResumeState(null);
+      setPreferredAdvisorId(null);
       setView("entry");
+      if (typeof window !== "undefined") {
+        window.sessionStorage.removeItem(WIZARD_VIEW_STORAGE_KEY);
+      }
     }
 
     window.addEventListener("mvp:conversation-selected", handleConversationSelected);
@@ -426,6 +435,36 @@ export function MvpEntryFlow() {
     setHistoryPanelOpen(false);
   }, [activeConversation?.id]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (view === "wizard") {
+      window.sessionStorage.setItem(WIZARD_VIEW_STORAGE_KEY, "wizard");
+      return;
+    }
+    window.sessionStorage.removeItem(WIZARD_VIEW_STORAGE_KEY);
+  }, [view]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (view !== "entry" || selectorIntent || activeConversationMessagesLoading) return;
+    if (window.sessionStorage.getItem(WIZARD_VIEW_STORAGE_KEY) !== "wizard") return;
+    if (!activeConversation || !activeConversationResume) {
+      if (!activeConversationMessagesLoading) {
+        window.sessionStorage.removeItem(WIZARD_VIEW_STORAGE_KEY);
+      }
+      return;
+    }
+    enterWizard(activeConversation.advisorId ?? null, {
+      resumeState: activeConversationResume,
+    });
+  }, [
+    activeConversation,
+    activeConversationMessagesLoading,
+    activeConversationResume,
+    selectorIntent,
+    view,
+  ]);
+
   function openSelector(intent: SelectorIntent) {
     setResumeState(null);
     const storedAdvisorId = readStoredAdvisorId();
@@ -482,6 +521,9 @@ export function MvpEntryFlow() {
     setPreferredAdvisorId(null);
     setSelectorIntent(null);
     setView("entry");
+    if (typeof window !== "undefined") {
+      window.sessionStorage.removeItem(WIZARD_VIEW_STORAGE_KEY);
+    }
   }
 
   function handleResumeConversation() {

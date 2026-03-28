@@ -630,7 +630,10 @@
   position: relative;
   width: min(100%, 860px);
   max-height: min(calc(100vh - 88px), 620px);
-  overflow-y: auto;
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
   border-radius: 28px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background:
@@ -701,9 +704,15 @@
 
 .checkinBody {
   display: grid;
+  min-height: 0;
+  flex: 1;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
   margin-top: 14px;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(126, 184, 247, 0.3) transparent;
 }
 
 .checkinQuestionBlock {
@@ -896,12 +905,16 @@
 .checkinActions {
   display: flex;
   flex-wrap: wrap;
+  flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
   margin-top: 12px;
   padding-top: 10px;
+  padding-bottom: max(4px, env(safe-area-inset-bottom));
   border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(13, 24, 37, 0) 0%, rgba(13, 24, 37, 0.88) 22%, rgba(10, 21, 32, 0.98) 100%);
 }
 
 .checkinPrimary {
@@ -1314,7 +1327,7 @@
   .checkinModal {
     max-height: calc(100vh - 72px);
     border-radius: 22px;
-    padding: 18px 16px 18px;
+    padding: 18px 16px 14px;
   }
 
   .checkinHeader {

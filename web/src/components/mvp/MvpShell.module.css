@@ -1136,8 +1136,10 @@
   min-height: 0;
   flex: 1;
   flex-direction: column;
+  align-items: stretch;
   gap: 10px;
   overflow-y: auto;
+  overflow-x: hidden;
   max-height: min(47vh, 438px);
   min-height: 188px;
   border-radius: 22px;
@@ -1183,8 +1185,10 @@
 
 .wizardBubble {
   position: relative;
+  min-width: 0;
+  align-self: flex-start;
   width: min(100%, 820px);
-  max-width: 94%;
+  max-width: min(94%, 820px);
   display: grid;
   gap: 9px;
   border-radius: 24px;
@@ -1207,6 +1211,7 @@
 
 .wizardBubbleIncoming {
   margin-right: auto;
+  align-self: flex-start;
   background:
     radial-gradient(circle at top left, rgba(126, 184, 247, 0.12) 0%, transparent 24%),
     linear-gradient(180deg, rgba(18, 34, 52, 0.98) 0%, rgba(10, 21, 32, 0.99) 100%);
@@ -1221,6 +1226,7 @@
 
 .wizardBubbleOutgoing {
   margin-left: auto;
+  align-self: flex-end;
   background:
     radial-gradient(circle at top left, rgba(255, 246, 208, 0.46) 0%, transparent 24%),
     linear-gradient(180deg, rgba(245, 210, 112, 0.98) 0%, rgba(227, 187, 84, 0.96) 100%);
@@ -1236,6 +1242,7 @@
 
 .wizardBubbleUnknown {
   margin-right: auto;
+  align-self: flex-start;
   background:
     radial-gradient(circle at top left, rgba(171, 187, 216, 0.18) 0%, transparent 26%),
     linear-gradient(180deg, rgba(78, 92, 117, 0.92) 0%, rgba(53, 65, 84, 0.98) 100%);
@@ -1250,8 +1257,10 @@
 
 .wizardBubbleHeader {
   display: flex;
+  min-width: 0;
   align-items: flex-start;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
@@ -1286,6 +1295,7 @@
 
 .wizardSpeakerSwitch {
   display: inline-flex;
+  max-width: 100%;
   align-items: center;
   flex-wrap: wrap;
   justify-content: flex-end;
@@ -1326,6 +1336,8 @@
 
 .wizardBubbleTextarea {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   resize: none;
   overflow-y: hidden;
   border: 0;
@@ -1337,6 +1349,8 @@
   line-height: 1.58;
   font-size: 13.5px;
   caret-color: rgba(255, 255, 255, 0.94);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .wizardBubbleTextarea::placeholder {
@@ -1370,6 +1384,7 @@
   gap: 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   padding-top: 14px;
+  padding-bottom: max(4px, env(safe-area-inset-bottom));
 }
 
 .wizardStepOneActions {
@@ -1619,6 +1634,7 @@
   flex-wrap: wrap;
   gap: 10px;
   padding-top: 2px;
+  padding-bottom: max(4px, env(safe-area-inset-bottom));
 }
 
 .wizardAnalysisCardHeader {
@@ -2138,6 +2154,7 @@
   gap: 10px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   padding-top: 10px;
+  padding-bottom: max(4px, env(safe-area-inset-bottom));
 }
 
 .wizardReviewFooter {

@@ -79,6 +79,8 @@ type DecisionAction = {
   subtitle: string;
 };
 
+type PersistConversationMessageResult = "persisted" | "skipped" | "failed";
+
 export type ConversationResumeState = {
   targetStep: 3 | 4;
   sourceText: string | null;
@@ -876,7 +878,8 @@ export function WizardScaffold({
   resumeState?: ConversationResumeState | null;
   onExitToEntry?: () => void;
 }) {
-  const { activeConversation, ensureActiveConversation, updateSidebarConversation } = useMvpShell();
+  const { activeConversation, ensureActiveConversation, updateSidebarConversation, upsertActiveConversationMessage } =
+    useMvpShell();
   const locale = resolveRuntimeLocale();
   const t = (key: string) => tRuntime(key, locale);
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(resumeState?.targetStep ?? 1);
@@ -923,11 +926,18 @@ export function WizardScaffold({
     Array<{ id: string; role: "user" | "advisor"; text: string }>
   >([]);
   const [speakingResponseIndex, setSpeakingResponseIndex] = useState<number | null>(null);
+  const [analysisActionSaveState, setAnalysisActionSaveState] = useState<"idle" | "saving" | "saved" | "error">(
+    "idle",
+  );
   const selectedCaseId = activeCase?.id ?? null;
   const manualInterpretTimerRef = useRef<number | null>(null);
   const conversationListRef = useRef<HTMLDivElement | null>(null);
   const sidebarConversationStartedAtRef = useRef<string | null>(null);
   const persistedMessageKeysRef = useRef<Set<string>>(new Set());
+  const pendingPersistenceKeysRef = useRef<Set<string>>(new Set());
+  const analysisActionRequestedTitleRef = useRef<string | null>(null);
+  const analysisActionPersistingRef = useRef(false);
+  const analysisActionStatusTimerRef = useRef<number | null>(null);
   const contextVoice = useSpeechToText({
     lang: "es-ES",
     continuous: false,
@@ -1000,6 +1010,9 @@ export function WizardScaffold({
       if (manualInterpretTimerRef.current !== null) {
         window.clearTimeout(manualInterpretTimerRef.current);
       }
+      if (analysisActionStatusTimerRef.current !== null) {
+        window.clearTimeout(analysisActionStatusTimerRef.current);
+      }
     };
   }, []);
 
@@ -1033,6 +1046,15 @@ export function WizardScaffold({
     }, 30);
     contextVoice.resetTranscript();
   }, [contextVoice.transcript, stepOneInputMode, contextVoice]);
+
+  useEffect(() => {
+    if (currentStep !== 1) return;
+    const focusTimer = window.setTimeout(() => {
+      const input = document.getElementById("wizard-primary-input") as HTMLTextAreaElement | null;
+      input?.focus();
+    }, 30);
+    return () => window.clearTimeout(focusTimer);
+  }, [currentStep, stepOneInputMode]);
 
   useEffect(() => {
     if (currentStep !== 3) {
@@ -1108,12 +1130,43 @@ export function WizardScaffold({
     return Object.keys(context).length > 0 ? context : undefined;
   }
 
-  function syncConversationBlocks(blocks: ConversationBlock[]) {
+  function clearManualInterpretTimer() {
+    if (manualInterpretTimerRef.current === null) return;
+    window.clearTimeout(manualInterpretTimerRef.current);
+    manualInterpretTimerRef.current = null;
+  }
+
+  function setAnalysisActionStatus(nextState: "idle" | "saving" | "saved" | "error") {
+    if (analysisActionStatusTimerRef.current !== null) {
+      window.clearTimeout(analysisActionStatusTimerRef.current);
+      analysisActionStatusTimerRef.current = null;
+    }
+    setAnalysisActionSaveState(nextState);
+    if (nextState === "saved") {
+      analysisActionStatusTimerRef.current = window.setTimeout(() => {
+        setAnalysisActionSaveState("idle");
+        analysisActionStatusTimerRef.current = null;
+      }, 1800);
+    }
+  }
+
+  function syncConversationBlocks(
+    blocks: ConversationBlock[],
+    options?: { syncMessageText?: boolean },
+  ) {
     setConversationBlocks(blocks);
-    const structuredText = formatConversationBlocksForContext(blocks);
-    if (structuredText) {
+    if (options?.syncMessageText) {
+      const structuredText = formatConversationBlocksForContext(blocks);
       setMessageText(structuredText);
     }
+  }
+
+  async function flushPendingConversationInterpretation(text: string, source: "ocr" | "text") {
+    clearManualInterpretTimer();
+    if (!looksLikeConversationInput(text)) {
+      return;
+    }
+    await interpretConversationText(text, source);
   }
 
   async function refreshConversationTitle(params: {
@@ -1147,18 +1200,19 @@ export function WizardScaffold({
     role: "user" | "system" | "assistant";
     messageType: "source_text" | "analysis_action" | "selected_reply";
     content: string;
-  }) {
+  }): Promise<PersistConversationMessageResult> {
     const normalizedContent = params.content.trim();
-    if (!normalizedContent) return;
+    if (!normalizedContent) return "skipped";
 
     const conversation = activeConversation ?? (await ensureActiveConversation({ advisorId: preferredAdvisorId }));
-    if (!conversation) return;
+    if (!conversation) return "failed";
 
-    const key = `${conversation.id}:${params.messageType}`;
-    if (persistedMessageKeysRef.current.has(key)) {
-      return;
+    const key = `${conversation.id}:${params.messageType}:${normalizedContent}`;
+    if (persistedMessageKeysRef.current.has(key) || pendingPersistenceKeysRef.current.has(key)) {
+      return "skipped";
     }
 
+    pendingPersistenceKeysRef.current.add(key);
     try {
       const persisted = await postMessage({
         conversation_id: conversation.id,
@@ -1166,10 +1220,51 @@ export function WizardScaffold({
         content: normalizedContent,
         message_type: params.messageType,
       });
-      persistedMessageKeysRef.current.add(`${persisted.conversation_id}:${persisted.message_type}`);
+      persistedMessageKeysRef.current.add(key);
+      upsertActiveConversationMessage(persisted);
+      return "persisted";
     } catch {
       // Keep UX resilient if minimal message persistence fails.
+      return "failed";
+    } finally {
+      pendingPersistenceKeysRef.current.delete(key);
     }
+  }
+
+  async function flushQueuedAnalysisActionPersistence() {
+    if (analysisActionPersistingRef.current) return;
+    analysisActionPersistingRef.current = true;
+
+    try {
+      while (analysisActionRequestedTitleRef.current) {
+        const titleToPersist = analysisActionRequestedTitleRef.current;
+        analysisActionRequestedTitleRef.current = null;
+        const persistenceResult = await persistConversationMessage({
+          role: "system",
+          messageType: "analysis_action",
+          content: titleToPersist,
+        });
+        if (analysisActionRequestedTitleRef.current) {
+          continue;
+        }
+        if (persistenceResult === "failed") {
+          setAnalysisActionStatus("error");
+        } else {
+          setAnalysisActionStatus("saved");
+        }
+      }
+    } finally {
+      analysisActionPersistingRef.current = false;
+      if (analysisActionRequestedTitleRef.current) {
+        void flushQueuedAnalysisActionPersistence();
+      }
+    }
+  }
+
+  function queueAnalysisActionPersistence(actionTitle: string) {
+    analysisActionRequestedTitleRef.current = actionTitle;
+    setAnalysisActionStatus("saving");
+    void flushQueuedAnalysisActionPersistence();
   }
 
   function syncSidebarConversationSummary(sourceTextOverride?: string) {
@@ -1353,10 +1448,7 @@ export function WizardScaffold({
 
   function handleMessageTextChange(nextValue: string) {
     setMessageText(nextValue);
-    if (manualInterpretTimerRef.current !== null) {
-      window.clearTimeout(manualInterpretTimerRef.current);
-      manualInterpretTimerRef.current = null;
-    }
+    clearManualInterpretTimer();
     if (!looksLikeConversationInput(nextValue)) {
       return;
     }
@@ -1369,17 +1461,19 @@ export function WizardScaffold({
     blockId: string,
     speaker: ConversationBlock["speaker"],
   ) {
+    clearManualInterpretTimer();
     const updated = conversationBlocks.map((block) =>
       block.id === blockId ? { ...block, speaker } : block,
     );
-    syncConversationBlocks(updated);
+    syncConversationBlocks(updated, { syncMessageText: true });
   }
 
   function updateConversationBlockText(blockId: string, content: string) {
+    clearManualInterpretTimer();
     const updated = conversationBlocks.map((block) =>
       block.id === blockId ? { ...block, content } : block,
     );
-    syncConversationBlocks(updated);
+    syncConversationBlocks(updated, { syncMessageText: true });
   }
 
   async function runAnalysisForText(text: string, sourceType: "ocr" | "text") {
@@ -1480,6 +1574,7 @@ export function WizardScaffold({
 
   async function handleContinueFromStep1() {
     if (!messageText.trim() && conversationBlocks.length === 0) return;
+    await flushPendingConversationInterpretation(messageText.trim(), ocrInfo ? "ocr" : "text");
     setAnalysisResult(null);
     setAnalysisId(null);
     setAnalysisError(null);
@@ -1533,6 +1628,7 @@ export function WizardScaffold({
   }
 
   function handleStartNewConversation() {
+    clearManualInterpretTimer();
     setCurrentStep(1);
     setStepOneInputMode("write");
     setSelectedDecision("no_reply");
@@ -1553,9 +1649,13 @@ export function WizardScaffold({
     setConversationBlocks([]);
     setAutoParsing(false);
     setAutoParseError(null);
+    setAnalysisActionStatus("idle");
+    analysisActionRequestedTitleRef.current = null;
+    analysisActionPersistingRef.current = false;
     setResponseTone("cordial");
     sidebarConversationStartedAtRef.current = null;
     persistedMessageKeysRef.current.clear();
+    pendingPersistenceKeysRef.current.clear();
     if (typeof window !== "undefined") {
       window.dispatchEvent(
         new CustomEvent("mvp:conversation-summary", {
@@ -2339,6 +2439,15 @@ export function WizardScaffold({
             {loadingAnalysis ? (
               <p className={styles.wizardStepStatus}>Interpretando contexto...</p>
             ) : null}
+            {analysisActionSaveState === "saving" ? (
+              <p className={styles.wizardStepStatus}>Guardando accion elegida...</p>
+            ) : null}
+            {analysisActionSaveState === "saved" ? (
+              <p className={styles.wizardStepStatus}>Accion guardada correctamente.</p>
+            ) : null}
+            {analysisActionSaveState === "error" ? (
+              <p className="text-sm text-red-700">No pudimos guardar la accion elegida.</p>
+            ) : null}
             {analysisError ? <p className="text-sm text-red-700">{analysisError}</p> : null}
             {advisorError ? <p className="text-sm text-red-700">{advisorError}</p> : null}
           </div>
@@ -2432,11 +2541,7 @@ export function WizardScaffold({
                               return;
                             }
                             setSelectedDecision(action.id);
-                            void persistConversationMessage({
-                              role: "system",
-                              messageType: "analysis_action",
-                              content: action.title,
-                            });
+                            queueAnalysisActionPersistence(action.title);
                           }}
                           className={`${styles.wizardDecisionOption} ${
                             isActive ? styles.wizardDecisionOptionActive : ""
