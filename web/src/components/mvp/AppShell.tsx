@@ -82,7 +82,9 @@ type ProcessSidebarItem = {
   timeLabel: string;
   safeTitle: string;
   safeSummary: string;
+  toneValue: string | null;
   toneLabel: string;
+  riskValue: string | null;
   riskLabel: string;
   recommendationLabel: string;
   isSensitive: boolean;
@@ -232,6 +234,73 @@ function truncateCopy(value: string, maxLength: number) {
   const normalized = value.trim();
   if (normalized.length <= maxLength) return normalized;
   return `${normalized.slice(0, Math.max(0, maxLength - 1)).trimEnd()}...`;
+}
+
+function formatProcessDrawerHeaderDate(value: string) {
+  const parsedDate = new Date(value);
+  if (Number.isNaN(parsedDate.getTime())) return "Sin fecha";
+  return new Intl.DateTimeFormat("es-UY", {
+    day: "numeric",
+    month: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(parsedDate).replace(",", " ·");
+}
+
+function getRiskLevelBucket(value: string | null | undefined) {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return "moderate";
+  if (normalized === "low") return "low";
+  if (normalized === "moderate") return "moderate";
+  if (normalized === "high") return "high";
+  if (normalized === "sensitive") return "high";
+  return "moderate";
+}
+
+function getDrawerRiskBadgeLabel(value: string | null | undefined) {
+  const riskBucket = getRiskLevelBucket(value);
+  if (riskBucket === "low") return "Riesgo bajo";
+  if (riskBucket === "high") return "Riesgo alto";
+  return "Riesgo medio";
+}
+
+function getToneInterpretation(value: string | null | undefined) {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) {
+    return "El tono se sintio contenido y sin señales claras de tension extra.";
+  }
+  if (normalized === "calm" || normalized === "neutral" || normalized === "supportive") {
+    return "El tono fue sereno y no muestra una carga fuerte de confrontacion.";
+  }
+  if (normalized === "firm") {
+    return "El tono fue firme, con necesidad de sostener limites sin entrar en mas desgaste.";
+  }
+  if (normalized === "acompanado") {
+    return "El tono muestra busqueda de apoyo y una mirada mas reflexiva sobre lo que paso.";
+  }
+  return `El tono fue ${normalizeSafeLabel(normalized, "sereno").toLowerCase()} y ayuda a leer la situacion con mas perspectiva.`;
+}
+
+function getRiskInterpretation(value: string | null | undefined) {
+  const riskBucket = getRiskLevelBucket(value);
+  if (riskBucket === "low") {
+    return "Esto indica que la situacion es manejable si se mantiene el enfoque actual.";
+  }
+  if (riskBucket === "high") {
+    return "Esto sugiere que conviene bajar el ritmo y priorizar una respuesta muy cuidada.";
+  }
+  return "Esto indica que hay que responder con cuidado para no escalar innecesariamente.";
+}
+
+function getLearningCopy(value: string | null | undefined) {
+  const riskBucket = getRiskLevelBucket(value);
+  if (riskBucket === "low") {
+    return "Podes mantener este tipo de enfoque en situaciones similares.";
+  }
+  if (riskBucket === "high") {
+    return "Es mejor pausar antes de responder y revisar el siguiente paso con calma.";
+  }
+  return "Conviene responder con cuidado para evitar escalar.";
 }
 
 function getMoodSummaryLabel(level: number | null | undefined) {
@@ -752,7 +821,9 @@ export function AppShell({ children }: AppShellProps) {
           timeLabel: formatProcessTime(item.created_at),
           safeTitle: item.safe_title,
           safeSummary: item.safe_summary,
+          toneValue: item.tone,
           toneLabel: getSafeToneLabel(item.tone),
+          riskValue: item.risk_level,
           riskLabel: getSafeRiskLabel(item.risk_level),
           recommendationLabel: item.recommended_next_step ?? "Seguir registrando como evoluciona el dia.",
           isSensitive: item.is_sensitive,
@@ -775,7 +846,9 @@ export function AppShell({ children }: AppShellProps) {
           timeLabel: formatProcessTime(item.created_at),
           safeTitle: item.safe_title,
           safeSummary: item.safe_summary,
+          toneValue: item.tone,
           toneLabel: getSafeToneLabel(item.tone),
+          riskValue: item.risk_level,
           riskLabel: getSafeRiskLabel(item.risk_level),
           recommendationLabel:
             item.recommended_next_step ?? "Volver sobre esta situacion cuando necesites decidir con mas calma.",
@@ -797,7 +870,9 @@ export function AppShell({ children }: AppShellProps) {
           timeLabel: formatProcessTime(item.created_at),
           safeTitle: item.safe_title,
           safeSummary: item.safe_summary,
+          toneValue: item.tone,
           toneLabel: getSafeToneLabel(item.tone),
+          riskValue: item.risk_level,
           riskLabel: getSafeRiskLabel(item.risk_level),
           recommendationLabel:
             item.recommended_next_step ?? "Volver a este consejo cuando quieras revisar tu siguiente paso.",
@@ -844,7 +919,30 @@ export function AppShell({ children }: AppShellProps) {
 
   const selectedProcessTimestampLabel = useMemo(() => {
     if (!selectedProcessItem) return "";
-    return `${selectedProcessItem.dayLabel} · ${selectedProcessItem.timeLabel}`;
+    return formatProcessDrawerHeaderDate(selectedProcessItem.createdAt);
+  }, [selectedProcessItem]);
+
+  const selectedProcessInterpretation = useMemo(() => {
+    if (!selectedProcessItem) return "";
+    return `${getToneInterpretation(selectedProcessItem.toneValue)} ${getRiskInterpretation(selectedProcessItem.riskValue)}`;
+  }, [selectedProcessItem]);
+
+  const selectedProcessLearning = useMemo(() => {
+    if (!selectedProcessItem) return "";
+    return getLearningCopy(selectedProcessItem.riskValue);
+  }, [selectedProcessItem]);
+
+  const selectedProcessRiskBadgeLabel = useMemo(() => {
+    if (!selectedProcessItem) return "";
+    return getDrawerRiskBadgeLabel(selectedProcessItem.riskValue);
+  }, [selectedProcessItem]);
+
+  const selectedProcessRiskBadgeClassName = useMemo(() => {
+    if (!selectedProcessItem) return styles.processDrawerRiskBadgeModerate;
+    const riskBucket = getRiskLevelBucket(selectedProcessItem.riskValue);
+    if (riskBucket === "low") return styles.processDrawerRiskBadgeLow;
+    if (riskBucket === "high") return styles.processDrawerRiskBadgeHigh;
+    return styles.processDrawerRiskBadgeModerate;
   }, [selectedProcessItem]);
 
   function toggleHistorySection(section: HistorySectionKey) {
@@ -1492,12 +1590,17 @@ export function AppShell({ children }: AppShellProps) {
             onClick={(event) => event.stopPropagation()}
           >
             <div className={styles.historyReportHeader}>
-              <div>
-                <p className={styles.historyReportEyebrow}>Ver evolucion</p>
-                <h2 id="process-detail-title" className={styles.historyReportTitle}>
-                  {selectedProcessItem.safeTitle}
+              <div className={styles.processDrawerHeaderContent}>
+                <p className={styles.historyReportEyebrow}>Tu proceso</p>
+                <div className={styles.processDrawerMetaRow}>
+                  <span className={styles.processDrawerDateLabel}>Fecha · {selectedProcessTimestampLabel}</span>
+                  <span className={`${styles.processDrawerRiskBadge} ${selectedProcessRiskBadgeClassName}`}>
+                    {selectedProcessRiskBadgeLabel}
+                  </span>
+                </div>
+                <h2 id="process-detail-title" className={styles.processDrawerHeading}>
+                  {selectedProcessSectionLabel}
                 </h2>
-                <p className={styles.processDrawerSubtitle}>{selectedProcessSectionLabel}</p>
               </div>
               <button
                 type="button"
@@ -1510,52 +1613,35 @@ export function AppShell({ children }: AppShellProps) {
             </div>
 
             <div className={styles.historyReportBody}>
-              <div className={styles.historyReportHero}>
-                <span className={styles.historyReportHeroPill}>{selectedProcessTimestampLabel}</span>
-                <p className={styles.historyReportSummary}>{selectedProcessItem.safeSummary}</p>
-              </div>
+              <section className={styles.processDrawerBlock}>
+                <p className={styles.processDrawerBlockTitle}>Que paso</p>
+                {selectedProcessItem.section === "advisor" && selectedProcessItem.advisorName ? (
+                  <p className={styles.processDrawerInlineNote}>Lo revisaste con {selectedProcessItem.advisorName}.</p>
+                ) : null}
+                <h3 className={styles.processDrawerContextTitle}>{selectedProcessItem.safeTitle}</h3>
+                <p className={styles.processDrawerContextCopy}>{selectedProcessItem.safeSummary}</p>
+              </section>
 
-              {selectedProcessItem.section === "advisor" && selectedProcessItem.advisorName ? (
-                <div className={styles.processDrawerTagRow}>
-                  <span className={styles.processDrawerTag}>Consejo recibido con {selectedProcessItem.advisorName}</span>
+              <section className={styles.processDrawerBlock}>
+                <p className={styles.processDrawerBlockTitle}>Como interpretar esto</p>
+                <div className={styles.processDrawerInterpretationCard}>
+                  <p className={styles.processDrawerBodyCopy}>{selectedProcessInterpretation}</p>
                 </div>
-              ) : null}
+              </section>
 
-              {selectedProcessItem.section === "mood" ? (
-                <div className={styles.processDrawerGrid}>
-                  <article className={styles.historyReportCard}>
-                    <p className={styles.historyReportCardTitle}>Animo</p>
-                    <p className={styles.historyReportLead}>{selectedProcessItem.moodLabel}</p>
-                  </article>
-                  <article className={styles.historyReportCard}>
-                    <p className={styles.historyReportCardTitle}>Confianza</p>
-                    <p className={styles.historyReportLead}>{selectedProcessItem.confidenceLabel}</p>
-                  </article>
-                  <article className={styles.historyReportCard}>
-                    <p className={styles.historyReportCardTitle}>Contacto reciente</p>
-                    <p className={styles.historyReportLead}>{selectedProcessItem.recentContactLabel}</p>
-                  </article>
+              <section className={styles.processDrawerBlock}>
+                <p className={styles.processDrawerBlockTitle}>Que te conviene hacer</p>
+                <div className={styles.processDrawerRecommendationCard}>
+                  <p className={styles.processDrawerRecommendationCopy}>{selectedProcessItem.recommendationLabel}</p>
                 </div>
-              ) : null}
+              </section>
 
-              <div className={styles.processDrawerGrid}>
-                <article className={styles.historyReportCard}>
-                  <p className={styles.historyReportCardTitle}>Resumen seguro</p>
-                  <p className={styles.processDrawerBodyCopy}>{selectedProcessItem.safeSummary}</p>
-                </article>
-                <article className={styles.historyReportCard}>
-                  <p className={styles.historyReportCardTitle}>Tono</p>
-                  <p className={styles.historyReportLead}>{selectedProcessItem.toneLabel}</p>
-                </article>
-                <article className={styles.historyReportCard}>
-                  <p className={styles.historyReportCardTitle}>Riesgo</p>
-                  <p className={styles.historyReportLead}>{selectedProcessItem.riskLabel}</p>
-                </article>
-                <article className={styles.historyReportCard}>
-                  <p className={styles.historyReportCardTitle}>Siguiente paso</p>
-                  <p className={styles.processDrawerBodyCopy}>{selectedProcessItem.recommendationLabel}</p>
-                </article>
-              </div>
+              <section className={styles.processDrawerBlock}>
+                <p className={styles.processDrawerBlockTitle}>Para tener en cuenta</p>
+                <div className={styles.processDrawerLearningCard}>
+                  <p className={styles.processDrawerBodyCopy}>{selectedProcessLearning}</p>
+                </div>
+              </section>
             </div>
           </section>
         </div>

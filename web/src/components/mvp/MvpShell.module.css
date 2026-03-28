@@ -1021,6 +1021,11 @@
   gap: 16px;
 }
 
+.processDrawerHeaderContent {
+  display: grid;
+  gap: 10px;
+}
+
 .historyReportEyebrow {
   font-size: 11px;
   font-weight: 700;
@@ -1034,6 +1039,54 @@
   font-size: 22px;
   line-height: 1.2;
   color: rgba(255, 255, 255, 0.94);
+}
+
+.processDrawerMetaRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.processDrawerDateLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(229, 239, 249, 0.74);
+}
+
+.processDrawerRiskBadge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.processDrawerRiskBadgeLow {
+  border: 1px solid rgba(34, 197, 139, 0.24);
+  background: rgba(34, 197, 139, 0.12);
+  color: rgba(176, 255, 220, 0.92);
+}
+
+.processDrawerRiskBadgeModerate {
+  border: 1px solid rgba(244, 201, 93, 0.24);
+  background: rgba(244, 201, 93, 0.12);
+  color: rgba(255, 235, 190, 0.94);
+}
+
+.processDrawerRiskBadgeHigh {
+  border: 1px solid rgba(248, 113, 113, 0.28);
+  background: rgba(248, 113, 113, 0.12);
+  color: rgba(255, 205, 205, 0.94);
+}
+
+.processDrawerHeading {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: rgba(255, 255, 255, 0.96);
 }
 
 .historyReportClose {
@@ -1062,7 +1115,7 @@
   min-height: 0;
   flex: 1;
   flex-direction: column;
-  gap: 16px;
+  gap: 22px;
   overflow-y: auto;
   padding-right: 4px;
 }
@@ -1103,6 +1156,66 @@
   font-size: 14px;
   line-height: 1.65;
   color: rgba(229, 239, 249, 0.76);
+}
+
+.processDrawerBlock {
+  display: grid;
+  gap: 12px;
+}
+
+.processDrawerBlockTitle {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.44);
+}
+
+.processDrawerInlineNote {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(34, 197, 139, 0.88);
+}
+
+.processDrawerContextTitle {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: rgba(255, 255, 255, 0.96);
+}
+
+.processDrawerContextCopy {
+  font-size: 15px;
+  line-height: 1.8;
+  color: rgba(229, 239, 249, 0.78);
+}
+
+.processDrawerInterpretationCard,
+.processDrawerLearningCard {
+  display: grid;
+  gap: 10px;
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(17, 32, 51, 0.84) 0%, rgba(10, 21, 32, 0.9) 100%);
+  padding: 18px;
+}
+
+.processDrawerRecommendationCard {
+  display: grid;
+  gap: 10px;
+  border-radius: 22px;
+  border: 1px solid rgba(244, 201, 93, 0.16);
+  background:
+    radial-gradient(circle at top left, rgba(244, 201, 93, 0.14) 0%, transparent 30%),
+    linear-gradient(180deg, rgba(24, 45, 40, 0.96) 0%, rgba(13, 31, 27, 0.98) 100%);
+  padding: 20px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.processDrawerRecommendationCopy {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.7;
+  color: rgba(237, 255, 246, 0.94);
 }
 
 .historyReportGrid {
@@ -2918,6 +3031,10 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .processDrawerMetaRow {
+    align-items: flex-start;
+  }
+
   .wizardPanel {
     border-radius: 24px;
     padding: 16px;
@@ -2975,6 +3092,17 @@
 
   .historyReportTitle {
     font-size: 20px;
+  }
+
+  .processDrawerHeading,
+  .processDrawerContextTitle {
+    font-size: 20px;
+  }
+
+  .processDrawerRecommendationCard,
+  .processDrawerInterpretationCard,
+  .processDrawerLearningCard {
+    padding: 16px;
   }
 
   .wizardPanel {
