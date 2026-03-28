@@ -120,8 +120,8 @@ class MemoryItemRepository:
                 updated_at
             FROM memory_items
             WHERE user_id = %s
-              AND (%s IS NULL OR memory_type = %s)
-              AND (%s IS NULL OR source_kind = %s)
+              AND (%s::text IS NULL OR memory_type = %s::text)
+              AND (%s::text IS NULL OR source_kind = %s::text)
             ORDER BY created_at DESC, updated_at DESC
             LIMIT %s OFFSET %s
         """
