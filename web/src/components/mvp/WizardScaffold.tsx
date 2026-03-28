@@ -1285,6 +1285,9 @@ export function WizardScaffold({
         analysis_summary: params.analysisSummary,
       });
       updateSidebarConversation(mapConversationSummaryToSidebar(updated));
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("mvp:memory-updated"));
+      }
     } catch {
       // Keep the analysis flow resilient if title refresh fails.
     }

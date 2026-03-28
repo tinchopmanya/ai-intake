@@ -11,12 +11,12 @@ import type { SidebarConversationSummary } from "@/components/mvp/MvpShellContex
 import styles from "@/components/mvp/MvpShell.module.css";
 import { ADVISOR_PROFILES } from "@/data/advisors";
 import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
-import { getEmotionalCheckinToday } from "@/lib/api/client";
 import { getConversationMessages } from "@/lib/api/client";
-import { getConversations, postConversation } from "@/lib/api/client";
+import { getConversations, getExPartnerHistoricalReport, getMemoryItems, postConversation } from "@/lib/api/client";
 import { postAdvisorChat } from "@/lib/api/client";
 import { toUiErrorMessage } from "@/lib/api/errors";
-import type { EmotionalCheckinSummary } from "@/lib/api/types";
+import type { ExPartnerHistoricalReportResponse } from "@/lib/api/types";
+import type { MemoryItemSummary } from "@/lib/api/types";
 import type { MessageSummary } from "@/lib/api/types";
 import { getCurrentUser, logoutSession } from "@/lib/auth/client";
 
@@ -37,8 +37,17 @@ const CONFIDENCE_LABELS = [
 
 type HistorySectionKey = "mood" | "advisor" | "ex";
 
-type SafeConversationEntry = {
+type MoodHistoryItem = {
   id: string;
+  timestampLabel: string;
+  moodLabel: string;
+  confidenceLabel: string;
+  recentContactLabel: string;
+};
+
+type SafeHistoryEntry = {
+  id: string;
+  conversationId: string | null;
   timestampLabel: string;
   timestampRaw: string;
   kind: "advisor" | "ex_partner";
@@ -52,7 +61,10 @@ type SafeConversationEntry = {
   topicLabel?: string | null;
   statusLabel?: string | null;
   isActive: boolean;
+  isSensitive: boolean;
 };
+
+type SafeConversationEntry = SafeHistoryEntry;
 
 type HistoricalReport = {
   totalCount: number;
@@ -266,6 +278,7 @@ function buildSafeConversationEntry(params: {
     const advisor = ADVISOR_PROFILES.find((profile) => profile.id === conversation.advisorId);
     return {
       id: conversation.id,
+      conversationId: conversation.id,
       timestampLabel: safeTimestamp,
       timestampRaw: conversation.lastMessageAt,
       kind: "advisor",
@@ -281,12 +294,14 @@ function buildSafeConversationEntry(params: {
       recommendationLabel: actionPresentation.recommendationLabel,
       statusLabel: actionPresentation.statusLabel,
       isActive,
+      isSensitive: false,
     };
   }
 
   const sourceText = sourceMessage?.content ?? "";
   return {
     id: conversation.id,
+    conversationId: conversation.id,
     timestampLabel: safeTimestamp,
     timestampRaw: conversation.lastMessageAt,
     kind: "ex_partner",
@@ -303,6 +318,7 @@ function buildSafeConversationEntry(params: {
     topicLabel: getSafeTopicLabel(sourceText, conversation.title),
     statusLabel: actionPresentation.statusLabel,
     isActive,
+    isSensitive: false,
   };
 }
 
@@ -351,12 +367,67 @@ function buildHistoricalReport(entries: SafeConversationEntry[]): HistoricalRepo
   };
 }
 
+function getNumberMetadataValue(metadata: Record<string, unknown>, key: string) {
+  const value = metadata[key];
+  return typeof value === "number" ? value : null;
+}
+
+function getBooleanMetadataValue(metadata: Record<string, unknown>, key: string) {
+  const value = metadata[key];
+  return typeof value === "boolean" ? value : null;
+}
+
+function getAdvisorNameFromMemory(
+  conversationId: string | null,
+  conversations: SidebarConversationSummary[],
+) {
+  if (!conversationId) return "Consejero";
+  const advisorId = conversations.find((conversation) => conversation.id === conversationId)?.advisorId;
+  const advisor = ADVISOR_PROFILES.find((profile) => profile.id === advisorId);
+  return advisor?.name ?? "Consejero";
+}
+
+function normalizeSafeLabel(value: string | null | undefined, fallback: string) {
+  const normalized = value?.trim();
+  if (!normalized) return fallback;
+  const compact = normalized.replace(/[_-]+/g, " ");
+  return compact.charAt(0).toUpperCase() + compact.slice(1);
+}
+
+function getSafeRiskLabel(value: string | null | undefined) {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return "Sin clasificar";
+  if (normalized === "low") return "Bajo";
+  if (normalized === "moderate") return "Moderado";
+  if (normalized === "high") return "Alto";
+  if (normalized === "sensitive") return "Sensible";
+  return normalizeSafeLabel(normalized, "Sin clasificar");
+}
+
+function getSafeToneLabel(value: string | null | undefined) {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return "En revision";
+  if (normalized === "supportive") return "Sostén";
+  if (normalized === "calm") return "Calma";
+  if (normalized === "neutral") return "Neutral";
+  if (normalized === "firm") return "Firme";
+  if (normalized === "acompanado") return "Acompañado";
+  return normalizeSafeLabel(normalized, "En revision");
+}
+
+function getSafeOriginLabel(sourceKind: MemoryItemSummary["source_kind"]) {
+  if (sourceKind === "ex_chat_capture") return "Captura";
+  if (sourceKind === "ex_chat_pasted") return "Texto pegado";
+  if (sourceKind === "draft_analysis") return "Borrador propio";
+  if (sourceKind === "advisor") return "Consejero";
+  return "Check-in";
+}
+
 export function AppShell({ children }: AppShellProps) {
   const router = useRouter();
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const advisorDropdownRef = useRef<HTMLDivElement | null>(null);
   const createConversationPromiseRef = useRef<Promise<SidebarConversationSummary | null> | null>(null);
-  const prefetchedConversationIdsRef = useRef<Set<string>>(new Set());
   const [menuOpen, setMenuOpen] = useState(false);
   const [advisorMenuOpen, setAdvisorMenuOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -375,8 +446,11 @@ export function AppShell({ children }: AppShellProps) {
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [activeConversationMessages, setActiveConversationMessages] = useState<MessageSummary[]>([]);
   const [activeConversationMessagesLoading, setActiveConversationMessagesLoading] = useState(false);
-  const [conversationMessagesById, setConversationMessagesById] = useState<Record<string, MessageSummary[]>>({});
-  const [todayCheckin, setTodayCheckin] = useState<EmotionalCheckinSummary | null>(null);
+  const [memoryItems, setMemoryItems] = useState<MemoryItemSummary[]>([]);
+  const [memoryItemsLoading, setMemoryItemsLoading] = useState(true);
+  const [historyReport, setHistoryReport] = useState<ExPartnerHistoricalReportResponse | null>(null);
+  const [historyReportLoading, setHistoryReportLoading] = useState(false);
+  const [historyNotice, setHistoryNotice] = useState<string | null>(null);
   const [historyReportOpen, setHistoryReportOpen] = useState(false);
   const [historyExpanded, setHistoryExpanded] = useState(true);
   const [sectionExpanded, setSectionExpanded] = useState<Record<HistorySectionKey, boolean>>({
@@ -399,44 +473,54 @@ export function AppShell({ children }: AppShellProps) {
     };
   }, []);
 
-  useEffect(() => {
-    let mounted = true;
+  const refreshConversations = useCallback(async () => {
     setConversationsLoading(true);
-    void getConversations()
-      .then((response) => {
-        if (!mounted) return;
-        setConversations(response.conversations.map(mapConversationSummary));
-        setShellFetchNotice(null);
-      })
-      .catch((error) => {
-        if (!mounted) return;
-        setConversations([]);
-        setShellFetchNotice(toUiErrorMessage(error, "No pudimos sincronizar las conversaciones por ahora."));
-      })
-      .finally(() => {
-        if (!mounted) return;
-        setConversationsLoading(false);
-      });
-    return () => {
-      mounted = false;
-    };
+    try {
+      const response = await getConversations();
+      setConversations(response.conversations.map(mapConversationSummary));
+      setShellFetchNotice(null);
+    } catch (error) {
+      setConversations([]);
+      setShellFetchNotice(toUiErrorMessage(error, "No pudimos sincronizar las conversaciones por ahora."));
+    } finally {
+      setConversationsLoading(false);
+    }
+  }, []);
+
+  const refreshMemoryItems = useCallback(async () => {
+    setMemoryItemsLoading(true);
+    try {
+      const response = await getMemoryItems({ limit: 100 });
+      setMemoryItems(
+        [...response.items].sort((left, right) => right.created_at.localeCompare(left.created_at)),
+      );
+      setHistoryNotice(null);
+    } catch (error) {
+      setMemoryItems([]);
+      setHistoryNotice(toUiErrorMessage(error, "No pudimos sincronizar el histórico seguro por ahora."));
+    } finally {
+      setMemoryItemsLoading(false);
+    }
+  }, []);
+
+  const refreshHistoryReport = useCallback(async () => {
+    setHistoryReportLoading(true);
+    try {
+      const response = await getExPartnerHistoricalReport();
+      setHistoryReport(response);
+      setHistoryNotice(null);
+    } catch (error) {
+      setHistoryReport(null);
+      setHistoryNotice(toUiErrorMessage(error, "No pudimos cargar el informe histórico por ahora."));
+    } finally {
+      setHistoryReportLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    let mounted = true;
-    void getEmotionalCheckinToday()
-      .then((response) => {
-        if (!mounted) return;
-        setTodayCheckin(response.today_checkin ?? null);
-      })
-      .catch(() => {
-        if (!mounted) return;
-        setTodayCheckin(null);
-      });
-    return () => {
-      mounted = false;
-    };
-  }, []);
+    void refreshConversations();
+    void refreshMemoryItems();
+  }, [refreshConversations, refreshMemoryItems]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -477,56 +561,40 @@ export function AppShell({ children }: AppShellProps) {
     };
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    function handleMemoryUpdated() {
+      void refreshMemoryItems();
+      if (historyReportOpen) {
+        void refreshHistoryReport();
+      }
+    }
+
+    window.addEventListener("mvp:memory-updated", handleMemoryUpdated);
+    return () => window.removeEventListener("mvp:memory-updated", handleMemoryUpdated);
+  }, [historyReportOpen, refreshHistoryReport, refreshMemoryItems]);
+
+  useEffect(() => {
+    if (!historyReportOpen) return;
+    void refreshHistoryReport();
+  }, [historyReportOpen, refreshHistoryReport]);
+
   const activeConversation = useMemo(
     () => conversations.find((conversation) => conversation.id === activeConversationId) ?? null,
     [activeConversationId, conversations],
   );
 
-  const visibleConversations = useMemo(
+  const usefulConversations = useMemo(
     () =>
       conversations.filter(
         (conversation) => hasUsefulConversationContent(conversation) || conversation.id === activeConversationId,
       ),
     [activeConversationId, conversations],
   );
+  const visibleConversations = usefulConversations;
 
-  const sidebarConversation = activeConversation ?? visibleConversations[0] ?? null;
-
-  useEffect(() => {
-    let cancelled = false;
-    const prefetchedIds = prefetchedConversationIdsRef.current;
-    const targets = visibleConversations
-      .filter((conversation) => hasUsefulConversationContent(conversation))
-      .filter((conversation) => conversation.id !== activeConversationId)
-      .filter((conversation) => conversationMessagesById[conversation.id] === undefined)
-      .filter((conversation) => !prefetchedIds.has(conversation.id));
-
-    targets.forEach((conversation) => {
-      prefetchedIds.add(conversation.id);
-      void getConversationMessages(conversation.id)
-        .then((response) => {
-          if (cancelled) return;
-          setConversationMessagesById((previous) => ({
-            ...previous,
-            [conversation.id]: response.messages,
-          }));
-        })
-        .catch(() => {
-          if (cancelled) return;
-          setConversationMessagesById((previous) => ({
-            ...previous,
-            [conversation.id]: [],
-          }));
-        })
-        .finally(() => {
-          prefetchedIds.delete(conversation.id);
-        });
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activeConversationId, conversationMessagesById, visibleConversations]);
+  const sidebarConversation = activeConversation ?? usefulConversations[0] ?? null;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -587,14 +655,6 @@ export function AppShell({ children }: AppShellProps) {
     };
   }, [activeConversationId]);
 
-  useEffect(() => {
-    if (!activeConversationId) return;
-    setConversationMessagesById((previous) => ({
-      ...previous,
-      [activeConversationId]: activeConversationMessages,
-    }));
-  }, [activeConversationId, activeConversationMessages]);
-
   const initials = useMemo(() => {
     const parts = displayName
       .split(" ")
@@ -605,34 +665,51 @@ export function AppShell({ children }: AppShellProps) {
   }, [displayName]);
 
   const moodHistoryItems = useMemo(() => {
-    if (!todayCheckin) return [];
-    return [
-      {
-        id: todayCheckin.id,
-        timestampLabel: formatHistoryTimestamp(todayCheckin.created_at),
-        moodLabel: getMoodSummaryLabel(todayCheckin.mood_level) ?? "Sin definir",
-        confidenceLabel: getConfidenceSummaryLabel(todayCheckin.confidence_level) ?? "Sin definir",
-        recentContactLabel: todayCheckin.recent_contact ? "Si" : "No",
-      },
-    ];
-  }, [todayCheckin]);
+    return memoryItems
+      .filter((item) => item.memory_type === "mood_checkin")
+      .map((item) => {
+        const metadata = item.memory_metadata ?? {};
+        const moodLevel = getNumberMetadataValue(metadata, "mood_level");
+        const confidenceLevel = getNumberMetadataValue(metadata, "confidence_level");
+        const recentContact = getBooleanMetadataValue(metadata, "recent_contact");
+        return {
+          id: item.id,
+          timestampLabel: formatHistoryTimestamp(item.created_at),
+          moodLabel: getMoodSummaryLabel(moodLevel) ?? "Sin definir",
+          confidenceLabel: getConfidenceSummaryLabel(confidenceLevel) ?? "Sin definir",
+          recentContactLabel: recentContact === null ? "Sin dato" : recentContact ? "Si" : "No",
+        } satisfies MoodHistoryItem;
+      });
+  }, [memoryItems]);
 
   const historicalEntries = useMemo(
     () =>
-      visibleConversations
-        .filter((conversation) => hasUsefulConversationContent(conversation))
-        .map((conversation) =>
-          buildSafeConversationEntry({
-            conversation,
-            messages:
-              conversation.id === activeConversationId
-                ? activeConversationMessages
-                : (conversationMessagesById[conversation.id] ?? []),
-            isActive: conversation.id === activeConversationId,
-          }),
-        )
+      memoryItems
+        .filter((item) => item.memory_type !== "mood_checkin")
+        .map((item) => ({
+          id: item.id,
+          conversationId: item.conversation_id,
+          timestampLabel: formatHistoryTimestamp(item.created_at),
+          timestampRaw: item.created_at,
+          kind: item.memory_type === "advisor_session_summary" ? "advisor" : "ex_partner",
+          safeTitle: item.safe_title,
+          safeSummary: item.safe_summary,
+          advisorName:
+            item.memory_type === "advisor_session_summary"
+              ? getAdvisorNameFromMemory(item.conversation_id, conversations)
+              : null,
+          originLabel:
+            item.memory_type === "coparenting_exchange_summary"
+              ? getSafeOriginLabel(item.source_kind)
+              : null,
+          toneLabel: getSafeToneLabel(item.tone),
+          riskLabel: getSafeRiskLabel(item.risk_level),
+          recommendationLabel: item.recommended_next_step,
+          isActive: item.conversation_id !== null && item.conversation_id === activeConversationId,
+          isSensitive: item.is_sensitive,
+        } satisfies SafeHistoryEntry))
         .sort((left, right) => right.timestampRaw.localeCompare(left.timestampRaw)),
-    [activeConversationId, activeConversationMessages, conversationMessagesById, visibleConversations],
+    [activeConversationId, conversations, memoryItems],
   );
 
   const advisorHistoryEntries = useMemo(
@@ -645,11 +722,6 @@ export function AppShell({ children }: AppShellProps) {
     [historicalEntries],
   );
 
-  const historicalReport = useMemo(
-    () => buildHistoricalReport(exPartnerHistoryEntries),
-    [exPartnerHistoryEntries],
-  );
-
   function toggleHistorySection(section: HistorySectionKey) {
     setSectionExpanded((previous) => ({
       ...previous,
@@ -657,7 +729,8 @@ export function AppShell({ children }: AppShellProps) {
     }));
   }
 
-  function handleSelectHistoryConversation(conversationId: string) {
+  function handleSelectHistoryConversation(conversationId: string | null) {
+    if (!conversationId) return;
     setActiveConversationId(conversationId);
     if (typeof window !== "undefined") {
       window.dispatchEvent(
@@ -720,7 +793,8 @@ export function AppShell({ children }: AppShellProps) {
     setConversations((previous) =>
       previous.map((item) => (item.id === conversation.id ? { ...item, ...conversation } : item)),
     );
-  }, []);
+    void refreshMemoryItems();
+  }, [refreshMemoryItems]);
 
   const upsertActiveConversationMessage = useCallback((message: MessageSummary) => {
     setActiveConversationMessages((previous) => {
@@ -1061,8 +1135,9 @@ export function AppShell({ children }: AppShellProps) {
               </div>
               <div className={styles.shellSidebarBody}>
                 {shellFetchNotice ? <p className={styles.shellSidebarEmpty}>{shellFetchNotice}</p> : null}
-                {conversationsLoading ? (
-                  <p className={styles.shellSidebarEmpty}>Cargando conversaciones...</p>
+                {historyNotice ? <p className={styles.shellSidebarEmpty}>{historyNotice}</p> : null}
+                {conversationsLoading || memoryItemsLoading ? (
+                  <p className={styles.shellSidebarEmpty}>Cargando histórico seguro...</p>
                 ) : historicalEntries.length > 0 || moodHistoryItems.length > 0 ? (
                   <div className={styles.shellHistoryList}>
                     <section className={styles.shellHistorySection}>
@@ -1074,7 +1149,7 @@ export function AppShell({ children }: AppShellProps) {
                       >
                         <span className={styles.shellHistorySectionHeading}>Historico</span>
                         <span className={styles.shellHistorySectionMeta}>
-                          {historicalEntries.length + moodHistoryItems.length} registro(s)
+                          {memoryItems.length} registro(s)
                         </span>
                       </button>
 
@@ -1142,7 +1217,7 @@ export function AppShell({ children }: AppShellProps) {
                                       className={`${styles.shellHistoryItemButton} ${
                                         entry.isActive ? styles.shellHistoryItemButtonActive : ""
                                       }`}
-                                      onClick={() => handleSelectHistoryConversation(entry.id)}
+                                      onClick={() => handleSelectHistoryConversation(entry.conversationId)}
                                     >
                                       <div className={styles.shellHistoryItemHeader}>
                                         <div>
@@ -1155,8 +1230,8 @@ export function AppShell({ children }: AppShellProps) {
                                       </div>
                                       <div className={styles.shellHistoryTagRow}>
                                         <span className={styles.shellHistoryTag}>Consejero: {entry.advisorName}</span>
-                                        {entry.statusLabel ? (
-                                          <span className={styles.shellHistoryTagMuted}>{entry.statusLabel}</span>
+                                        {entry.isSensitive ? (
+                                          <span className={styles.shellHistoryTagMuted}>Resumen sensible</span>
                                         ) : null}
                                       </div>
                                       <p className={styles.shellHistoryItemSummary}>{entry.safeSummary}</p>
@@ -1192,7 +1267,7 @@ export function AppShell({ children }: AppShellProps) {
                                         className={`${styles.shellHistoryItemButton} ${
                                           entry.isActive ? styles.shellHistoryItemButtonActive : ""
                                         }`}
-                                        onClick={() => handleSelectHistoryConversation(entry.id)}
+                                        onClick={() => handleSelectHistoryConversation(entry.conversationId)}
                                       >
                                         <div className={styles.shellHistoryItemHeader}>
                                           <div>
@@ -1207,8 +1282,8 @@ export function AppShell({ children }: AppShellProps) {
                                           {entry.originLabel ? (
                                             <span className={styles.shellHistoryTag}>Origen: {entry.originLabel}</span>
                                           ) : null}
-                                          {entry.topicLabel ? (
-                                            <span className={styles.shellHistoryTagMuted}>{entry.topicLabel}</span>
+                                          {entry.isSensitive ? (
+                                            <span className={styles.shellHistoryTagMuted}>Resumen sensible</span>
                                           ) : null}
                                         </div>
                                         <p className={styles.shellHistoryItemSummary}>{entry.safeSummary}</p>
@@ -1321,21 +1396,23 @@ export function AppShell({ children }: AppShellProps) {
               </button>
             </div>
 
-            {historicalReport ? (
+            {historyReportLoading ? (
+              <p className={styles.shellSidebarEmpty}>Cargando informe historico...</p>
+            ) : historyReport ? (
               <div className={styles.historyReportBody}>
                 <div className={styles.historyReportHero}>
-                  <span className={styles.historyReportHeroPill}>{historicalReport.totalCount} caso(s) utiles</span>
-                  <p className={styles.historyReportSummary}>{historicalReport.globalSummary}</p>
+                  <span className={styles.historyReportHeroPill}>{historyReport.total_items} caso(s) utiles</span>
+                  <p className={styles.historyReportSummary}>{historyReport.global_summary}</p>
                 </div>
 
                 <div className={styles.historyReportGrid}>
                   <article className={styles.historyReportCard}>
                     <p className={styles.historyReportCardTitle}>Temas frecuentes</p>
                     <div className={styles.historyReportChipRow}>
-                      {historicalReport.topTopics.length > 0 ? (
-                        historicalReport.topTopics.map((topic) => (
-                          <span key={topic} className={styles.historyReportChip}>
-                            {topic}
+                      {historyReport.frequent_topics.length > 0 ? (
+                        historyReport.frequent_topics.map((topic) => (
+                          <span key={topic.label} className={styles.historyReportChip}>
+                            {topic.label} ({topic.count})
                           </span>
                         ))
                       ) : (
@@ -1346,23 +1423,27 @@ export function AppShell({ children }: AppShellProps) {
 
                   <article className={styles.historyReportCard}>
                     <p className={styles.historyReportCardTitle}>Tono habitual</p>
-                    <p className={styles.historyReportLead}>{historicalReport.predominantTone}</p>
+                    <p className={styles.historyReportLead}>
+                      {getSafeToneLabel(historyReport.predominant_tone)}
+                    </p>
                     <p className={styles.historyReportMuted}>Etiqueta consolidada sin exponer mensajes literales.</p>
                   </article>
 
                   <article className={styles.historyReportCard}>
                     <p className={styles.historyReportCardTitle}>Riesgo predominante</p>
-                    <p className={styles.historyReportLead}>{historicalReport.predominantRisk}</p>
+                    <p className={styles.historyReportLead}>
+                      {getSafeRiskLabel(historyReport.predominant_risk_level)}
+                    </p>
                     <p className={styles.historyReportMuted}>Sirve para orientar la revision, no como diagnostico final.</p>
                   </article>
 
                   <article className={styles.historyReportCard}>
                     <p className={styles.historyReportCardTitle}>Recomendaciones recurrentes</p>
                     <div className={styles.historyReportRecommendationList}>
-                      {historicalReport.recurringRecommendations.length > 0 ? (
-                        historicalReport.recurringRecommendations.map((recommendation) => (
-                          <p key={recommendation} className={styles.historyReportRecommendationItem}>
-                            {recommendation}
+                      {historyReport.recurring_recommendations.length > 0 ? (
+                        historyReport.recurring_recommendations.map((recommendation) => (
+                          <p key={recommendation.label} className={styles.historyReportRecommendationItem}>
+                            {recommendation.label}
                           </p>
                         ))
                       ) : (

@@ -557,6 +557,9 @@ export function MvpEntryFlow() {
       });
       setTodayCheckin(created);
       syncCheckinDrafts(created);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("mvp:memory-updated"));
+      }
       setCheckinModalOpen(false);
     } catch (error) {
       setCheckinError(toUiErrorMessage(error, "No pudimos guardar tu check-in por ahora."));

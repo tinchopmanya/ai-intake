@@ -226,6 +226,45 @@ export type EmotionalCheckinTodayResponse = {
   today_checkin: EmotionalCheckinSummary | null;
 };
 
+export type MemoryType = "mood_checkin" | "advisor_session_summary" | "coparenting_exchange_summary";
+export type MemorySourceKind = "advisor" | "ex_chat_capture" | "ex_chat_pasted" | "draft_analysis" | "checkin";
+
+export type MemoryItemSummary = {
+  id: string;
+  user_id: string;
+  conversation_id: string | null;
+  memory_type: MemoryType;
+  safe_title: string;
+  safe_summary: string;
+  tone: string | null;
+  risk_level: string | null;
+  recommended_next_step: string | null;
+  source_kind: MemorySourceKind;
+  is_sensitive: boolean;
+  source_reference_id: string | null;
+  memory_metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MemoryItemListResponse = {
+  items: MemoryItemSummary[];
+};
+
+export type MemoryAggregateBucket = {
+  label: string;
+  count: number;
+};
+
+export type ExPartnerHistoricalReportResponse = {
+  total_items: number;
+  predominant_tone: string | null;
+  predominant_risk_level: string | null;
+  frequent_topics: MemoryAggregateBucket[];
+  recurring_recommendations: MemoryAggregateBucket[];
+  global_summary: string;
+};
+
 export type IncidentType =
   | "schedule_change"
   | "cancellation"

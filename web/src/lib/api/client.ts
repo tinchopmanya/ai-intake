@@ -18,10 +18,14 @@ import type { ConversationUpdateRequest } from "@/lib/api/types";
 import type { EmotionalCheckinCreateRequest } from "@/lib/api/types";
 import type { EmotionalCheckinSummary } from "@/lib/api/types";
 import type { EmotionalCheckinTodayResponse } from "@/lib/api/types";
+import type { ExPartnerHistoricalReportResponse } from "@/lib/api/types";
 import type { IncidentCreateRequest } from "@/lib/api/types";
 import type { IncidentListResponse } from "@/lib/api/types";
 import type { IncidentSummary } from "@/lib/api/types";
 import type { IncidentUpdateRequest } from "@/lib/api/types";
+import type { MemoryItemListResponse } from "@/lib/api/types";
+import type { MemorySourceKind } from "@/lib/api/types";
+import type { MemoryType } from "@/lib/api/types";
 import type { MessageCreateRequest } from "@/lib/api/types";
 import type { MessageListResponse } from "@/lib/api/types";
 import type { MessageSummary } from "@/lib/api/types";
@@ -191,6 +195,33 @@ export function postMessage(payload: MessageCreateRequest): Promise<MessageSumma
 
 export function getConversationMessages(conversationId: string): Promise<MessageListResponse> {
   return getJson<MessageListResponse>(`/v1/conversations/${conversationId}/messages`);
+}
+
+export function getMemoryItems(params?: {
+  memory_type?: MemoryType;
+  source_kind?: MemorySourceKind;
+  limit?: number;
+  offset?: number;
+}): Promise<MemoryItemListResponse> {
+  const searchParams = new URLSearchParams();
+  if (params?.memory_type) {
+    searchParams.set("memory_type", params.memory_type);
+  }
+  if (params?.source_kind) {
+    searchParams.set("source_kind", params.source_kind);
+  }
+  if (typeof params?.limit === "number") {
+    searchParams.set("limit", String(params.limit));
+  }
+  if (typeof params?.offset === "number") {
+    searchParams.set("offset", String(params.offset));
+  }
+  const suffix = searchParams.toString();
+  return getJson<MemoryItemListResponse>(`/v1/memory-items${suffix ? `?${suffix}` : ""}`);
+}
+
+export function getExPartnerHistoricalReport(): Promise<ExPartnerHistoricalReportResponse> {
+  return getJson<ExPartnerHistoricalReportResponse>("/v1/memory-items/report/ex-partner");
 }
 
 export function postIncident(payload: IncidentCreateRequest): Promise<IncidentSummary> {
