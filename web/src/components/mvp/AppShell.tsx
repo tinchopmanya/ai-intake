@@ -12,10 +12,9 @@ import styles from "@/components/mvp/MvpShell.module.css";
 import { ADVISOR_PROFILES } from "@/data/advisors";
 import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
 import { getConversationMessages } from "@/lib/api/client";
-import { getConversations, getExPartnerHistoricalReport, getMemoryItems, postConversation } from "@/lib/api/client";
+import { getConversations, getMemoryItems, postConversation } from "@/lib/api/client";
 import { postAdvisorChat } from "@/lib/api/client";
 import { toUiErrorMessage } from "@/lib/api/errors";
-import type { ExPartnerHistoricalReportResponse } from "@/lib/api/types";
 import type { MemoryItemSummary } from "@/lib/api/types";
 import type { MessageSummary } from "@/lib/api/types";
 import { getCurrentUser, logoutSession } from "@/lib/auth/client";
@@ -73,6 +72,29 @@ type HistoricalReport = {
   topTopics: string[];
   recurringRecommendations: string[];
   globalSummary: string;
+};
+
+type ProcessSidebarItem = {
+  id: string;
+  section: HistorySectionKey;
+  createdAt: string;
+  dayLabel: string;
+  timeLabel: string;
+  safeTitle: string;
+  safeSummary: string;
+  toneLabel: string;
+  riskLabel: string;
+  recommendationLabel: string;
+  isSensitive: boolean;
+  advisorName?: string | null;
+  moodLabel?: string;
+  confidenceLabel?: string;
+  recentContactLabel?: string;
+};
+
+type ProcessSidebarGroup = {
+  label: string;
+  items: ProcessSidebarItem[];
 };
 
 function getAdvisorAvatar(
@@ -135,6 +157,81 @@ function formatHistoryTimestamp(value: string) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(parsedDate);
+}
+
+function formatProcessTime(value: string) {
+  const parsedDate = new Date(value);
+  if (Number.isNaN(parsedDate.getTime())) return "Sin hora";
+  return new Intl.DateTimeFormat("es-UY", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(parsedDate);
+}
+
+function getProcessDayLabel(value: string) {
+  const parsedDate = new Date(value);
+  if (Number.isNaN(parsedDate.getTime())) return "Sin fecha";
+
+  const currentDate = new Date();
+  const currentStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+  const targetStart = new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate());
+  const dayDifference = Math.round((currentStart.getTime() - targetStart.getTime()) / 86400000);
+
+  if (dayDifference === 0) return "Hoy";
+  if (dayDifference === 1) return "Ayer";
+
+  return new Intl.DateTimeFormat("es-UY", {
+    day: "numeric",
+    month: "short",
+  }).format(parsedDate);
+}
+
+function groupProcessItems(items: ProcessSidebarItem[]) {
+  const groups = new Map<string, ProcessSidebarGroup>();
+
+  for (const item of items) {
+    const existingGroup = groups.get(item.dayLabel);
+    if (existingGroup) {
+      existingGroup.items.push(item);
+      continue;
+    }
+    groups.set(item.dayLabel, {
+      label: item.dayLabel,
+      items: [item],
+    });
+  }
+
+  return [...groups.values()];
+}
+
+function getTextMetadataValue(metadata: Record<string, unknown>, key: string) {
+  const value = metadata[key];
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
+function getAdvisorDisplayNameFromMemory(item: MemoryItemSummary) {
+  const metadata = item.memory_metadata ?? {};
+  const advisorName =
+    getTextMetadataValue(metadata, "advisor_name") ??
+    getTextMetadataValue(metadata, "advisor_label") ??
+    getTextMetadataValue(metadata, "selected_advisor_name");
+  if (advisorName) return advisorName;
+
+  const advisorId =
+    getTextMetadataValue(metadata, "advisor_id") ??
+    getTextMetadataValue(metadata, "selected_advisor_id");
+  if (!advisorId) return null;
+
+  const advisor = ADVISOR_PROFILES.find((profile) => profile.id === advisorId.trim().toLowerCase());
+  return advisor?.name ?? normalizeSafeLabel(advisorId, "Consejero");
+}
+
+function truncateCopy(value: string, maxLength: number) {
+  const normalized = value.trim();
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, Math.max(0, maxLength - 1)).trimEnd()}...`;
 }
 
 function getMoodSummaryLabel(level: number | null | undefined) {
@@ -448,16 +545,13 @@ export function AppShell({ children }: AppShellProps) {
   const [activeConversationMessagesLoading, setActiveConversationMessagesLoading] = useState(false);
   const [memoryItems, setMemoryItems] = useState<MemoryItemSummary[]>([]);
   const [memoryItemsLoading, setMemoryItemsLoading] = useState(true);
-  const [historyReport, setHistoryReport] = useState<ExPartnerHistoricalReportResponse | null>(null);
-  const [historyReportLoading, setHistoryReportLoading] = useState(false);
   const [historyNotice, setHistoryNotice] = useState<string | null>(null);
-  const [historyReportOpen, setHistoryReportOpen] = useState(false);
-  const [historyExpanded, setHistoryExpanded] = useState(true);
   const [sectionExpanded, setSectionExpanded] = useState<Record<HistorySectionKey, boolean>>({
     mood: true,
     advisor: true,
     ex: true,
   });
+  const [selectedProcessItem, setSelectedProcessItem] = useState<ProcessSidebarItem | null>(null);
   const [shellFetchNotice, setShellFetchNotice] = useState<string | null>(null);
   const speechSynthesis = useSpeechSynthesis({ lang: "es-ES" });
 
@@ -500,20 +594,6 @@ export function AppShell({ children }: AppShellProps) {
       setHistoryNotice(toUiErrorMessage(error, "No pudimos sincronizar el histórico seguro por ahora."));
     } finally {
       setMemoryItemsLoading(false);
-    }
-  }, []);
-
-  const refreshHistoryReport = useCallback(async () => {
-    setHistoryReportLoading(true);
-    try {
-      const response = await getExPartnerHistoricalReport();
-      setHistoryReport(response);
-      setHistoryNotice(null);
-    } catch (error) {
-      setHistoryReport(null);
-      setHistoryNotice(toUiErrorMessage(error, "No pudimos cargar el informe histórico por ahora."));
-    } finally {
-      setHistoryReportLoading(false);
     }
   }, []);
 
@@ -566,19 +646,11 @@ export function AppShell({ children }: AppShellProps) {
 
     function handleMemoryUpdated() {
       void refreshMemoryItems();
-      if (historyReportOpen) {
-        void refreshHistoryReport();
-      }
     }
 
     window.addEventListener("mvp:memory-updated", handleMemoryUpdated);
     return () => window.removeEventListener("mvp:memory-updated", handleMemoryUpdated);
-  }, [historyReportOpen, refreshHistoryReport, refreshMemoryItems]);
-
-  useEffect(() => {
-    if (!historyReportOpen) return;
-    void refreshHistoryReport();
-  }, [historyReportOpen, refreshHistoryReport]);
+  }, [refreshMemoryItems]);
 
   const activeConversation = useMemo(
     () => conversations.find((conversation) => conversation.id === activeConversationId) ?? null,
@@ -674,72 +746,112 @@ export function AppShell({ children }: AppShellProps) {
         const recentContact = getBooleanMetadataValue(metadata, "recent_contact");
         return {
           id: item.id,
-          timestampLabel: formatHistoryTimestamp(item.created_at),
+          section: "mood",
+          createdAt: item.created_at,
+          dayLabel: getProcessDayLabel(item.created_at),
+          timeLabel: formatProcessTime(item.created_at),
+          safeTitle: item.safe_title,
+          safeSummary: item.safe_summary,
+          toneLabel: getSafeToneLabel(item.tone),
+          riskLabel: getSafeRiskLabel(item.risk_level),
+          recommendationLabel: item.recommended_next_step ?? "Seguir registrando como evoluciona el dia.",
+          isSensitive: item.is_sensitive,
           moodLabel: getMoodSummaryLabel(moodLevel) ?? "Sin definir",
           confidenceLabel: getConfidenceSummaryLabel(confidenceLevel) ?? "Sin definir",
           recentContactLabel: recentContact === null ? "Sin dato" : recentContact ? "Si" : "No",
-        } satisfies MoodHistoryItem;
+        } satisfies ProcessSidebarItem;
       });
   }, [memoryItems]);
 
-  const historicalEntries = useMemo(
+  const exPartnerHistoryEntries = useMemo(
     () =>
       memoryItems
-        .filter((item) => item.memory_type !== "mood_checkin")
+        .filter((item) => item.memory_type === "coparenting_exchange_summary")
         .map((item) => ({
           id: item.id,
-          conversationId: item.conversation_id,
-          timestampLabel: formatHistoryTimestamp(item.created_at),
-          timestampRaw: item.created_at,
-          kind: item.memory_type === "advisor_session_summary" ? "advisor" : "ex_partner",
+          section: "ex",
+          createdAt: item.created_at,
+          dayLabel: getProcessDayLabel(item.created_at),
+          timeLabel: formatProcessTime(item.created_at),
           safeTitle: item.safe_title,
           safeSummary: item.safe_summary,
-          advisorName:
-            item.memory_type === "advisor_session_summary"
-              ? getAdvisorNameFromMemory(item.conversation_id, conversations)
-              : null,
-          originLabel:
-            item.memory_type === "coparenting_exchange_summary"
-              ? getSafeOriginLabel(item.source_kind)
-              : null,
           toneLabel: getSafeToneLabel(item.tone),
           riskLabel: getSafeRiskLabel(item.risk_level),
-          recommendationLabel: item.recommended_next_step,
-          isActive: item.conversation_id !== null && item.conversation_id === activeConversationId,
+          recommendationLabel:
+            item.recommended_next_step ?? "Volver sobre esta situacion cuando necesites decidir con mas calma.",
           isSensitive: item.is_sensitive,
-        } satisfies SafeHistoryEntry))
-        .sort((left, right) => right.timestampRaw.localeCompare(left.timestampRaw)),
-    [activeConversationId, conversations, memoryItems],
+        } satisfies ProcessSidebarItem))
+        .sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
+    [memoryItems],
   );
 
   const advisorHistoryEntries = useMemo(
-    () => historicalEntries.filter((entry) => entry.kind === "advisor"),
-    [historicalEntries],
+    () =>
+      memoryItems
+        .filter((item) => item.memory_type === "advisor_session_summary")
+        .map((item) => ({
+          id: item.id,
+          section: "advisor",
+          createdAt: item.created_at,
+          dayLabel: getProcessDayLabel(item.created_at),
+          timeLabel: formatProcessTime(item.created_at),
+          safeTitle: item.safe_title,
+          safeSummary: item.safe_summary,
+          toneLabel: getSafeToneLabel(item.tone),
+          riskLabel: getSafeRiskLabel(item.risk_level),
+          recommendationLabel:
+            item.recommended_next_step ?? "Volver a este consejo cuando quieras revisar tu siguiente paso.",
+          isSensitive: item.is_sensitive,
+          advisorName: getAdvisorDisplayNameFromMemory(item),
+        } satisfies ProcessSidebarItem))
+        .sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
+    [memoryItems],
   );
 
-  const exPartnerHistoryEntries = useMemo(
-    () => historicalEntries.filter((entry) => entry.kind === "ex_partner"),
-    [historicalEntries],
-  );
+  const groupedMoodHistory = useMemo(() => groupProcessItems(moodHistoryItems), [moodHistoryItems]);
+  const groupedExPartnerHistory = useMemo(() => groupProcessItems(exPartnerHistoryEntries), [exPartnerHistoryEntries]);
+  const groupedAdvisorHistory = useMemo(() => groupProcessItems(advisorHistoryEntries), [advisorHistoryEntries]);
+  const totalProcessItems = moodHistoryItems.length + exPartnerHistoryEntries.length + advisorHistoryEntries.length;
+
+  useEffect(() => {
+    if (!selectedProcessItem) return;
+
+    const refreshedItem = [...moodHistoryItems, ...exPartnerHistoryEntries, ...advisorHistoryEntries].find(
+      (item) => item.id === selectedProcessItem.id,
+    );
+    if (!refreshedItem) {
+      setSelectedProcessItem(null);
+      return;
+    }
+    setSelectedProcessItem(refreshedItem);
+  }, [advisorHistoryEntries, exPartnerHistoryEntries, moodHistoryItems, selectedProcessItem]);
+
+  function handleSelectProcessItem(item: ProcessSidebarItem) {
+    setSelectedProcessItem(item);
+    if (!isDesktop) setSidebarOpen(false);
+  }
+
+  function closeProcessDetail() {
+    setSelectedProcessItem(null);
+  }
+
+  const selectedProcessSectionLabel = useMemo(() => {
+    if (!selectedProcessItem) return "";
+    if (selectedProcessItem.section === "mood") return "Como estas";
+    if (selectedProcessItem.section === "ex") return "Situaciones analizadas";
+    return "Consejos recibidos";
+  }, [selectedProcessItem]);
+
+  const selectedProcessTimestampLabel = useMemo(() => {
+    if (!selectedProcessItem) return "";
+    return `${selectedProcessItem.dayLabel} · ${selectedProcessItem.timeLabel}`;
+  }, [selectedProcessItem]);
 
   function toggleHistorySection(section: HistorySectionKey) {
     setSectionExpanded((previous) => ({
       ...previous,
       [section]: !previous[section],
     }));
-  }
-
-  function handleSelectHistoryConversation(conversationId: string | null) {
-    if (!conversationId) return;
-    setActiveConversationId(conversationId);
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(
-        new CustomEvent("mvp:conversation-selected", {
-          detail: { conversationId },
-        }),
-      );
-    }
-    if (!isDesktop) setSidebarOpen(false);
   }
 
   const findReusableDraftConversation = useCallback(
@@ -1084,10 +1196,10 @@ export function AppShell({ children }: AppShellProps) {
 
         <aside
           className={`${styles.shellSidebar} ${sidebarOpen ? styles.shellSidebarExpanded : ""}`}
-          aria-label="Historico"
+          aria-label="Tu proceso"
         >
           <div className={styles.shellSidebarHeader}>
-            {sidebarOpen ? <span className={styles.shellSidebarTitle}>Historico</span> : <span />}
+            {sidebarOpen ? <span className={styles.shellSidebarTitle}>Tu proceso</span> : <span />}
             <button
               type="button"
               className={styles.shellSidebarToggle}
@@ -1137,188 +1249,188 @@ export function AppShell({ children }: AppShellProps) {
                 {shellFetchNotice ? <p className={styles.shellSidebarEmpty}>{shellFetchNotice}</p> : null}
                 {historyNotice ? <p className={styles.shellSidebarEmpty}>{historyNotice}</p> : null}
                 {conversationsLoading || memoryItemsLoading ? (
-                  <p className={styles.shellSidebarEmpty}>Cargando histórico seguro...</p>
-                ) : historicalEntries.length > 0 || moodHistoryItems.length > 0 ? (
-                  <div className={styles.shellHistoryList}>
-                    <section className={styles.shellHistorySection}>
+                  <p className={styles.shellSidebarEmpty}>Cargando tu proceso...</p>
+                ) : totalProcessItems > 0 ? (
+                  <div className={styles.processPanel}>
+                    <section className={styles.processOverviewCard}>
+                      <p className={styles.processOverviewEyebrow}>Tu proceso</p>
+                      <p className={styles.processOverviewTitle}>Lo que ya pudiste registrar y revisar</p>
+                      <p className={styles.processOverviewCopy}>
+                        {totalProcessItems} momento(s) guardado(s), organizados para que entiendas tu evolucion sin ver
+                        mensajes crudos.
+                      </p>
+                    </section>
+
+                    <section className={styles.processSection}>
                       <button
                         type="button"
-                        className={styles.shellHistorySectionToggle}
-                        onClick={() => setHistoryExpanded((previous) => !previous)}
-                        aria-expanded={historyExpanded}
+                        className={styles.processSectionToggle}
+                        onClick={() => toggleHistorySection("mood")}
+                        aria-expanded={sectionExpanded.mood}
                       >
-                        <span className={styles.shellHistorySectionHeading}>Historico</span>
-                        <span className={styles.shellHistorySectionMeta}>
-                          {memoryItems.length} registro(s)
-                        </span>
+                        <div>
+                          <p className={styles.processSectionTitle}>Como estas</p>
+                          <p className={styles.processSectionCopy}>Registro diario emocional</p>
+                        </div>
+                        <span className={styles.shellHistoryCountPill}>{moodHistoryItems.length}</span>
                       </button>
-
-                      {historyExpanded ? (
-                        <div className={styles.shellHistorySectionBody}>
-                          <div className={styles.shellHistorySubsection}>
-                            <button
-                              type="button"
-                              className={styles.shellHistorySubsectionToggle}
-                              onClick={() => toggleHistorySection("mood")}
-                              aria-expanded={sectionExpanded.mood}
-                            >
-                              <span>Estado de animo</span>
-                              <span className={styles.shellHistoryCountPill}>{moodHistoryItems.length}</span>
-                            </button>
-                            {sectionExpanded.mood ? (
-                              moodHistoryItems.length > 0 ? (
-                                <div className={styles.shellHistoryItemList}>
-                                  {moodHistoryItems.map((item) => (
-                                    <article key={item.id} className={styles.shellHistoryItem}>
-                                      <div className={styles.shellHistoryItemHeader}>
-                                        <p className={styles.shellHistoryItemTitle}>Check-in diario</p>
-                                        <span className={styles.shellHistoryItemTimestamp}>{item.timestampLabel}</span>
-                                      </div>
-                                      <div className={styles.shellHistoryMetricsGrid}>
-                                        <div className={styles.shellHistoryMetric}>
-                                          <span className={styles.shellHistoryMetricLabel}>Animo</span>
-                                          <span className={styles.shellHistoryMetricValue}>{item.moodLabel}</span>
-                                        </div>
-                                        <div className={styles.shellHistoryMetric}>
-                                          <span className={styles.shellHistoryMetricLabel}>Confianza</span>
-                                          <span className={styles.shellHistoryMetricValue}>{item.confidenceLabel}</span>
-                                        </div>
-                                        <div className={styles.shellHistoryMetric}>
-                                          <span className={styles.shellHistoryMetricLabel}>Contacto reciente</span>
-                                          <span className={styles.shellHistoryMetricValue}>{item.recentContactLabel}</span>
-                                        </div>
-                                      </div>
-                                    </article>
-                                  ))}
-                                </div>
-                              ) : (
-                                <p className={styles.shellSidebarEmpty}>Todavia no hay check-ins guardados.</p>
-                              )
-                            ) : null}
-                          </div>
-
-                          <div className={styles.shellHistorySubsection}>
-                            <button
-                              type="button"
-                              className={styles.shellHistorySubsectionToggle}
-                              onClick={() => toggleHistorySection("advisor")}
-                              aria-expanded={sectionExpanded.advisor}
-                            >
-                              <span>Conversaciones con consejeros</span>
-                              <span className={styles.shellHistoryCountPill}>{advisorHistoryEntries.length}</span>
-                            </button>
-                            {sectionExpanded.advisor ? (
-                              advisorHistoryEntries.length > 0 ? (
-                                <div className={styles.shellHistoryItemList}>
-                                  {advisorHistoryEntries.map((entry) => (
+                      {sectionExpanded.mood ? (
+                        groupedMoodHistory.length > 0 ? (
+                          <div className={styles.processSectionBody}>
+                            {groupedMoodHistory.map((group) => (
+                              <div key={group.label} className={styles.processDateGroup}>
+                                <p className={styles.processDateLabel}>{group.label}</p>
+                                <div className={styles.processItemList}>
+                                  {group.items.map((item) => (
                                     <button
-                                      key={entry.id}
+                                      key={item.id}
                                       type="button"
-                                      className={`${styles.shellHistoryItemButton} ${
-                                        entry.isActive ? styles.shellHistoryItemButtonActive : ""
+                                      className={`${styles.processItemCard} ${
+                                        selectedProcessItem?.id === item.id ? styles.processItemSelected : ""
                                       }`}
-                                      onClick={() => handleSelectHistoryConversation(entry.conversationId)}
+                                      onClick={() => handleSelectProcessItem(item)}
                                     >
-                                      <div className={styles.shellHistoryItemHeader}>
+                                      <div className={styles.processItemHeader}>
                                         <div>
-                                          <p className={styles.shellHistoryItemTitle}>{entry.safeTitle}</p>
-                                          <p className={styles.shellHistoryItemTimestamp}>{entry.timestampLabel}</p>
+                                          <p className={styles.processItemTitle}>Registro diario emocional</p>
+                                          <p className={styles.processItemMeta}>{item.dayLabel} · {item.timeLabel}</p>
                                         </div>
-                                        {entry.isActive ? (
-                                          <span className={styles.shellSessionBadge}>Activa</span>
-                                        ) : null}
+                                        <span className={styles.processItemArrow} aria-hidden="true">
+                                          ›
+                                        </span>
                                       </div>
-                                      <div className={styles.shellHistoryTagRow}>
-                                        <span className={styles.shellHistoryTag}>Consejero: {entry.advisorName}</span>
-                                        {entry.isSensitive ? (
-                                          <span className={styles.shellHistoryTagMuted}>Resumen sensible</span>
-                                        ) : null}
+                                      <div className={styles.processMoodGrid}>
+                                        <div className={styles.processMetricCard}>
+                                          <span className={styles.processMetricLabel}>Animo</span>
+                                          <span className={styles.processMetricValue}>{item.moodLabel}</span>
+                                        </div>
+                                        <div className={styles.processMetricCard}>
+                                          <span className={styles.processMetricLabel}>Confianza</span>
+                                          <span className={styles.processMetricValue}>{item.confidenceLabel}</span>
+                                        </div>
+                                        <div className={styles.processMetricCard}>
+                                          <span className={styles.processMetricLabel}>Contacto reciente</span>
+                                          <span className={styles.processMetricValue}>{item.recentContactLabel}</span>
+                                        </div>
                                       </div>
-                                      <p className={styles.shellHistoryItemSummary}>{entry.safeSummary}</p>
                                     </button>
                                   ))}
                                 </div>
-                              ) : (
-                                <p className={styles.shellSidebarEmpty}>
-                                  Todavia no hay conversaciones guiadas para mostrar.
-                                </p>
-                              )
-                            ) : null}
+                              </div>
+                            ))}
                           </div>
+                        ) : (
+                          <p className={styles.shellSidebarEmpty}>Todavia no hay registros emocionales guardados.</p>
+                        )
+                      ) : null}
+                    </section>
 
-                          <div className={styles.shellHistorySubsection}>
-                            <button
-                              type="button"
-                              className={styles.shellHistorySubsectionToggle}
-                              onClick={() => toggleHistorySection("ex")}
-                              aria-expanded={sectionExpanded.ex}
-                            >
-                              <span>Conversaciones con expareja</span>
-                              <span className={styles.shellHistoryCountPill}>{exPartnerHistoryEntries.length}</span>
-                            </button>
-                            {sectionExpanded.ex ? (
-                              exPartnerHistoryEntries.length > 0 ? (
-                                <>
-                                  <div className={styles.shellHistoryItemList}>
-                                    {exPartnerHistoryEntries.map((entry) => (
-                                      <button
-                                        key={entry.id}
-                                        type="button"
-                                        className={`${styles.shellHistoryItemButton} ${
-                                          entry.isActive ? styles.shellHistoryItemButtonActive : ""
-                                        }`}
-                                        onClick={() => handleSelectHistoryConversation(entry.conversationId)}
-                                      >
-                                        <div className={styles.shellHistoryItemHeader}>
-                                          <div>
-                                            <p className={styles.shellHistoryItemTitle}>{entry.safeTitle}</p>
-                                            <p className={styles.shellHistoryItemTimestamp}>{entry.timestampLabel}</p>
-                                          </div>
-                                          {entry.isActive ? (
-                                            <span className={styles.shellSessionBadge}>Activa</span>
-                                          ) : null}
-                                        </div>
-                                        <div className={styles.shellHistoryTagRow}>
-                                          {entry.originLabel ? (
-                                            <span className={styles.shellHistoryTag}>Origen: {entry.originLabel}</span>
-                                          ) : null}
-                                          {entry.isSensitive ? (
-                                            <span className={styles.shellHistoryTagMuted}>Resumen sensible</span>
-                                          ) : null}
-                                        </div>
-                                        <p className={styles.shellHistoryItemSummary}>{entry.safeSummary}</p>
-                                        <div className={styles.shellHistoryMetaGrid}>
-                                          <div className={styles.shellHistoryMetaItem}>
-                                            <span className={styles.shellHistoryMetaLabel}>Tono</span>
-                                            <span className={styles.shellHistoryMetaValue}>{entry.toneLabel}</span>
-                                          </div>
-                                          <div className={styles.shellHistoryMetaItem}>
-                                            <span className={styles.shellHistoryMetaLabel}>Riesgo</span>
-                                            <span className={styles.shellHistoryMetaValue}>{entry.riskLabel}</span>
-                                          </div>
-                                        </div>
-                                        {entry.recommendationLabel ? (
-                                          <p className={styles.shellHistoryRecommendation}>{entry.recommendationLabel}</p>
-                                        ) : null}
-                                      </button>
-                                    ))}
-                                  </div>
-                                  <button
-                                    type="button"
-                                    className={styles.shellHistoryReportButton}
-                                    onClick={() => setHistoryReportOpen(true)}
-                                  >
-                                    Ver informe historico
-                                  </button>
-                                </>
-                              ) : (
-                                <p className={styles.shellSidebarEmpty}>
-                                  Todavia no hay intercambios con expareja listos para resumir.
-                                </p>
-                              )
-                            ) : null}
-                          </div>
+                    <section className={styles.processSection}>
+                      <button
+                        type="button"
+                        className={styles.processSectionToggle}
+                        onClick={() => toggleHistorySection("ex")}
+                        aria-expanded={sectionExpanded.ex}
+                      >
+                        <div>
+                          <p className={styles.processSectionTitle}>Situaciones analizadas</p>
+                          <p className={styles.processSectionCopy}>Casos revisados sin exponer contenido literal.</p>
                         </div>
+                        <span className={styles.shellHistoryCountPill}>{exPartnerHistoryEntries.length}</span>
+                      </button>
+                      {sectionExpanded.ex ? (
+                        groupedExPartnerHistory.length > 0 ? (
+                          <div className={styles.processSectionBody}>
+                            {groupedExPartnerHistory.map((group) => (
+                              <div key={group.label} className={styles.processDateGroup}>
+                                <p className={styles.processDateLabel}>{group.label}</p>
+                                <div className={styles.processItemList}>
+                                  {group.items.map((item) => (
+                                    <button
+                                      key={item.id}
+                                      type="button"
+                                      className={`${styles.processItemCard} ${styles.processItemInteractive} ${
+                                        selectedProcessItem?.id === item.id ? styles.processItemSelected : ""
+                                      }`}
+                                      onClick={() => handleSelectProcessItem(item)}
+                                    >
+                                      <div className={styles.processItemHeader}>
+                                        <div>
+                                          <p className={styles.processItemTitle}>{item.safeTitle}</p>
+                                          <p className={styles.processItemMeta}>{item.dayLabel} · {item.timeLabel}</p>
+                                        </div>
+                                        <span className={styles.processItemArrow} aria-hidden="true">
+                                          ›
+                                        </span>
+                                      </div>
+                                      <div className={styles.processItemTagRow}>
+                                        <span className={styles.processRiskBadge}>{item.riskLabel}</span>
+                                        <span className={styles.processActionHint}>Ver evolucion</span>
+                                      </div>
+                                      <p className={styles.processRecommendationPreview}>{item.recommendationLabel}</p>
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className={styles.shellSidebarEmpty}>Todavia no hay situaciones analizadas para mostrar.</p>
+                        )
+                      ) : null}
+                    </section>
+
+                    <section className={styles.processSection}>
+                      <button
+                        type="button"
+                        className={styles.processSectionToggle}
+                        onClick={() => toggleHistorySection("advisor")}
+                        aria-expanded={sectionExpanded.advisor}
+                      >
+                        <div>
+                          <p className={styles.processSectionTitle}>Consejos recibidos</p>
+                          <p className={styles.processSectionCopy}>Recomendaciones guardadas para volver cuando las necesites.</p>
+                        </div>
+                        <span className={styles.shellHistoryCountPill}>{advisorHistoryEntries.length}</span>
+                      </button>
+                      {sectionExpanded.advisor ? (
+                        groupedAdvisorHistory.length > 0 ? (
+                          <div className={styles.processSectionBody}>
+                            {groupedAdvisorHistory.map((group) => (
+                              <div key={group.label} className={styles.processDateGroup}>
+                                <p className={styles.processDateLabel}>{group.label}</p>
+                                <div className={styles.processItemList}>
+                                  {group.items.map((item) => (
+                                    <button
+                                      key={item.id}
+                                      type="button"
+                                      className={`${styles.processItemCard} ${
+                                        selectedProcessItem?.id === item.id ? styles.processItemSelected : ""
+                                      }`}
+                                      onClick={() => handleSelectProcessItem(item)}
+                                    >
+                                      <div className={styles.processItemHeader}>
+                                        <div>
+                                          <p className={styles.processItemTitle}>{item.safeTitle}</p>
+                                          <p className={styles.processItemMeta}>{item.dayLabel} · {item.timeLabel}</p>
+                                        </div>
+                                        <span className={styles.processItemArrow} aria-hidden="true">
+                                          ›
+                                        </span>
+                                      </div>
+                                      {item.advisorName ? (
+                                        <p className={styles.processAdvisorLabel}>Con {item.advisorName}</p>
+                                      ) : null}
+                                      <p className={styles.processSummaryPreview}>{truncateCopy(item.safeSummary, 120)}</p>
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className={styles.shellSidebarEmpty}>Todavia no hay consejos guardados para revisar.</p>
+                        )
                       ) : null}
                     </section>
                   </div>
@@ -1370,92 +1482,81 @@ export function AppShell({ children }: AppShellProps) {
         <section className={styles.shellContent}>{children}</section>
       </div>
 
-      {historyReportOpen ? (
-        <div className={styles.historyReportBackdrop} role="presentation" onClick={() => setHistoryReportOpen(false)}>
+      {selectedProcessItem ? (
+        <div className={styles.historyReportBackdrop} role="presentation" onClick={closeProcessDetail}>
           <section
             className={styles.historyReportPanel}
             role="dialog"
             aria-modal="true"
-            aria-labelledby="historical-report-title"
+            aria-labelledby="process-detail-title"
             onClick={(event) => event.stopPropagation()}
           >
             <div className={styles.historyReportHeader}>
               <div>
-                <p className={styles.historyReportEyebrow}>Informe historico</p>
-                <h2 id="historical-report-title" className={styles.historyReportTitle}>
-                  Interacciones consolidadas con expareja
+                <p className={styles.historyReportEyebrow}>Ver evolucion</p>
+                <h2 id="process-detail-title" className={styles.historyReportTitle}>
+                  {selectedProcessItem.safeTitle}
                 </h2>
+                <p className={styles.processDrawerSubtitle}>{selectedProcessSectionLabel}</p>
               </div>
               <button
                 type="button"
                 className={styles.historyReportClose}
-                aria-label="Cerrar informe historico"
-                onClick={() => setHistoryReportOpen(false)}
+                aria-label="Cerrar detalle"
+                onClick={closeProcessDetail}
               >
                 ×
               </button>
             </div>
 
-            {historyReportLoading ? (
-              <p className={styles.shellSidebarEmpty}>Cargando informe historico...</p>
-            ) : historyReport ? (
-              <div className={styles.historyReportBody}>
-                <div className={styles.historyReportHero}>
-                  <span className={styles.historyReportHeroPill}>{historyReport.total_items} caso(s) utiles</span>
-                  <p className={styles.historyReportSummary}>{historyReport.global_summary}</p>
-                </div>
-
-                <div className={styles.historyReportGrid}>
-                  <article className={styles.historyReportCard}>
-                    <p className={styles.historyReportCardTitle}>Temas frecuentes</p>
-                    <div className={styles.historyReportChipRow}>
-                      {historyReport.frequent_topics.length > 0 ? (
-                        historyReport.frequent_topics.map((topic) => (
-                          <span key={topic.label} className={styles.historyReportChip}>
-                            {topic.label} ({topic.count})
-                          </span>
-                        ))
-                      ) : (
-                        <span className={styles.historyReportMuted}>Sin patron suficiente aun.</span>
-                      )}
-                    </div>
-                  </article>
-
-                  <article className={styles.historyReportCard}>
-                    <p className={styles.historyReportCardTitle}>Tono habitual</p>
-                    <p className={styles.historyReportLead}>
-                      {getSafeToneLabel(historyReport.predominant_tone)}
-                    </p>
-                    <p className={styles.historyReportMuted}>Etiqueta consolidada sin exponer mensajes literales.</p>
-                  </article>
-
-                  <article className={styles.historyReportCard}>
-                    <p className={styles.historyReportCardTitle}>Riesgo predominante</p>
-                    <p className={styles.historyReportLead}>
-                      {getSafeRiskLabel(historyReport.predominant_risk_level)}
-                    </p>
-                    <p className={styles.historyReportMuted}>Sirve para orientar la revision, no como diagnostico final.</p>
-                  </article>
-
-                  <article className={styles.historyReportCard}>
-                    <p className={styles.historyReportCardTitle}>Recomendaciones recurrentes</p>
-                    <div className={styles.historyReportRecommendationList}>
-                      {historyReport.recurring_recommendations.length > 0 ? (
-                        historyReport.recurring_recommendations.map((recommendation) => (
-                          <p key={recommendation.label} className={styles.historyReportRecommendationItem}>
-                            {recommendation.label}
-                          </p>
-                        ))
-                      ) : (
-                        <p className={styles.historyReportMuted}>Aun no hay recomendaciones repetidas para destacar.</p>
-                      )}
-                    </div>
-                  </article>
-                </div>
+            <div className={styles.historyReportBody}>
+              <div className={styles.historyReportHero}>
+                <span className={styles.historyReportHeroPill}>{selectedProcessTimestampLabel}</span>
+                <p className={styles.historyReportSummary}>{selectedProcessItem.safeSummary}</p>
               </div>
-            ) : (
-              <p className={styles.shellSidebarEmpty}>Todavia no hay historial suficiente para consolidar.</p>
-            )}
+
+              {selectedProcessItem.section === "advisor" && selectedProcessItem.advisorName ? (
+                <div className={styles.processDrawerTagRow}>
+                  <span className={styles.processDrawerTag}>Consejo recibido con {selectedProcessItem.advisorName}</span>
+                </div>
+              ) : null}
+
+              {selectedProcessItem.section === "mood" ? (
+                <div className={styles.processDrawerGrid}>
+                  <article className={styles.historyReportCard}>
+                    <p className={styles.historyReportCardTitle}>Animo</p>
+                    <p className={styles.historyReportLead}>{selectedProcessItem.moodLabel}</p>
+                  </article>
+                  <article className={styles.historyReportCard}>
+                    <p className={styles.historyReportCardTitle}>Confianza</p>
+                    <p className={styles.historyReportLead}>{selectedProcessItem.confidenceLabel}</p>
+                  </article>
+                  <article className={styles.historyReportCard}>
+                    <p className={styles.historyReportCardTitle}>Contacto reciente</p>
+                    <p className={styles.historyReportLead}>{selectedProcessItem.recentContactLabel}</p>
+                  </article>
+                </div>
+              ) : null}
+
+              <div className={styles.processDrawerGrid}>
+                <article className={styles.historyReportCard}>
+                  <p className={styles.historyReportCardTitle}>Resumen seguro</p>
+                  <p className={styles.processDrawerBodyCopy}>{selectedProcessItem.safeSummary}</p>
+                </article>
+                <article className={styles.historyReportCard}>
+                  <p className={styles.historyReportCardTitle}>Tono</p>
+                  <p className={styles.historyReportLead}>{selectedProcessItem.toneLabel}</p>
+                </article>
+                <article className={styles.historyReportCard}>
+                  <p className={styles.historyReportCardTitle}>Riesgo</p>
+                  <p className={styles.historyReportLead}>{selectedProcessItem.riskLabel}</p>
+                </article>
+                <article className={styles.historyReportCard}>
+                  <p className={styles.historyReportCardTitle}>Siguiente paso</p>
+                  <p className={styles.processDrawerBodyCopy}>{selectedProcessItem.recommendationLabel}</p>
+                </article>
+              </div>
+            </div>
           </section>
         </div>
       ) : null}

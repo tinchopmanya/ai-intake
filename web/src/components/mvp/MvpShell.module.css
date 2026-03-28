@@ -317,6 +317,278 @@
   color: rgba(255, 255, 255, 0.44);
 }
 
+.processPanel {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.processPanel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.processPanel::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(45, 107, 228, 0.34);
+}
+
+.processOverviewCard {
+  display: grid;
+  gap: 8px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(circle at top left, rgba(244, 201, 93, 0.08) 0%, transparent 24%),
+    linear-gradient(180deg, rgba(17, 32, 51, 0.96) 0%, rgba(10, 21, 32, 0.98) 100%);
+  padding: 14px;
+}
+
+.processOverviewEyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(244, 218, 152, 0.74);
+}
+
+.processOverviewTitle {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.processOverviewCopy {
+  font-size: 12px;
+  line-height: 1.6;
+  color: rgba(229, 239, 249, 0.68);
+}
+
+.processSection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.processSectionToggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(17, 32, 51, 0.94) 100%);
+  color: rgba(255, 255, 255, 0.9);
+  padding: 12px 13px;
+  text-align: left;
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
+}
+
+.processSectionToggle:hover {
+  transform: translateY(-1px);
+  border-color: rgba(126, 184, 247, 0.22);
+  background: linear-gradient(180deg, rgba(45, 107, 228, 0.1) 0%, rgba(17, 32, 51, 0.98) 100%);
+}
+
+.processSectionTitle {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.processSectionCopy {
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.54);
+}
+
+.processSectionBody {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.processDateGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.processDateLabel {
+  padding: 0 2px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(244, 218, 152, 0.62);
+}
+
+.processItemList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.processItemCard {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(circle at top left, rgba(244, 201, 93, 0.05) 0%, transparent 20%),
+    linear-gradient(180deg, rgba(17, 32, 51, 0.96) 0%, rgba(10, 21, 32, 0.98) 100%);
+  padding: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+.processItemCard:hover {
+  transform: translateY(-1px);
+  border-color: rgba(244, 201, 93, 0.28);
+  box-shadow: 0 16px 28px rgba(0, 0, 0, 0.16);
+  background:
+    radial-gradient(circle at top left, rgba(244, 201, 93, 0.1) 0%, transparent 24%),
+    linear-gradient(180deg, rgba(19, 35, 53, 0.98) 0%, rgba(10, 21, 32, 0.99) 100%);
+}
+
+.processItemInteractive {
+  cursor: pointer;
+}
+
+.processItemSelected {
+  border-color: rgba(244, 201, 93, 0.34);
+  box-shadow:
+    inset 0 0 0 1px rgba(244, 201, 93, 0.08),
+    0 16px 30px rgba(0, 0, 0, 0.18);
+}
+
+.processItemHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.processItemTitle {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.processItemMeta {
+  margin-top: 3px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.48);
+}
+
+.processItemArrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1px solid rgba(244, 201, 93, 0.16);
+  background: rgba(244, 201, 93, 0.08);
+  color: rgba(255, 235, 190, 0.88);
+  font-size: 18px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.processMoodGrid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.processMetricCard {
+  display: grid;
+  gap: 4px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 8px;
+}
+
+.processMetricLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.processMetricValue {
+  font-size: 12px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.processItemTagRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.processRiskBadge,
+.processDrawerTag {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(244, 201, 93, 0.18);
+  background: rgba(244, 201, 93, 0.12);
+  padding: 5px 9px;
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(255, 235, 190, 0.92);
+}
+
+.processActionHint {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(244, 218, 152, 0.86);
+}
+
+.processRecommendationPreview,
+.processSummaryPreview,
+.processDrawerBodyCopy {
+  font-size: 12px;
+  line-height: 1.6;
+  color: rgba(229, 239, 249, 0.74);
+}
+
+.processAdvisorLabel,
+.processDrawerSubtitle {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(34, 197, 139, 0.88);
+}
+
+.processDrawerTagRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.processDrawerGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .shellHistoryList {
   display: flex;
   flex: 1;
@@ -2640,7 +2912,9 @@
   }
 
   .historyReportGrid,
-  .shellHistoryMetricsGrid {
+  .shellHistoryMetricsGrid,
+  .processDrawerGrid,
+  .processMoodGrid {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -2692,6 +2966,11 @@
 
   .shellHistoryMetaGrid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .processSectionToggle,
+  .processItemHeader {
+    align-items: flex-start;
   }
 
   .historyReportTitle {
