@@ -650,6 +650,7 @@ export function AppShell({ children }: AppShellProps) {
   const [displayName, setDisplayName] = useState("Usuario");
   const [advisorChatOpen, setAdvisorChatOpen] = useState(false);
   const [advisorChatIndex, setAdvisorChatIndex] = useState<number | null>(null);
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [advisorChatInput, setAdvisorChatInput] = useState("");
   const [advisorChatSending, setAdvisorChatSending] = useState(false);
   const [advisorChatDebugPayload, setAdvisorChatDebugPayload] = useState<Record<string, unknown> | null>(null);
@@ -935,7 +936,7 @@ export function AppShell({ children }: AppShellProps) {
   const groupedMoodHistory = useMemo(() => groupProcessItems(moodHistoryItems), [moodHistoryItems]);
   const groupedExPartnerHistory = useMemo(() => groupProcessItems(exPartnerHistoryEntries), [exPartnerHistoryEntries]);
   const groupedAdvisorHistory = useMemo(() => groupProcessItems(advisorHistoryEntries), [advisorHistoryEntries]);
-  const totalProcessItems = moodHistoryItems.length + exPartnerHistoryEntries.length + advisorHistoryEntries.length;
+  const totalVisibleProcessItems = moodHistoryItems.length + exPartnerHistoryEntries.length;
 
   useEffect(() => {
     if (!selectedProcessItem) return;
@@ -1383,41 +1384,13 @@ export function AppShell({ children }: AppShellProps) {
 
           {sidebarOpen ? (
             <>
-              <div className={styles.shellSidebarPrimaryAction}>
-                <button
-                  type="button"
-                  className={styles.shellNewConversation}
-                  onClick={() => {
-                    setActiveConversationId(null);
-                    if (typeof window !== "undefined") {
-                      window.sessionStorage.removeItem(ACTIVE_CONVERSATION_STORAGE_KEY);
-                      window.dispatchEvent(new Event("mvp:new-conversation"));
-                    }
-                    if (!isDesktop) setSidebarOpen(false);
-                  }}
-                >
-                  <span className={styles.shellNewConversationIcon} aria-hidden="true">
-                    +
-                  </span>
-                  Nueva conversacion
-                </button>
-              </div>
               <div className={styles.shellSidebarBody}>
                 {shellFetchNotice ? <p className={styles.shellSidebarEmpty}>{shellFetchNotice}</p> : null}
                 {historyNotice ? <p className={styles.shellSidebarEmpty}>{historyNotice}</p> : null}
                 {conversationsLoading || memoryItemsLoading ? (
                   <p className={styles.shellSidebarEmpty}>Cargando tu proceso...</p>
-                ) : totalProcessItems > 0 ? (
+                ) : totalVisibleProcessItems > 0 ? (
                   <div className={styles.processPanel}>
-                    <section className={styles.processOverviewCard}>
-                      <p className={styles.processOverviewEyebrow}>Tu proceso</p>
-                      <p className={styles.processOverviewTitle}>Lo que ya pudiste registrar y revisar</p>
-                      <p className={styles.processOverviewCopy}>
-                        {totalProcessItems} momento(s) guardado(s), organizados para que entiendas tu evolucion sin ver
-                        mensajes crudos.
-                      </p>
-                    </section>
-
                     <section className={styles.processSection}>
                       <button
                         type="button"
@@ -1425,11 +1398,42 @@ export function AppShell({ children }: AppShellProps) {
                         onClick={() => toggleHistorySection("mood")}
                         aria-expanded={sectionExpanded.mood}
                       >
-                        <div>
-                          <p className={styles.processSectionTitle}>Como estas</p>
-                          <p className={styles.processSectionCopy}>Registro diario emocional</p>
+                        <div className={styles.processSectionLead}>
+                          <span className={`${styles.processSectionIcon} ${styles.processSectionIconMood}`} aria-hidden="true">
+                            <svg viewBox="0 0 20 20" className={styles.processSectionIconSvg} fill="none">
+                              <path
+                                d="M10 16.25s-4.75-2.95-4.75-7.05A2.7 2.7 0 0 1 8 6.5c.84 0 1.63.39 2 .99.37-.6 1.16-.99 2-.99a2.7 2.7 0 0 1 2.75 2.7c0 4.1-4.75 7.05-4.75 7.05Z"
+                                stroke="currentColor"
+                                strokeWidth="1.6"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                          </span>
+                          <div>
+                            <p className={styles.processSectionTitle}>Check-ins diarios</p>
+                            <p className={styles.processSectionCopy}>Cómo te venís sintiendo y si hubo contacto.</p>
+                          </div>
                         </div>
-                        <span className={styles.shellHistoryCountPill}>{moodHistoryItems.length}</span>
+                        <div className={styles.processSectionMeta}>
+                          <span className={styles.shellHistoryCountPill}>{moodHistoryItems.length}</span>
+                          <span
+                            className={`${styles.processSectionChevron} ${
+                              sectionExpanded.mood ? styles.processSectionChevronOpen : ""
+                            }`}
+                            aria-hidden="true"
+                          >
+                            <svg viewBox="0 0 20 20" className={styles.processSectionChevronSvg} fill="none">
+                              <path
+                                d="m7 4 6 6-6 6"
+                                stroke="currentColor"
+                                strokeWidth="1.8"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                          </span>
+                        </div>
                       </button>
                       {sectionExpanded.mood ? (
                         groupedMoodHistory.length > 0 ? (
@@ -1489,11 +1493,42 @@ export function AppShell({ children }: AppShellProps) {
                         onClick={() => toggleHistorySection("ex")}
                         aria-expanded={sectionExpanded.ex}
                       >
-                        <div>
-                          <p className={styles.processSectionTitle}>Situaciones analizadas</p>
-                          <p className={styles.processSectionCopy}>Casos revisados sin exponer contenido literal.</p>
+                        <div className={styles.processSectionLead}>
+                          <span className={`${styles.processSectionIcon} ${styles.processSectionIconEx}`} aria-hidden="true">
+                            <svg viewBox="0 0 20 20" className={styles.processSectionIconSvg} fill="none">
+                              <path
+                                d="M4.75 5.75h10.5a1.5 1.5 0 0 1 1.5 1.5v5a1.5 1.5 0 0 1-1.5 1.5H9.8L6.2 16.6a.75.75 0 0 1-1.2-.6v-2.25H4.75a1.5 1.5 0 0 1-1.5-1.5v-5a1.5 1.5 0 0 1 1.5-1.5Z"
+                                stroke="currentColor"
+                                strokeWidth="1.55"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                          </span>
+                          <div>
+                            <p className={styles.processSectionTitle}>Situaciones analizadas</p>
+                            <p className={styles.processSectionCopy}>Lecturas seguras para decidir con más claridad.</p>
+                          </div>
                         </div>
-                        <span className={styles.shellHistoryCountPill}>{exPartnerHistoryEntries.length}</span>
+                        <div className={styles.processSectionMeta}>
+                          <span className={styles.shellHistoryCountPill}>{exPartnerHistoryEntries.length}</span>
+                          <span
+                            className={`${styles.processSectionChevron} ${
+                              sectionExpanded.ex ? styles.processSectionChevronOpen : ""
+                            }`}
+                            aria-hidden="true"
+                          >
+                            <svg viewBox="0 0 20 20" className={styles.processSectionChevronSvg} fill="none">
+                              <path
+                                d="m7 4 6 6-6 6"
+                                stroke="currentColor"
+                                strokeWidth="1.8"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                          </span>
+                        </div>
                       </button>
                       {sectionExpanded.ex ? (
                         groupedExPartnerHistory.length > 0 ? (
@@ -1534,16 +1569,17 @@ export function AppShell({ children }: AppShellProps) {
                         ) : (
                           <p className={styles.shellSidebarEmpty}>Todavia no hay situaciones analizadas para mostrar.</p>
                         )
-                      ) : null}
+                        ) : null}
                     </section>
 
-                    <section className={styles.processSection}>
-                      <button
-                        type="button"
-                        className={styles.processSectionToggle}
-                        onClick={() => toggleHistorySection("advisor")}
-                        aria-expanded={sectionExpanded.advisor}
-                      >
+                    {false ? (
+                      <section className={styles.processSection}>
+                        <button
+                          type="button"
+                          className={styles.processSectionToggle}
+                          onClick={() => toggleHistorySection("advisor")}
+                          aria-expanded={sectionExpanded.advisor}
+                        >
                         <div>
                           <p className={styles.processSectionTitle}>Consejos recibidos</p>
                           <p className={styles.processSectionCopy}>Recomendaciones guardadas para volver cuando las necesites.</p>
@@ -1589,7 +1625,8 @@ export function AppShell({ children }: AppShellProps) {
                           <p className={styles.shellSidebarEmpty}>Todavia no hay consejos guardados para revisar.</p>
                         )
                       ) : null}
-                    </section>
+                      </section>
+                    ) : null}
                   </div>
                 ) : false ? (
                   <div className={styles.shellSessionList}>
@@ -1629,6 +1666,36 @@ export function AppShell({ children }: AppShellProps) {
                 ) : (
                   <p className={styles.shellSidebarEmpty}>Todavía no tienes conversaciones guardadas.</p>
                 )}
+              </div>
+              <div className={styles.shellSidebarFooter}>
+                <button
+                  type="button"
+                  className={styles.shellSidebarSettingsButton}
+                  onClick={() => setSettingsModalOpen(true)}
+                >
+                  <span className={styles.shellSidebarSettingsIcon} aria-hidden="true">
+                    <svg viewBox="0 0 20 20" className={styles.shellSidebarSettingsSvg} fill="none">
+                      <path
+                        d="M8.3 4.15a1 1 0 0 1 1.4-.8l.54.23a1 1 0 0 0 .8 0l.54-.23a1 1 0 0 1 1.4.8l.1.58a1 1 0 0 0 .55.72l.52.26a1 1 0 0 1 .44 1.55l-.36.48a1 1 0 0 0 0 .86l.36.48a1 1 0 0 1-.44 1.55l-.52.26a1 1 0 0 0-.55.72l-.1.58a1 1 0 0 1-1.4.8l-.54-.23a1 1 0 0 0-.8 0l-.54.23a1 1 0 0 1-1.4-.8l-.1-.58a1 1 0 0 0-.55-.72l-.52-.26a1 1 0 0 1-.44-1.55l.36-.48a1 1 0 0 0 0-.86l-.36-.48a1 1 0 0 1 .44-1.55l.52-.26a1 1 0 0 0 .55-.72l.1-.58Z"
+                        stroke="currentColor"
+                        strokeWidth="1.4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M11.75 10a1.75 1.75 0 1 1-3.5 0 1.75 1.75 0 0 1 3.5 0Z"
+                        stroke="currentColor"
+                        strokeWidth="1.4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </span>
+                  <span className={styles.shellSidebarSettingsCopy}>
+                    <span className={styles.shellSidebarSettingsTitle}>Configuración</span>
+                    <span className={styles.shellSidebarSettingsHint}>Preferencias y acciones de cuenta</span>
+                  </span>
+                </button>
               </div>
             </>
           ) : (
@@ -1707,6 +1774,57 @@ export function AppShell({ children }: AppShellProps) {
                 <div className={styles.processDrawerLearningCard}>
                   <p className={styles.processDrawerBodyCopy}>{selectedProcessLearning}</p>
                 </div>
+              </section>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {settingsModalOpen ? (
+        <div
+          className={styles.historyReportBackdrop}
+          role="presentation"
+          onClick={() => setSettingsModalOpen(false)}
+        >
+          <section
+            className={styles.settingsModal}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="settings-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className={styles.historyReportHeader}>
+              <div className={styles.processDrawerHeaderContent}>
+                <p className={styles.historyReportEyebrow}>Configuración</p>
+                <h2 id="settings-modal-title" className={styles.processDrawerHeading}>
+                  Ajustes de tu proceso
+                </h2>
+                <p className={styles.processDrawerContextCopy}>
+                  Acá vamos a concentrar preferencias y acciones sensibles sin sacarte del flujo principal.
+                </p>
+              </div>
+              <button
+                type="button"
+                className={styles.historyReportClose}
+                aria-label="Cerrar configuración"
+                onClick={() => setSettingsModalOpen(false)}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className={styles.settingsModalBody}>
+              <section className={styles.settingsActionCard}>
+                <div className={styles.settingsActionCopyBlock}>
+                  <p className={styles.settingsActionEyebrow}>Historial</p>
+                  <h3 className={styles.settingsActionTitle}>Borrar historial</h3>
+                  <p className={styles.settingsActionText}>
+                    Esta acción va a quedar disponible cuando exista soporte completo del backend para limpiar la memoria segura.
+                  </p>
+                </div>
+                <button type="button" disabled className={styles.settingsActionButton}>
+                  Próximamente
+                </button>
               </section>
             </div>
           </section>

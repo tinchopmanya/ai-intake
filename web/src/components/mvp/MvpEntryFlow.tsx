@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 
@@ -215,6 +215,69 @@ function buildHistoryEntries(messages: MessageSummary[]): HistoryEntry[] {
       content: message.content.trim(),
       timestamp: formatMessageTimestamp(message.created_at),
     }));
+}
+
+function getCheckinPercent(level: number | null | undefined) {
+  if (level === null || level === undefined) return 0;
+  return ((level + 1) / DAILY_MOOD_OPTIONS.length) * 100;
+}
+
+function getCheckinTone(level: number | null | undefined) {
+  if (level === null || level === undefined) return "steady";
+  if (level <= 1) return "low";
+  if (level >= 3) return "high";
+  return "steady";
+}
+
+function getRecentContactSummary(value: boolean | null | undefined) {
+  if (value === true) return "Hubo contacto reciente";
+  if (value === false) return "Sin contacto reciente";
+  return "Sin registrar";
+}
+
+function TodayStateMetric({
+  label,
+  value,
+  percent,
+  tone,
+  icon,
+}: {
+  label: string;
+  value: string;
+  percent: number;
+  tone: "low" | "steady" | "high";
+  icon: ReactNode;
+}) {
+  const toneClassName =
+    tone === "low"
+      ? styles.todayStateLow
+      : tone === "high"
+        ? styles.todayStateHigh
+        : styles.todayStateSteady;
+
+  return (
+    <div className={styles.todayStateMetric}>
+      <div className={styles.todayStateMetricHeader}>
+        <span className={`${styles.todayStateMetricIcon} ${toneClassName}`} aria-hidden="true">
+          {icon}
+        </span>
+        <div className={styles.todayStateMetricCopy}>
+          <span className={styles.todayStateMetricLabel}>{label}</span>
+          <span className={styles.todayStateMetricValue}>{value}</span>
+        </div>
+      </div>
+      <div className={styles.todayStateBarTrack} aria-hidden="true">
+        <span
+          className={`${styles.todayStateBarFill} ${toneClassName}`}
+          style={
+            {
+              "--today-state-fill": `${percent}%`,
+            } as CSSProperties
+          }
+        />
+      </div>
+    </div>
+  );
 }
 
 function CheckinSliderQuestion({
@@ -690,7 +753,7 @@ export function MvpEntryFlow() {
                     </span>
                     <span className={styles.actionTextBlock}>
                       <span className={styles.actionTitle}>Solo quiero desahogarme</span>
-                      <span className={styles.actionCopy}>Entrar rápido a un espacio breve para descargar y ordenar.</span>
+                      <span className={styles.actionCopy}>{"Habl\u00e1 con un consejero sobre c\u00f3mo te sent\u00eds"}</span>
                     </span>
                   </button>
                   <button type="button" className={styles.secondaryAction} onClick={handleAnalyzeConversation}>
@@ -738,6 +801,143 @@ export function MvpEntryFlow() {
                     </span>
                   </button>
                 </div>
+
+                {todayCheckin || (sidebarConversation && lastSessionMeta) || activeConversationSummary ? (
+                  <section className={styles.contextSummarySection}>
+                    <div className={styles.contextSummarySectionHeader}>
+                      <div>
+                        <p className={styles.contextSummarySectionEyebrow}>Tu proceso hoy</p>
+                        <p className={styles.contextSummarySectionTitle}>Un vistazo simple para volver a ubicarse.</p>
+                      </div>
+                      {todayCheckin ? (
+                        <button type="button" className={styles.summaryInlineButton} onClick={handleOpenCheckinEditor}>
+                          Ajustar check-in
+                        </button>
+                      ) : null}
+                    </div>
+
+                    <div className={styles.contextSummaryCards}>
+                      {todayCheckin ? (
+                        <section className={`${styles.daySummaryCard} ${styles.todayStateCard}`}>
+                          <div className={styles.summaryCardHeaderRow}>
+                            <div>
+                              <p className={styles.contextSummaryLabel}>Resumen de hoy</p>
+                              <p className={styles.todayStateTitle}>Tu estado de hoy</p>
+                            </div>
+                            <span className={styles.todayStateChip}>{checkinSummaryLine ?? "Check-in listo"}</span>
+                          </div>
+                          <div className={styles.todayStateMetrics}>
+                            <TodayStateMetric
+                              label="Animo"
+                              value={getMoodSummaryLabel(todayCheckin.mood_level) ?? "Sin registrar"}
+                              percent={getCheckinPercent(todayCheckin.mood_level)}
+                              tone={getCheckinTone(todayCheckin.mood_level)}
+                              icon={
+                                <svg viewBox="0 0 20 20" className={styles.todayStateMetricSvg} fill="none">
+                                  <path
+                                    d="M10 16.25s-4.75-2.95-4.75-7.05A2.7 2.7 0 0 1 8 6.5c.84 0 1.63.39 2 .99.37-.6 1.16-.99 2-.99a2.7 2.7 0 0 1 2.75 2.7c0 4.1-4.75 7.05-4.75 7.05Z"
+                                    stroke="currentColor"
+                                    strokeWidth="1.6"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                </svg>
+                              }
+                            />
+                            <TodayStateMetric
+                              label="Confianza"
+                              value={getConfidenceSummaryLabel(todayCheckin.confidence_level) ?? "Sin registrar"}
+                              percent={getCheckinPercent(todayCheckin.confidence_level)}
+                              tone={getCheckinTone(todayCheckin.confidence_level)}
+                              icon={
+                                <svg viewBox="0 0 20 20" className={styles.todayStateMetricSvg} fill="none">
+                                  <path
+                                    d="M10 3.75 14.75 5.5v3.7c0 2.93-1.86 5.47-4.75 6.8-2.89-1.33-4.75-3.87-4.75-6.8V5.5L10 3.75Z"
+                                    stroke="currentColor"
+                                    strokeWidth="1.6"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                </svg>
+                              }
+                            />
+                          </div>
+                          <div className={styles.todayStateFooter}>
+                            <span className={styles.todayStateFooterLabel}>Contacto reciente</span>
+                            <span
+                              className={`${styles.todayStateContactChip} ${
+                                todayCheckin.recent_contact ? styles.todayStateContactChipAlert : styles.todayStateContactChipCalm
+                              }`}
+                            >
+                              {getRecentContactSummary(todayCheckin.recent_contact)}
+                            </span>
+                          </div>
+                        </section>
+                      ) : null}
+
+                      <div className={styles.contextSummaryGrid}>
+                        {sidebarConversation && lastSessionMeta ? (
+                          <div className={styles.sessionCard}>
+                            <span className={styles.sessionDot} aria-hidden="true" />
+                            <div className={styles.contextSummaryTextBlock}>
+                              <p className={styles.contextSummaryLabel}>Última sesión</p>
+                              <p className={styles.sessionText}>
+                                {sessionTitleLabel} · {lastSessionMeta}
+                              </p>
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {activeConversation ? (
+                          <div className={styles.historySummaryCard}>
+                            <span className={styles.historySummaryDot} aria-hidden="true" />
+                            <div className={styles.contextSummaryTextBlock}>
+                              <p className={styles.contextSummaryLabel}>Conversación seleccionada</p>
+                              {activeConversationMessagesLoading ? (
+                                <p className={styles.historySummaryText}>Cargando conversación...</p>
+                              ) : activeConversationSummary ? (
+                                <>
+                                  <p className={styles.historySummaryText}>
+                                    {getSavedItemsLabel(activeConversationSummary.count)} · {activeConversationSummary.lastTypeLabel}
+                                  </p>
+                                  <p className={styles.historySummaryPreview}>{activeConversationSummary.preview}</p>
+                                  {activeConversationResume ? (
+                                    <div className={styles.historySummaryActions}>
+                                      <p className={styles.historySummaryHint}>{activeConversationResume.helperText}</p>
+                                      {activeConversationResume.previewText ? (
+                                        <p className={styles.historySummaryResumePreview}>
+                                          {activeConversationResume.previewText}
+                                        </p>
+                                      ) : null}
+                                      <div className={styles.historySummaryButtonRow}>
+                                        <button
+                                          type="button"
+                                          className={styles.historySummaryButton}
+                                          onClick={handleResumeConversation}
+                                        >
+                                          {activeConversationResume.ctaLabel}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className={styles.historySummarySecondaryButton}
+                                          onClick={handleOpenHistoryPanel}
+                                        >
+                                          Ver historial
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : null}
+                                </>
+                              ) : (
+                                <p className={styles.historySummaryText}>Todavía no guardaste contenido en esta conversación.</p>
+                              )}
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  </section>
+                ) : null}
 
                 <p className={styles.disclaimer}>
                   Guardamos el contexto mínimo para que puedas retomar tu proceso. La IA puede equivocarse.
@@ -853,6 +1053,9 @@ export function MvpEntryFlow() {
             {checkinError ? <p className={styles.checkinError}>{checkinError}</p> : null}
 
             <div className={styles.checkinActions}>
+              <button type="button" className={styles.checkinSecondary} onClick={handleSkipCheckinForVisit}>
+                Omitir por hoy
+              </button>
               <button
                 type="button"
                 className={styles.checkinPrimary}
@@ -860,9 +1063,6 @@ export function MvpEntryFlow() {
                 disabled={!canSubmitCheckin}
               >
                 {checkinSubmitting ? "Guardando..." : "Guardar y continuar"}
-              </button>
-              <button type="button" className={styles.checkinSecondary} onClick={handleSkipCheckinForVisit}>
-                Omitir por hoy
               </button>
             </div>
           </section>

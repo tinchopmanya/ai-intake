@@ -61,7 +61,7 @@
 
 .headline {
   margin-top: 6px;
-  font-size: clamp(28px, 4.2vw, 38px);
+  font-size: clamp(27px, 4vw, 36px);
   line-height: 1.12;
   font-weight: 600;
   letter-spacing: -0.03em;
@@ -82,18 +82,57 @@
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
+.entryBody > .contextSummaryGrid {
+  display: none;
+}
+
+.contextSummarySection {
+  display: grid;
+  gap: 12px;
+}
+
+.contextSummarySectionHeader {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.contextSummarySectionEyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(246, 215, 145, 0.82);
+}
+
+.contextSummarySectionTitle {
+  margin-top: 4px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: rgba(229, 239, 250, 0.72);
+}
+
+.contextSummaryCards {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+}
+
 .daySummaryCard {
   display: flex;
   align-items: flex-start;
   gap: 10px;
   min-height: 88px;
-  padding: 14px 15px;
-  border-radius: 18px;
+  padding: 16px;
+  border-radius: 22px;
   border: 1px solid rgba(240, 191, 82, 0.24);
   background:
-    linear-gradient(180deg, rgba(242, 188, 68, 0.14) 0%, rgba(31, 34, 27, 0.08) 100%),
+    linear-gradient(180deg, rgba(242, 188, 68, 0.16) 0%, rgba(31, 34, 27, 0.08) 100%),
     rgba(255, 255, 255, 0.03);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 20px 36px rgba(4, 10, 18, 0.18);
 }
 
 .daySummaryDot {
@@ -114,45 +153,49 @@
 
 .summaryCardHeaderRow {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
 }
 
 .summaryInlineButton {
-  min-height: 30px;
+  min-height: 36px;
   border-radius: 999px;
-  border: 1px solid rgba(240, 191, 82, 0.24);
-  background: rgba(240, 191, 82, 0.12);
-  color: rgba(252, 245, 224, 0.95);
-  padding: 0 12px;
-  font-size: 11px;
+  border: 1px solid rgba(240, 191, 82, 0.22);
+  background: linear-gradient(180deg, rgba(240, 191, 82, 0.16) 0%, rgba(54, 43, 18, 0.58) 100%);
+  color: rgba(255, 247, 225, 0.96);
+  padding: 0 14px;
+  font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
   transition:
     transform 160ms ease,
     background 160ms ease,
-    border-color 160ms ease;
+    border-color 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .summaryInlineButton:hover {
   transform: translateY(-1px);
-  background: rgba(240, 191, 82, 0.18);
+  background: linear-gradient(180deg, rgba(240, 191, 82, 0.22) 0%, rgba(64, 50, 20, 0.72) 100%);
   border-color: rgba(240, 191, 82, 0.32);
+  box-shadow: 0 10px 20px rgba(244, 201, 93, 0.12);
 }
 
 .sessionCard {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  min-height: 88px;
-  padding: 14px 15px;
-  border-radius: 18px;
+  min-height: 112px;
+  padding: 16px;
+  border-radius: 22px;
   border: 1px solid rgba(126, 184, 247, 0.16);
   background:
-    radial-gradient(circle at top left, rgba(78, 141, 230, 0.1) 0%, transparent 40%),
+    radial-gradient(circle at top left, rgba(78, 141, 230, 0.14) 0%, transparent 40%),
     rgba(255, 255, 255, 0.035);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.02),
+    0 18px 32px rgba(4, 10, 18, 0.16);
 }
 
 .sessionDot {
@@ -175,14 +218,16 @@
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  min-height: 88px;
-  padding: 14px 15px;
-  border-radius: 18px;
+  min-height: 128px;
+  padding: 16px;
+  border-radius: 22px;
   border: 1px solid rgba(27, 169, 125, 0.22);
   background:
-    radial-gradient(circle at top left, rgba(16, 185, 129, 0.12) 0%, transparent 42%),
+    radial-gradient(circle at top left, rgba(16, 185, 129, 0.14) 0%, transparent 42%),
     rgba(255, 255, 255, 0.035);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 18px 32px rgba(4, 10, 18, 0.16);
 }
 
 .historySummaryDot {
@@ -306,6 +351,166 @@
   color: rgba(185, 211, 242, 0.68);
 }
 
+.todayStateCard {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
+.todayStateTitle {
+  margin-top: 4px;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: rgba(250, 252, 255, 0.97);
+}
+
+.todayStateChip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  max-width: 280px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.07);
+  padding: 0 12px;
+  font-size: 11px;
+  color: rgba(250, 245, 230, 0.88);
+}
+
+.todayStateMetrics {
+  display: grid;
+  gap: 12px;
+}
+
+.todayStateMetric {
+  display: grid;
+  gap: 10px;
+}
+
+.todayStateMetricHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.todayStateMetricIcon {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.todayStateMetricSvg {
+  width: 18px;
+  height: 18px;
+}
+
+.todayStateMetricCopy {
+  display: grid;
+  gap: 2px;
+}
+
+.todayStateMetricLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(220, 231, 245, 0.62);
+}
+
+.todayStateMetricValue {
+  font-size: 14px;
+  line-height: 1.45;
+  color: rgba(250, 252, 255, 0.96);
+}
+
+.todayStateBarTrack {
+  position: relative;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.todayStateBarFill {
+  display: block;
+  height: 100%;
+  width: var(--today-state-fill);
+  border-radius: inherit;
+  transform-origin: left center;
+  animation: todayStateBarIn 520ms ease;
+}
+
+.todayStateLow {
+  color: #fb923c;
+}
+
+.todayStateSteady {
+  color: #facc15;
+}
+
+.todayStateHigh {
+  color: #4ade80;
+}
+
+.todayStateBarFill.todayStateLow {
+  background: linear-gradient(90deg, #ef4444 0%, #f59e0b 100%);
+}
+
+.todayStateBarFill.todayStateSteady {
+  background: linear-gradient(90deg, #f59e0b 0%, #facc15 100%);
+}
+
+.todayStateBarFill.todayStateHigh {
+  background: linear-gradient(90deg, #84cc16 0%, #22c55e 100%);
+}
+
+.todayStateFooter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 2px;
+}
+
+.todayStateFooterLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(220, 231, 245, 0.58);
+}
+
+.todayStateContactChip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.todayStateContactChipAlert {
+  border-color: rgba(250, 204, 21, 0.2);
+  background: rgba(250, 204, 21, 0.12);
+  color: rgba(255, 244, 214, 0.94);
+}
+
+.todayStateContactChipCalm {
+  border-color: rgba(34, 197, 139, 0.22);
+  background: rgba(34, 197, 139, 0.12);
+  color: rgba(231, 255, 246, 0.94);
+}
+
 .actionsHeader {
   display: flex;
   align-items: center;
@@ -321,7 +526,7 @@
 
 .actions {
   display: grid;
-  gap: 12px;
+  gap: 14px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
@@ -331,13 +536,13 @@
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  min-height: 86px;
+  min-height: 96px;
   width: 100%;
-  border-radius: 22px;
+  border-radius: 24px;
   display: inline-flex;
   align-items: flex-start;
-  gap: 14px;
-  padding: 18px;
+  gap: 16px;
+  padding: 20px;
   text-align: left;
   font-size: 14px;
   font-weight: 600;
@@ -375,10 +580,10 @@
 
 .primaryAction {
   grid-column: 1 / -1;
-  min-height: 106px;
-  border: 1px solid rgba(89, 140, 228, 0.34);
+  min-height: 118px;
+  border: 1px solid rgba(89, 140, 228, 0.38);
   color: #f8fbff;
-  box-shadow: 0 22px 34px rgba(7, 18, 31, 0.28);
+  box-shadow: 0 24px 40px rgba(7, 18, 31, 0.32);
 }
 
 .primaryAction::before {
@@ -417,15 +622,17 @@
 
 .buttonIconBadge {
   display: inline-flex;
-  width: 48px;
-  height: 48px;
+  width: 58px;
+  height: 58px;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border-radius: 16px;
+  border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.08);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 12px 22px rgba(0, 0, 0, 0.18);
 }
 
 .primaryAction .buttonIconBadge {
@@ -444,8 +651,8 @@
 }
 
 .buttonIcon {
-  width: 21px;
-  height: 21px;
+  width: 26px;
+  height: 26px;
 }
 
 .actionTextBlock {
@@ -456,13 +663,13 @@
 
 .actionTitle {
   display: block;
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.34;
 }
 
 .actionCopy {
   display: block;
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.55;
   font-weight: 400;
   color: rgba(238, 244, 250, 0.72);
@@ -628,13 +835,13 @@
 
 .checkinModal {
   position: relative;
-  width: min(100%, 860px);
-  max-height: min(calc(100vh - 88px), 620px);
+  width: min(100%, 820px);
+  max-height: min(calc(100vh - 88px), 600px);
   display: flex;
   min-height: 0;
   flex-direction: column;
   overflow: hidden;
-  border-radius: 28px;
+  border-radius: 30px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background:
     radial-gradient(circle at top left, rgba(248, 205, 100, 0.14) 0%, transparent 24%),
@@ -644,7 +851,7 @@
   box-shadow:
     0 34px 92px rgba(0, 0, 0, 0.44),
     inset 0 1px 0 rgba(255, 255, 255, 0.03);
-  padding: 16px 16px 14px;
+  padding: 18px 18px 16px;
   scrollbar-width: thin;
   scrollbar-color: rgba(126, 184, 247, 0.3) transparent;
 }
@@ -675,7 +882,7 @@
 
 .checkinHeader {
   display: grid;
-  gap: 5px;
+  gap: 6px;
   padding-right: 46px;
 }
 
@@ -697,8 +904,8 @@
 
 .checkinSubtitle {
   max-width: 680px;
-  font-size: 12.5px;
-  line-height: 1.45;
+  font-size: 13px;
+  line-height: 1.55;
   color: rgba(227, 237, 248, 0.68);
 }
 
@@ -707,8 +914,8 @@
   min-height: 0;
   flex: 1;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 14px;
+  gap: 12px;
+  margin-top: 16px;
   overflow-y: auto;
   padding-right: 4px;
   scrollbar-width: thin;
@@ -717,13 +924,15 @@
 
 .checkinQuestionBlock {
   display: grid;
-  gap: 8px;
-  border-radius: 20px;
+  gap: 10px;
+  border-radius: 24px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background:
     linear-gradient(180deg, rgba(19, 31, 45, 0.96) 0%, rgba(10, 21, 32, 0.98) 100%);
-  padding: 12px 13px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  padding: 14px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 16px 26px rgba(4, 10, 18, 0.16);
 }
 
 .checkinQuestionBlock:nth-child(1) {
@@ -741,7 +950,7 @@
 }
 
 .checkinQuestionTitle {
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.4;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.93);
@@ -757,112 +966,120 @@
 .checkinSliderValue {
   display: inline-flex;
   align-items: center;
-  min-height: 24px;
-  padding: 0 10px;
+  min-height: 28px;
+  padding: 0 12px;
   border-radius: 999px;
   border: 1px solid rgba(126, 184, 247, 0.2);
-  background: rgba(126, 184, 247, 0.1);
+  background: rgba(126, 184, 247, 0.12);
   color: rgba(237, 245, 255, 0.92);
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 600;
   white-space: nowrap;
 }
 
 .checkinSliderWrap {
   position: relative;
-  padding: 4px 2px 0;
+  padding: 8px 4px 2px;
 }
 
 .checkinSliderWrap::before {
   content: "";
   position: absolute;
-  left: 2px;
-  right: 2px;
+  left: 4px;
+  right: 4px;
   top: 50%;
-  height: 4px;
+  height: 8px;
   border-radius: 999px;
   transform: translateY(-50%);
-  background: linear-gradient(
-    90deg,
-    rgba(245, 197, 84, 0.74) 0%,
-    rgba(34, 197, 139, 0.7) var(--checkin-slider-fill),
-    rgba(255, 255, 255, 0.12) var(--checkin-slider-fill),
-    rgba(255, 255, 255, 0.12) 100%
-  );
+  background:
+    linear-gradient(90deg, #ef4444 0%, #f59e0b 26%, #facc15 56%, #22c55e 100%) 0 0 /
+      var(--checkin-slider-fill) 100% no-repeat,
+    rgba(255, 255, 255, 0.1);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 0 24px rgba(45, 107, 228, 0.08);
+  transition: background-size 220ms ease;
 }
 
 .checkinSlider {
   position: relative;
   z-index: 1;
   width: 100%;
-  height: 22px;
+  height: 30px;
   appearance: none;
   background: transparent;
   cursor: pointer;
 }
 
 .checkinSlider::-webkit-slider-runnable-track {
-  height: 4px;
+  height: 8px;
   background: transparent;
 }
 
 .checkinSlider::-moz-range-track {
-  height: 4px;
+  height: 8px;
   background: transparent;
 }
 
 .checkinSlider::-webkit-slider-thumb {
   appearance: none;
-  width: 16px;
-  height: 16px;
-  margin-top: -6px;
+  width: 22px;
+  height: 22px;
+  margin-top: -7px;
   border-radius: 999px;
-  border: 2px solid rgba(230, 236, 255, 0.92);
-  background: linear-gradient(180deg, #f4c95d 0%, #24c58d 100%);
-  box-shadow: 0 0 0 4px rgba(126, 184, 247, 0.1);
+  border: 3px solid rgba(238, 244, 255, 0.96);
+  background: linear-gradient(180deg, #fff5c8 0%, #facc15 42%, #22c55e 100%);
+  box-shadow:
+    0 0 0 6px rgba(126, 184, 247, 0.08),
+    0 8px 18px rgba(5, 15, 28, 0.28);
 }
 
 .checkinSlider::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
+  width: 22px;
+  height: 22px;
   border-radius: 999px;
-  border: 2px solid rgba(230, 236, 255, 0.92);
-  background: linear-gradient(180deg, #f4c95d 0%, #24c58d 100%);
-  box-shadow: 0 0 0 4px rgba(126, 184, 247, 0.1);
+  border: 3px solid rgba(238, 244, 255, 0.96);
+  background: linear-gradient(180deg, #fff5c8 0%, #facc15 42%, #22c55e 100%);
+  box-shadow:
+    0 0 0 6px rgba(126, 184, 247, 0.08),
+    0 8px 18px rgba(5, 15, 28, 0.28);
 }
 
 .checkinSliderLabels {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 8px;
+  gap: 6px;
 }
 
 .checkinSliderLabelButton {
-  min-height: 32px;
-  border-radius: 12px;
-  border: 1px solid transparent;
-  background: transparent;
-  padding: 4px 4px;
+  min-height: 40px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.02);
+  padding: 6px 5px;
   text-align: center;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.58);
   cursor: pointer;
-  transition: color 160ms ease, border-color 160ms ease, background 160ms ease;
+  transition: color 160ms ease, border-color 160ms ease, background 160ms ease, transform 160ms ease;
 }
 
 .checkinSliderLabelButton:hover {
-  color: rgba(255, 255, 255, 0.78);
+  transform: translateY(-1px);
+  color: rgba(255, 255, 255, 0.86);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 .checkinSliderLabelButtonActive {
-  border-color: rgba(245, 197, 84, 0.18);
-  background: rgba(245, 197, 84, 0.08);
+  border-color: rgba(245, 197, 84, 0.22);
+  background: rgba(245, 197, 84, 0.1);
   color: rgba(239, 244, 255, 0.92);
+  box-shadow: inset 0 0 0 1px rgba(245, 197, 84, 0.08);
 }
 
 .checkinSliderLabelText {
   display: block;
-  font-size: 10px;
-  line-height: 1.25;
+  font-size: 10.5px;
+  line-height: 1.3;
 }
 
 .binaryOptionRow {
@@ -872,8 +1089,8 @@
 }
 
 .binaryOptionButton {
-  min-height: 40px;
-  border-radius: 14px;
+  min-height: 44px;
+  border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.035);
   color: rgba(255, 255, 255, 0.78);
@@ -893,6 +1110,7 @@
   border-color: rgba(34, 197, 139, 0.28);
   background: rgba(34, 197, 139, 0.12);
   color: rgba(255, 255, 255, 0.95);
+  box-shadow: inset 0 0 0 1px rgba(34, 197, 139, 0.08);
 }
 
 .checkinError {
@@ -909,8 +1127,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  margin-top: 12px;
-  padding-top: 10px;
+  margin-top: 14px;
+  padding-top: 12px;
   padding-bottom: max(4px, env(safe-area-inset-bottom));
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   background:
@@ -918,9 +1136,9 @@
 }
 
 .checkinPrimary {
-  min-height: 42px;
-  padding: 0 18px;
-  border-radius: 14px;
+  min-height: 46px;
+  padding: 0 20px;
+  border-radius: 16px;
   border: 1px solid rgba(83, 144, 228, 0.34);
   background:
     linear-gradient(135deg, rgba(245, 197, 84, 0.18) 0%, transparent 28%),
@@ -942,13 +1160,31 @@
 }
 
 .checkinSecondary {
-  min-height: 38px;
-  padding: 0 4px;
-  border: 0;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.6);
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.72);
   font-size: 13px;
   cursor: pointer;
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.checkinSecondary:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+@keyframes todayStateBarIn {
+  from {
+    width: 0;
+  }
+
+  to {
+    width: var(--today-state-fill);
+  }
 }
 
 .sheetBackdrop {
@@ -1260,6 +1496,10 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .contextSummaryCards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .contextSummaryGrid {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -1300,7 +1540,7 @@
   }
 
   .headline {
-    font-size: clamp(24px, 8.4vw, 30px);
+    font-size: clamp(23px, 8vw, 28px);
   }
 
   .subcopy {
@@ -1310,14 +1550,14 @@
   .primaryAction,
   .secondaryAction,
   .tertiaryAction {
-    min-height: 84px;
-    padding: 14px;
+    min-height: 88px;
+    padding: 16px;
   }
 
   .buttonIconBadge {
-    width: 40px;
-    height: 40px;
-    border-radius: 12px;
+    width: 48px;
+    height: 48px;
+    border-radius: 16px;
   }
 
   .checkinBackdrop {

@@ -2132,7 +2132,7 @@ export function WizardScaffold({
                 <div className={styles.wizardPanelTitleRow}>
                   <div>
                     <h4 className={styles.wizardPanelTitle}>Escribir</h4>
-                    <p className={styles.wizardPanelHint}>Pegá el mensaje o contalo con tus palabras.</p>
+                    <p className={styles.wizardPanelHint}>Escribí lo que pasó o contalo con tus palabras.</p>
                   </div>
                   {hasConversationInput ? (
                     <button
@@ -2159,7 +2159,7 @@ export function WizardScaffold({
                   value={messageText}
                   onChange={(event) => handleMessageTextChange(event.target.value)}
                   rows={6}
-                  placeholder="Pegá el mensaje que recibiste o copiá la conversación completa."
+                  placeholder="Pegá el mensaje o dejá acá lo que necesitás ordenar antes de responder."
                   spellCheck={false}
                   className={`${styles.wizardPrimaryTextarea} ${styles.wizardPrimaryTextareaCompact} ${
                     hasCapturedDraft ? styles.wizardPrimaryTextareaCaptured : ""
@@ -2174,7 +2174,7 @@ export function WizardScaffold({
               >
                 <div>
                   <h4 className={styles.wizardPanelTitle}>Captura</h4>
-                  <p className={styles.wizardPanelHint}>Adjuntá una imagen y reutilizamos el OCR actual.</p>
+                  <p className={styles.wizardPanelHint}>Subí una captura y después ajustá el texto con calma.</p>
                 </div>
                 <input
                   type="file"
@@ -2220,7 +2220,7 @@ export function WizardScaffold({
                   value={messageText}
                   onChange={(event) => handleMessageTextChange(event.target.value)}
                   rows={5}
-                  placeholder="Acá va a aparecer el texto extraído para que lo ajustes."
+                  placeholder="Acá vas a ver el texto detectado para corregirlo si hace falta."
                   spellCheck={false}
                   className={`${styles.wizardPrimaryTextarea} ${styles.wizardPrimaryTextareaCompact}`}
                 />
@@ -2231,7 +2231,7 @@ export function WizardScaffold({
               <div className={styles.wizardInputGroup}>
                 <div>
                   <h4 className={styles.wizardPanelTitle}>Voz</h4>
-                  <p className={styles.wizardPanelHint}>Tu dictado entra directo al texto principal.</p>
+                  <p className={styles.wizardPanelHint}>Dictá a tu ritmo y después revisalo antes de seguir.</p>
                 </div>
                 <div className={styles.wizardVoiceCaptureCard}>
                   <button
@@ -2280,7 +2280,7 @@ export function WizardScaffold({
                   value={messageText}
                   onChange={(event) => handleMessageTextChange(event.target.value)}
                   rows={6}
-                  placeholder="Acá se va armando el dictado para que lo revises."
+                  placeholder="Acá se va armando lo que decís para que lo dejes claro y a tu manera."
                   spellCheck={false}
                   className={`${styles.wizardPrimaryTextarea} ${styles.wizardPrimaryTextareaCompact}`}
                 />

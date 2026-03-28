@@ -296,11 +296,7 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  padding: 4px 10px 14px;
-}
-
-.shellSidebarPrimaryAction {
-  padding: 6px 10px 12px;
+  padding: 6px 10px 10px;
 }
 
 .shellSessionList {
@@ -322,7 +318,7 @@
   flex: 1;
   min-height: 0;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   overflow-y: auto;
   padding-right: 2px;
 }
@@ -380,19 +376,88 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  border-radius: 16px;
+  border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(17, 32, 51, 0.94) 100%);
+  background:
+    radial-gradient(circle at top left, rgba(244, 201, 93, 0.08) 0%, transparent 32%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055) 0%, rgba(17, 32, 51, 0.96) 100%);
   color: rgba(255, 255, 255, 0.9);
-  padding: 12px 13px;
+  padding: 13px 14px;
   text-align: left;
-  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
 }
 
 .processSectionToggle:hover {
   transform: translateY(-1px);
-  border-color: rgba(126, 184, 247, 0.22);
-  background: linear-gradient(180deg, rgba(45, 107, 228, 0.1) 0%, rgba(17, 32, 51, 0.98) 100%);
+  border-color: rgba(126, 184, 247, 0.26);
+  background:
+    radial-gradient(circle at top left, rgba(45, 107, 228, 0.16) 0%, transparent 32%),
+    linear-gradient(180deg, rgba(45, 107, 228, 0.1) 0%, rgba(17, 32, 51, 0.98) 100%);
+  box-shadow: 0 14px 24px rgba(0, 0, 0, 0.16);
+}
+
+.processSectionLead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.processSectionIcon {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.processSectionIconMood {
+  color: #f6d47a;
+  background: rgba(244, 201, 93, 0.12);
+}
+
+.processSectionIconEx {
+  color: #8fc0ff;
+  background: rgba(45, 107, 228, 0.14);
+}
+
+.processSectionIconSvg {
+  width: 18px;
+  height: 18px;
+}
+
+.processSectionMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.processSectionChevron {
+  display: inline-flex;
+  width: 26px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.56);
+  transition: transform 180ms ease, color 180ms ease, border-color 180ms ease;
+}
+
+.processSectionChevronOpen {
+  transform: rotate(90deg);
+  color: rgba(255, 255, 255, 0.88);
+  border-color: rgba(126, 184, 247, 0.2);
+}
+
+.processSectionChevronSvg {
+  width: 14px;
+  height: 14px;
 }
 
 .processSectionTitle {
@@ -404,9 +469,9 @@
 
 .processSectionCopy {
   margin-top: 4px;
-  font-size: 11px;
+  font-size: 11.5px;
   line-height: 1.55;
-  color: rgba(255, 255, 255, 0.54);
+  color: rgba(223, 235, 248, 0.62);
 }
 
 .processSectionBody {
@@ -427,7 +492,7 @@
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(244, 218, 152, 0.62);
+  color: rgba(244, 218, 152, 0.72);
 }
 
 .processItemList {
@@ -441,12 +506,12 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  border-radius: 16px;
+  border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background:
-    radial-gradient(circle at top left, rgba(244, 201, 93, 0.05) 0%, transparent 20%),
+    radial-gradient(circle at top left, rgba(244, 201, 93, 0.07) 0%, transparent 20%),
     linear-gradient(180deg, rgba(17, 32, 51, 0.96) 0%, rgba(10, 21, 32, 0.98) 100%);
-  padding: 12px;
+  padding: 13px;
   text-align: left;
   cursor: pointer;
   transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
@@ -454,10 +519,10 @@
 
 .processItemCard:hover {
   transform: translateY(-1px);
-  border-color: rgba(244, 201, 93, 0.28);
-  box-shadow: 0 16px 28px rgba(0, 0, 0, 0.16);
+  border-color: rgba(126, 184, 247, 0.24);
+  box-shadow: 0 18px 30px rgba(0, 0, 0, 0.2);
   background:
-    radial-gradient(circle at top left, rgba(244, 201, 93, 0.1) 0%, transparent 24%),
+    radial-gradient(circle at top left, rgba(45, 107, 228, 0.12) 0%, transparent 24%),
     linear-gradient(180deg, rgba(19, 35, 53, 0.98) 0%, rgba(10, 21, 32, 0.99) 100%);
 }
 
@@ -466,9 +531,9 @@
 }
 
 .processItemSelected {
-  border-color: rgba(244, 201, 93, 0.34);
+  border-color: rgba(34, 197, 139, 0.3);
   box-shadow:
-    inset 0 0 0 1px rgba(244, 201, 93, 0.08),
+    inset 0 0 0 1px rgba(34, 197, 139, 0.08),
     0 16px 30px rgba(0, 0, 0, 0.18);
 }
 
@@ -480,7 +545,7 @@
 }
 
 .processItemTitle {
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 700;
   line-height: 1.45;
   color: rgba(255, 255, 255, 0.92);
@@ -496,12 +561,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   border-radius: 999px;
-  border: 1px solid rgba(244, 201, 93, 0.16);
-  background: rgba(244, 201, 93, 0.08);
-  color: rgba(255, 235, 190, 0.88);
+  border: 1px solid rgba(126, 184, 247, 0.16);
+  background: rgba(45, 107, 228, 0.12);
+  color: rgba(214, 234, 255, 0.88);
   font-size: 18px;
   line-height: 1;
   flex-shrink: 0;
@@ -937,45 +1002,142 @@
 }
 
 .shellSidebarFooter {
-  padding: 10px 8px 12px;
+  padding: 12px 10px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.shellNewConversation {
+.shellSidebarSettingsButton {
   width: 100%;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  border-radius: 14px;
-  border: 1px solid rgba(45, 107, 228, 0.28);
-  background: linear-gradient(180deg, rgba(45, 107, 228, 0.14) 0%, rgba(19, 39, 67, 0.92) 100%);
-  color: #9dc8ff;
-  padding: 11px 13px;
+  gap: 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(circle at top left, rgba(244, 201, 93, 0.08) 0%, transparent 32%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(17, 32, 51, 0.96) 100%);
+  color: rgba(232, 241, 250, 0.9);
+  padding: 12px 13px;
   font-size: 13px;
   font-weight: 600;
   text-align: left;
   cursor: pointer;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
-  transition: background 180ms ease, border-color 180ms ease, transform 180ms ease;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 14px 24px rgba(0, 0, 0, 0.12);
+  transition: background 180ms ease, border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
 }
 
-.shellNewConversation:hover {
-  background: linear-gradient(180deg, rgba(45, 107, 228, 0.2) 0%, rgba(23, 48, 82, 0.96) 100%);
-  border-color: rgba(45, 107, 228, 0.45);
+.shellSidebarSettingsButton:hover {
+  background:
+    radial-gradient(circle at top left, rgba(45, 107, 228, 0.14) 0%, transparent 32%),
+    linear-gradient(180deg, rgba(45, 107, 228, 0.1) 0%, rgba(19, 39, 67, 0.96) 100%);
+  border-color: rgba(45, 107, 228, 0.26);
   transform: translateY(-1px);
+  box-shadow: 0 18px 28px rgba(0, 0, 0, 0.18);
 }
 
-.shellNewConversationIcon {
+.shellSidebarSettingsIcon {
   display: inline-flex;
-  width: 20px;
-  height: 20px;
+  width: 40px;
+  height: 40px;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  color: #7eb8f7;
-  font-size: 15px;
-  line-height: 1;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(45, 107, 228, 0.14);
+  color: #a6cbff;
   flex-shrink: 0;
+}
+
+.shellSidebarSettingsSvg {
+  width: 18px;
+  height: 18px;
+}
+
+.shellSidebarSettingsCopy {
+  display: grid;
+  gap: 3px;
+}
+
+.shellSidebarSettingsTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(248, 251, 255, 0.96);
+}
+
+.shellSidebarSettingsHint {
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: rgba(214, 226, 241, 0.66);
+}
+
+.settingsModal {
+  width: min(100%, 620px);
+  border-radius: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background:
+    radial-gradient(circle at top left, rgba(244, 201, 93, 0.12) 0%, transparent 24%),
+    radial-gradient(circle at top right, rgba(45, 107, 228, 0.12) 0%, transparent 28%),
+    linear-gradient(180deg, rgba(13, 24, 37, 0.99) 0%, rgba(10, 21, 32, 0.99) 100%);
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.34);
+  padding: 22px;
+}
+
+.settingsModalBody {
+  display: grid;
+  gap: 14px;
+}
+
+.settingsActionCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(circle at top left, rgba(244, 201, 93, 0.08) 0%, transparent 28%),
+    linear-gradient(180deg, rgba(17, 32, 51, 0.94) 0%, rgba(10, 21, 32, 0.98) 100%);
+  padding: 16px;
+}
+
+.settingsActionCopyBlock {
+  display: grid;
+  gap: 5px;
+}
+
+.settingsActionEyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(244, 218, 152, 0.74);
+}
+
+.settingsActionTitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: rgba(248, 251, 255, 0.98);
+}
+
+.settingsActionText {
+  font-size: 13px;
+  line-height: 1.6;
+  color: rgba(226, 238, 251, 0.68);
+}
+
+.settingsActionButton {
+  min-height: 42px;
+  min-width: 132px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.48);
+  padding: 0 16px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: not-allowed;
 }
 
 .shellContent {
@@ -1514,6 +1676,7 @@
   min-height: 0;
   flex: 1;
   overflow: hidden;
+  height: clamp(430px, 58vh, 560px);
   padding: 14px;
   background:
     radial-gradient(circle at top left, rgba(244, 201, 93, 0.08) 0%, transparent 20%),
@@ -1523,27 +1686,31 @@
 .wizardModeTabs {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 9px;
-  padding: 4px;
-  border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(255, 255, 255, 0.025);
+  gap: 10px;
+  padding: 6px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(circle at top left, rgba(244, 201, 93, 0.08) 0%, transparent 30%),
+    rgba(255, 255, 255, 0.025);
 }
 
 .wizardModeTab {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 52px;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  min-height: 58px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.045) 0%, rgba(255, 255, 255, 0.02) 100%);
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 13.5px;
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.025) 100%);
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 12px 24px rgba(2, 8, 16, 0.08);
   transition:
     background 180ms ease,
     border-color 180ms ease,
@@ -1554,20 +1721,20 @@
 
 .wizardModeTab:hover {
   transform: translateY(-1px);
-  border-color: rgba(255, 255, 255, 0.14);
-  box-shadow: 0 12px 20px rgba(0, 0, 0, 0.12);
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 16px 26px rgba(0, 0, 0, 0.16);
 }
 
 .wizardModeTabInner {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .wizardModeTabSvg {
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
 }
 
 .wizardModeTabIcon {
@@ -1575,10 +1742,10 @@
   align-items: center;
   justify-content: center;
   color: rgba(255, 255, 255, 0.68);
-  width: 28px;
-  height: 28px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.06);
+  width: 38px;
+  height: 38px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .wizardModeTabVoiceIcon {
@@ -1606,12 +1773,13 @@
 }
 
 .wizardModeTabActive {
-  border-color: rgba(244, 201, 93, 0.34);
+  border-color: rgba(244, 201, 93, 0.28);
   background:
     radial-gradient(circle at top left, rgba(244, 201, 93, 0.18) 0%, transparent 34%),
+    radial-gradient(circle at top right, rgba(34, 197, 139, 0.12) 0%, transparent 30%),
     linear-gradient(180deg, rgba(27, 41, 59, 0.98) 0%, rgba(15, 27, 40, 0.98) 100%);
   color: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.14);
+  box-shadow: 0 18px 30px rgba(0, 0, 0, 0.18);
 }
 
 .wizardStepOneGrid {
@@ -1681,19 +1849,21 @@
   max-height: 248px;
   resize: none;
   overflow-y: auto;
-  border-radius: 20px;
-  border: 1px solid rgba(126, 184, 247, 0.16);
+  border-radius: 24px;
+  border: 1px solid rgba(126, 184, 247, 0.18);
   background:
+    radial-gradient(circle at top left, rgba(244, 201, 93, 0.08) 0%, transparent 24%),
     linear-gradient(180deg, rgba(20, 35, 52, 0.98) 0%, rgba(10, 21, 32, 0.99) 100%);
   color: var(--text-primary);
-  padding: 16px 17px;
+  padding: 18px;
   line-height: 1.7;
   font-size: 15px;
   scrollbar-width: thin;
   scrollbar-color: rgba(45, 107, 228, 0.28) transparent;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.02),
-    inset 0 0 0 1px rgba(7, 18, 28, 0.26);
+    inset 0 0 0 1px rgba(7, 18, 28, 0.26),
+    0 18px 30px rgba(0, 0, 0, 0.12);
 }
 
 .wizardPrimaryTextareaCompact {
@@ -1702,7 +1872,7 @@
 }
 
 .wizardPrimaryTextarea::placeholder {
-  color: rgba(202, 217, 233, 0.42);
+  color: rgba(218, 229, 241, 0.5);
 }
 
 .wizardPrimaryTextareaCaptured {
@@ -1713,9 +1883,10 @@
 }
 
 .wizardPrimaryTextarea:focus-visible {
-  border-color: rgba(126, 184, 247, 0.28);
+  border-color: rgba(126, 184, 247, 0.32);
   box-shadow:
-    0 0 0 4px rgba(126, 184, 247, 0.08),
+    0 0 0 4px rgba(126, 184, 247, 0.1),
+    0 0 26px rgba(45, 107, 228, 0.16),
     inset 0 1px 0 rgba(255, 255, 255, 0.02),
     inset 0 0 0 1px rgba(7, 18, 28, 0.26);
 }
@@ -1961,19 +2132,22 @@
   flex: 1;
   flex-direction: column;
   align-items: stretch;
-  gap: 10px;
+  gap: 12px;
   overflow-y: auto;
   overflow-x: hidden;
-  border-radius: 22px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   background:
     radial-gradient(circle at top left, rgba(244, 201, 93, 0.08) 0%, transparent 22%),
+    radial-gradient(circle at top right, rgba(45, 107, 228, 0.08) 0%, transparent 24%),
     linear-gradient(180deg, rgba(10, 21, 32, 0.98) 0%, rgba(6, 14, 22, 1) 100%);
-  padding: 14px 12px 16px;
+  padding: 16px 14px 18px;
   scrollbar-width: thin;
   scrollbar-color: rgba(45, 107, 228, 0.34) transparent;
   overscroll-behavior: contain;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.02),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.02);
 }
 
 .wizardConversationList::-webkit-scrollbar {
@@ -2012,12 +2186,12 @@
   width: min(100%, 820px);
   max-width: min(94%, 820px);
   display: grid;
-  gap: 10px;
+  gap: 12px;
   border-radius: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 15px 16px;
   overflow: visible;
-  box-shadow: 0 16px 28px rgba(0, 0, 0, 0.13);
+  box-shadow: 0 18px 30px rgba(0, 0, 0, 0.16);
 }
 
 .wizardBubble::after {
@@ -2035,10 +2209,10 @@
   margin-right: auto;
   align-self: flex-start;
   background:
-    radial-gradient(circle at top left, rgba(126, 184, 247, 0.12) 0%, transparent 24%),
-    linear-gradient(180deg, rgba(18, 34, 52, 0.98) 0%, rgba(10, 21, 32, 0.99) 100%);
+    radial-gradient(circle at top left, rgba(126, 184, 247, 0.16) 0%, transparent 24%),
+    linear-gradient(180deg, rgba(21, 42, 70, 0.98) 0%, rgba(11, 24, 39, 0.99) 100%);
   color: var(--bubble-adv-text);
-  border-color: rgba(126, 184, 247, 0.18);
+  border-color: rgba(126, 184, 247, 0.22);
   border-radius: 26px 26px 26px 12px;
 }
 
@@ -2050,26 +2224,26 @@
   margin-left: auto;
   align-self: flex-end;
   background:
-    radial-gradient(circle at top left, rgba(252, 214, 98, 0.18) 0%, transparent 24%),
-    linear-gradient(180deg, rgba(138, 103, 24, 0.98) 0%, rgba(96, 68, 12, 0.98) 100%);
-  color: rgba(255, 250, 236, 0.96);
+    radial-gradient(circle at top left, rgba(34, 197, 139, 0.16) 0%, transparent 24%),
+    linear-gradient(180deg, rgba(16, 78, 62, 0.98) 0%, rgba(8, 52, 42, 0.98) 100%);
+  color: rgba(237, 255, 247, 0.96);
   font-weight: 500;
-  border-color: rgba(214, 167, 52, 0.44);
+  border-color: rgba(52, 211, 153, 0.28);
   border-radius: 26px 26px 12px 26px;
 }
 
 .wizardBubbleOutgoing::after {
-  background: linear-gradient(135deg, rgba(214, 167, 52, 0.34) 0%, rgba(214, 167, 52, 0.08) 100%);
+  background: linear-gradient(135deg, rgba(52, 211, 153, 0.34) 0%, rgba(52, 211, 153, 0.08) 100%);
 }
 
 .wizardBubbleUnknown {
   margin-right: auto;
   align-self: flex-start;
   background:
-    radial-gradient(circle at top left, rgba(162, 169, 187, 0.16) 0%, transparent 26%),
-    linear-gradient(180deg, rgba(61, 70, 87, 0.96) 0%, rgba(40, 48, 62, 0.98) 100%);
+    radial-gradient(circle at top left, rgba(145, 165, 196, 0.14) 0%, transparent 26%),
+    linear-gradient(180deg, rgba(58, 74, 96, 0.96) 0%, rgba(35, 47, 63, 0.98) 100%);
   color: rgba(244, 247, 252, 0.94);
-  border-color: rgba(171, 187, 216, 0.18);
+  border-color: rgba(171, 187, 216, 0.2);
   border-radius: 24px;
 }
 
@@ -2106,8 +2280,8 @@
 }
 
 .wizardBubbleOutgoing .wizardBubbleSpeakerLabel {
-  background: rgba(255, 243, 204, 0.12);
-  color: rgba(255, 247, 225, 0.95);
+  background: rgba(187, 247, 208, 0.14);
+  color: rgba(232, 255, 241, 0.95);
 }
 
 .wizardBubbleUnknown .wizardBubbleSpeakerLabel {
@@ -2123,14 +2297,14 @@
   justify-content: flex-end;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(8, 17, 26, 0.22);
+  background: rgba(8, 17, 26, 0.26);
   padding: 3px;
 }
 
 .wizardSpeakerOption {
   border-radius: 999px;
-  padding: 6px 9px;
-  font-size: 9px;
+  padding: 7px 10px;
+  font-size: 9.5px;
   font-weight: 600;
   letter-spacing: 0.02em;
   background: transparent;
@@ -2145,15 +2319,15 @@
 }
 
 .wizardSpeakerOptionActiveUnknown {
-  background: rgba(178, 170, 210, 0.18);
+  background: rgba(145, 165, 196, 0.2);
   color: rgba(255, 255, 255, 0.92);
-  box-shadow: inset 0 0 0 1px rgba(178, 170, 210, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(145, 165, 196, 0.16);
 }
 
 .wizardSpeakerOptionActiveOutgoing {
-  background: rgba(245, 197, 84, 0.2);
-  box-shadow: inset 0 0 0 1px rgba(245, 197, 84, 0.22);
-  color: rgba(74, 53, 8, 0.96);
+  background: rgba(34, 197, 139, 0.22);
+  box-shadow: inset 0 0 0 1px rgba(34, 197, 139, 0.18);
+  color: rgba(233, 255, 246, 0.96);
 }
 
 .wizardBubbleTextarea {
@@ -2189,12 +2363,12 @@
 }
 
 .wizardBubbleOutgoing .wizardBubbleTextarea {
-  color: rgba(255, 250, 236, 0.96);
-  caret-color: rgba(255, 250, 236, 0.96);
+  color: rgba(237, 255, 247, 0.96);
+  caret-color: rgba(237, 255, 247, 0.96);
 }
 
 .wizardBubbleOutgoing .wizardBubbleTextarea::placeholder {
-  color: rgba(255, 244, 217, 0.54);
+  color: rgba(205, 246, 226, 0.56);
 }
 
 .wizardStatusStack {
@@ -2293,6 +2467,7 @@
 .shellAdvisorTrigger,
 .shellSidebarToggle,
 .shellNewConversation,
+.shellSidebarSettingsButton,
 .shellUserButton {
   outline: none;
 }
@@ -2308,6 +2483,7 @@
 .shellAdvisorTrigger:focus-visible,
 .shellSidebarToggle:focus-visible,
 .shellNewConversation:focus-visible,
+.shellSidebarSettingsButton:focus-visible,
 .shellUserButton:focus-visible {
   box-shadow: 0 0 0 3px rgba(45, 107, 228, 0.18);
 }
@@ -2365,16 +2541,17 @@
 
 .wizardAnalysisActionsCard {
   position: relative;
-  gap: 10px;
-  padding: 14px;
-  border-color: rgba(244, 201, 93, 0.22);
+  gap: 12px;
+  padding: 16px;
+  border-color: rgba(244, 201, 93, 0.18);
   background:
-    radial-gradient(circle at top left, rgba(244, 201, 93, 0.16) 0%, transparent 28%),
-    radial-gradient(circle at 90% 10%, rgba(34, 197, 139, 0.12) 0%, transparent 24%),
-    linear-gradient(180deg, rgba(17, 32, 51, 0.92) 0%, rgba(10, 21, 32, 0.96) 100%);
+    radial-gradient(circle at top left, rgba(244, 201, 93, 0.18) 0%, transparent 28%),
+    radial-gradient(circle at 90% 10%, rgba(34, 197, 139, 0.16) 0%, transparent 24%),
+    linear-gradient(180deg, rgba(22, 38, 57, 0.96) 0%, rgba(10, 21, 32, 0.98) 100%);
   box-shadow:
-    0 18px 28px rgba(4, 11, 20, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    0 20px 32px rgba(4, 11, 20, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 0 0 1px rgba(244, 201, 93, 0.04);
 }
 
 .wizardAnalysisActionsCard::before {
@@ -2693,27 +2870,30 @@
 
 .wizardDecisionListCompact {
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .wizardDecisionOption {
   position: relative;
   display: grid;
-  gap: 5px;
+  gap: 6px;
   width: 100%;
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.045) 0%, rgba(255, 255, 255, 0.025) 100%);
-  padding: 12px 13px;
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055) 0%, rgba(255, 255, 255, 0.03) 100%);
+  padding: 14px 15px;
   text-align: left;
   cursor: pointer;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 14px 24px rgba(0, 0, 0, 0.12);
   transition:
     border-color 180ms ease,
     background 180ms ease,
     transform 180ms ease,
-    box-shadow 180ms ease;
+    box-shadow 180ms ease,
+    filter 180ms ease;
 }
 
 .wizardDecisionOption::after {
@@ -2729,16 +2909,20 @@
 
 .wizardDecisionOption:hover {
   transform: translateY(-1px);
-  border-color: rgba(255, 255, 255, 0.18);
-  box-shadow: 0 14px 22px rgba(0, 0, 0, 0.14);
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow: 0 18px 28px rgba(0, 0, 0, 0.18);
+  filter: brightness(1.04);
 }
 
 .wizardDecisionOptionActive {
-  border-color: rgba(34, 197, 139, 0.34);
+  border-color: rgba(34, 197, 139, 0.38);
   background:
-    radial-gradient(circle at top left, rgba(34, 197, 139, 0.14) 0%, transparent 34%),
-    rgba(255, 255, 255, 0.05);
-  box-shadow: inset 0 0 0 1px rgba(34, 197, 139, 0.08), 0 16px 24px rgba(0, 0, 0, 0.16);
+    radial-gradient(circle at top left, rgba(34, 197, 139, 0.18) 0%, transparent 34%),
+    linear-gradient(180deg, rgba(7, 61, 47, 0.26) 0%, rgba(255, 255, 255, 0.05) 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(34, 197, 139, 0.08),
+    0 18px 28px rgba(0, 0, 0, 0.18),
+    0 0 24px rgba(34, 197, 139, 0.08);
 }
 
 .wizardDecisionOptionActive::after,
@@ -2747,10 +2931,10 @@
 }
 
 .wizardDecisionOptionSuggested {
-  border-color: rgba(244, 201, 93, 0.24);
+  border-color: rgba(244, 201, 93, 0.28);
   background:
-    radial-gradient(circle at top left, rgba(244, 201, 93, 0.14) 0%, transparent 34%),
-    rgba(255, 255, 255, 0.045);
+    radial-gradient(circle at top left, rgba(244, 201, 93, 0.18) 0%, transparent 34%),
+    linear-gradient(180deg, rgba(78, 60, 12, 0.18) 0%, rgba(255, 255, 255, 0.045) 100%);
 }
 
 .wizardDecisionOptionSuggested::after {
@@ -2758,27 +2942,27 @@
 }
 
 .wizardDecisionOptionAdvisor {
-  border-color: rgba(34, 197, 139, 0.28);
+  border-color: rgba(45, 107, 228, 0.26);
   background:
-    radial-gradient(circle at top left, rgba(34, 197, 139, 0.16) 0%, transparent 34%),
-    linear-gradient(180deg, rgba(5, 150, 105, 0.08) 0%, rgba(8, 17, 26, 0.28) 100%),
+    radial-gradient(circle at top left, rgba(45, 107, 228, 0.18) 0%, transparent 34%),
+    linear-gradient(180deg, rgba(45, 107, 228, 0.1) 0%, rgba(8, 17, 26, 0.28) 100%),
     rgba(255, 255, 255, 0.04);
 }
 
 .wizardDecisionTitle {
   display: block;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 13.5px;
+  font-weight: 700;
   color: var(--text-primary);
-  padding-left: 10px;
+  padding-left: 12px;
 }
 
 .wizardDecisionCopy {
   display: block;
-  font-size: 11px;
-  line-height: 1.48;
+  font-size: 11.5px;
+  line-height: 1.55;
   color: rgba(231, 238, 245, 0.66);
-  padding-left: 10px;
+  padding-left: 12px;
 }
 
 .wizardDecisionPreview {
@@ -3095,6 +3279,12 @@
   .processSectionToggle,
   .processItemHeader {
     align-items: flex-start;
+  }
+
+  .processSectionLead,
+  .settingsActionCard {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .historyReportTitle {
