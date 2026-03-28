@@ -956,6 +956,13 @@
   color: rgba(255, 255, 255, 0.93);
 }
 
+.checkinQuestionHelper {
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: rgba(220, 231, 245, 0.62);
+}
+
 .checkinSliderHeader {
   display: flex;
   align-items: center;

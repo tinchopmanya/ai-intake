@@ -480,6 +480,156 @@
   gap: 14px;
 }
 
+.diaryPanel {
+  display: grid;
+  gap: 12px;
+  overflow-x: auto;
+}
+
+.diarySubtitle {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(244, 218, 152, 0.72);
+}
+
+.diaryTable {
+  display: grid;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.diaryCornerCell,
+.diaryHeaderCell,
+.diaryRowLabel,
+.diaryValueCell {
+  min-width: 0;
+}
+
+.diaryHeaderCell {
+  display: grid;
+  gap: 2px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.035);
+  padding: 10px 8px;
+  text-align: center;
+}
+
+.diaryHeaderDate {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(245, 249, 255, 0.92);
+}
+
+.diaryHeaderTime {
+  font-size: 10px;
+  color: rgba(214, 226, 241, 0.58);
+}
+
+.diaryRowLabel {
+  display: flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: rgba(232, 240, 249, 0.82);
+  padding-right: 8px;
+}
+
+.diaryValueCell {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.diaryValueChip {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 38px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 6px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.diaryValueDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.diaryValueText {
+  min-width: 0;
+}
+
+.diaryValueLow {
+  background: rgba(239, 68, 68, 0.14);
+  border-color: rgba(239, 68, 68, 0.24);
+  color: #fecaca;
+}
+
+.diaryValueSteady {
+  background: rgba(250, 204, 21, 0.12);
+  border-color: rgba(250, 204, 21, 0.22);
+  color: #fde68a;
+}
+
+.diaryValueHigh {
+  background: rgba(34, 197, 139, 0.14);
+  border-color: rgba(34, 197, 139, 0.24);
+  color: #bbf7d0;
+}
+
+.diaryValueAlert {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.22);
+  color: #fde68a;
+}
+
+.diaryValueCalm {
+  background: rgba(45, 107, 228, 0.12);
+  border-color: rgba(45, 107, 228, 0.22);
+  color: #bfdbfe;
+}
+
+.diaryValueNeutral {
+  background: rgba(148, 163, 184, 0.12);
+  border-color: rgba(148, 163, 184, 0.2);
+  color: #cbd5e1;
+}
+
+.diaryHistoryButton {
+  width: 100%;
+  min-height: 40px;
+  border-radius: 14px;
+  border: 1px solid rgba(45, 107, 228, 0.24);
+  background:
+    radial-gradient(circle at top left, rgba(45, 107, 228, 0.16) 0%, transparent 34%),
+    linear-gradient(180deg, rgba(17, 32, 51, 0.96) 0%, rgba(10, 21, 32, 0.98) 100%);
+  color: rgba(230, 241, 255, 0.92);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.diaryHistoryButton:hover {
+  transform: translateY(-1px);
+  border-color: rgba(120, 179, 255, 0.34);
+  box-shadow: 0 14px 24px rgba(0, 0, 0, 0.16);
+}
+
 .processDateGroup {
   display: flex;
   flex-direction: column;
@@ -1074,6 +1224,9 @@
 
 .settingsModal {
   width: min(100%, 620px);
+  max-height: min(calc(100vh - 96px), 760px);
+  display: flex;
+  flex-direction: column;
   border-radius: 26px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background:
@@ -1087,6 +1240,8 @@
 .settingsModalBody {
   display: grid;
   gap: 14px;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .settingsActionCard {
@@ -1131,13 +1286,118 @@
   min-height: 42px;
   min-width: 132px;
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.48);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  background: rgba(239, 68, 68, 0.12);
+  color: #fee2e2;
   padding: 0 16px;
   font-size: 12px;
   font-weight: 700;
-  cursor: not-allowed;
+  cursor: pointer;
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, opacity 180ms ease;
+}
+
+.settingsActionButton:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(248, 113, 113, 0.32);
+  background: rgba(239, 68, 68, 0.18);
+}
+
+.settingsActionButton:disabled {
+  cursor: progress;
+  opacity: 0.72;
+}
+
+.settingsActionError {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #fca5a5;
+}
+
+.historyModalBody {
+  display: grid;
+  gap: 12px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.historyModalEntry {
+  display: grid;
+  gap: 12px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(circle at top left, rgba(34, 197, 139, 0.08) 0%, transparent 24%),
+    linear-gradient(180deg, rgba(17, 32, 51, 0.96) 0%, rgba(10, 21, 32, 0.98) 100%);
+  padding: 16px;
+}
+
+.historyModalEntryHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.historyModalEntryDate {
+  font-size: 15px;
+  font-weight: 700;
+  color: rgba(248, 251, 255, 0.96);
+}
+
+.historyModalEntryTime {
+  margin-top: 3px;
+  font-size: 11px;
+  color: rgba(214, 226, 241, 0.58);
+}
+
+.historyModalEntryBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  border-radius: 999px;
+  border: 1px solid rgba(45, 107, 228, 0.22);
+  background: rgba(45, 107, 228, 0.12);
+  padding: 0 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(214, 234, 255, 0.9);
+}
+
+.historyModalGrid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.historyModalRow {
+  display: grid;
+  gap: 4px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.035);
+  padding: 10px 11px;
+}
+
+.historyModalRowLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(214, 226, 241, 0.54);
+}
+
+.historyModalRowValue {
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgba(245, 249, 255, 0.92);
+}
+
+.historyModalSummary {
+  font-size: 12px;
+  line-height: 1.6;
+  color: rgba(226, 238, 251, 0.7);
 }
 
 .shellContent {
@@ -3217,6 +3477,7 @@
 
   .historyReportGrid,
   .shellHistoryMetricsGrid,
+  .historyModalGrid,
   .processDrawerGrid,
   .processMoodGrid {
     grid-template-columns: minmax(0, 1fr);

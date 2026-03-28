@@ -17,6 +17,7 @@ from main import app
 class FakeMemoryItemsRepository:
     def __init__(self, user_id):
         self.user_id = user_id
+        self.deleted_count = 0
         self.rows = [
             {
                 "id": uuid4(),
@@ -62,10 +63,26 @@ class FakeMemoryItemsRepository:
             rows = [row for row in rows if row["source_kind"] == source_kind]
         return rows[offset : offset + limit]
 
+    def delete_all_for_user(self, *, user_id):
+        self.deleted_count = len([row for row in self.rows if row["user_id"] == user_id])
+        self.rows = [row for row in self.rows if row["user_id"] != user_id]
+        return self.deleted_count
+
+
+class FakeEmotionalCheckinsRepository:
+    def __init__(self) -> None:
+        self.deleted_count = 0
+
+    def delete_all_for_user(self, *, user_id):
+        del user_id
+        self.deleted_count = 3
+        return self.deleted_count
+
 
 class FakeUow:
     def __init__(self, user_id):
         self.memory_items = FakeMemoryItemsRepository(user_id)
+        self.emotional_checkins = FakeEmotionalCheckinsRepository()
 
 
 class DummyProvider:
@@ -110,6 +127,17 @@ class TestMemoryItemsRouter(unittest.TestCase):
         self.assertEqual(body["total_items"], 1)
         self.assertEqual(body["predominant_tone"], "logistico")
         self.assertEqual(body["frequent_topics"][0]["label"], "Coordinacion")
+
+    def test_delete_history(self):
+        response = self.client.delete("/v1/memory-items/history")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {
+                "emotional_checkins_deleted": 3,
+                "memory_items_deleted": 2,
+            },
+        )
 
 
 if __name__ == "__main__":

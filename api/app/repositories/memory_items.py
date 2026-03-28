@@ -133,6 +133,15 @@ class MemoryItemRepository:
             rows = cursor.fetchall()
         return [dict(row) for row in rows]
 
+    def delete_all_for_user(self, *, user_id: UUID) -> int:
+        query = """
+            DELETE FROM memory_items
+            WHERE user_id = %s
+        """
+        with self._connection.cursor() as cursor:
+            cursor.execute(query, (str(user_id),))
+            return int(cursor.rowcount or 0)
+
 
 def _to_json_text(value: Mapping[str, Any]) -> str:
     import json

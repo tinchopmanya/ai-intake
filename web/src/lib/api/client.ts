@@ -16,6 +16,7 @@ import type { ConversationListResponse } from "@/lib/api/types";
 import type { ConversationSummary } from "@/lib/api/types";
 import type { ConversationUpdateRequest } from "@/lib/api/types";
 import type { EmotionalCheckinCreateRequest } from "@/lib/api/types";
+import type { EmotionalHistoryDeleteResponse } from "@/lib/api/types";
 import type { EmotionalCheckinSummary } from "@/lib/api/types";
 import type { EmotionalCheckinTodayResponse } from "@/lib/api/types";
 import type { ExPartnerHistoricalReportResponse } from "@/lib/api/types";
@@ -83,6 +84,12 @@ async function getJson<T>(path: string): Promise<T> {
   return requestJson<T>(path, {
     method: "GET",
     cache: "no-store",
+  });
+}
+
+async function deleteJson<T>(path: string): Promise<T> {
+  return requestJson<T>(path, {
+    method: "DELETE",
   });
 }
 
@@ -187,6 +194,10 @@ export function getEmotionalCheckinToday(): Promise<EmotionalCheckinTodayRespons
 
 export function postEmotionalCheckin(payload: EmotionalCheckinCreateRequest): Promise<EmotionalCheckinSummary> {
   return postJson<EmotionalCheckinSummary>("/v1/emotional-checkins", payload);
+}
+
+export function deleteEmotionalHistory(): Promise<EmotionalHistoryDeleteResponse> {
+  return deleteJson<EmotionalHistoryDeleteResponse>("/v1/memory-items/history");
 }
 
 export function postMessage(payload: MessageCreateRequest): Promise<MessageSummary> {

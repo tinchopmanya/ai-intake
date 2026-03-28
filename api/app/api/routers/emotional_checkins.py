@@ -26,6 +26,12 @@ def _to_checkin_summary(row: dict) -> EmotionalCheckinSummary:
         mood_level=int(row["mood_level"]),
         confidence_level=int(row["confidence_level"]),
         recent_contact=bool(row["recent_contact"]),
+        vinculo_expareja=(
+            int(row["vinculo_expareja"]) if row.get("vinculo_expareja") is not None else None
+        ),
+        interaccion_hijos=(
+            int(row["interaccion_hijos"]) if row.get("interaccion_hijos") is not None else None
+        ),
     )
 
 
@@ -68,12 +74,16 @@ async def create_emotional_checkin(
         mood_level=payload.mood_level,
         confidence_level=payload.confidence_level,
         recent_contact=payload.recent_contact,
+        vinculo_expareja=payload.vinculo_expareja,
+        interaccion_hijos=payload.interaccion_hijos,
     )
     safe_memory_service = SafeMemoryService(provider)
     memory_item = safe_memory_service.build_checkin_memory(
         mood_level=payload.mood_level,
         confidence_level=payload.confidence_level,
         recent_contact=payload.recent_contact,
+        vinculo_expareja=payload.vinculo_expareja,
+        interaccion_hijos=payload.interaccion_hijos,
     )
     uow.memory_items.upsert_by_source_reference(
         user_id=current_user.id,

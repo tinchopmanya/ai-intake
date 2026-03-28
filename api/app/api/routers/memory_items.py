@@ -10,6 +10,7 @@ from app.api.deps import get_ai_provider
 from app.api.deps import get_current_user
 from app.api.deps import get_uow
 from app.repositories import UnitOfWork
+from app.schemas.emotional_checkins import EmotionalHistoryDeleteResponse
 from app.schemas.memory_items import ExPartnerHistoricalReportResponse
 from app.schemas.memory_items import MemoryItemListResponse
 from app.schemas.memory_items import MemoryItemSummary
@@ -83,3 +84,23 @@ async def get_ex_partner_report(
     )
     safe_memory_service = SafeMemoryService(provider)
     return safe_memory_service.build_ex_partner_report(items=[dict(row) for row in rows])
+
+
+@router.delete(
+    "/history",
+    response_model=EmotionalHistoryDeleteResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def delete_history(
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    uow: Annotated[UnitOfWork | None, Depends(get_uow)],
+) -> EmotionalHistoryDeleteResponse:
+    if uow is None:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="memory_persistence_unavailable")
+
+    emotional_checkins_deleted = uow.emotional_checkins.delete_all_for_user(user_id=current_user.id)
+    memory_items_deleted = uow.memory_items.delete_all_for_user(user_id=current_user.id)
+    return EmotionalHistoryDeleteResponse(
+        emotional_checkins_deleted=emotional_checkins_deleted,
+        memory_items_deleted=memory_items_deleted,
+    )

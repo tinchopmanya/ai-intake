@@ -17,7 +17,9 @@ class EmotionalCheckinRepository:
                 created_at,
                 mood_level,
                 confidence_level,
-                recent_contact
+                recent_contact,
+                vinculo_expareja,
+                interaccion_hijos
             FROM emotional_checkins
             WHERE user_id = %s
               AND created_at >= date_trunc('day', now())
@@ -37,6 +39,8 @@ class EmotionalCheckinRepository:
         mood_level: int,
         confidence_level: int,
         recent_contact: bool,
+        vinculo_expareja: int | None,
+        interaccion_hijos: int | None,
     ) -> Mapping[str, Any]:
         query = """
             INSERT INTO emotional_checkins (
@@ -44,16 +48,20 @@ class EmotionalCheckinRepository:
                 mood_level,
                 confidence_level,
                 recent_contact,
+                vinculo_expareja,
+                interaccion_hijos,
                 created_at
             )
-            VALUES (%s, %s, %s, %s, now())
+            VALUES (%s, %s, %s, %s, %s, %s, now())
             RETURNING
                 id,
                 user_id,
                 created_at,
                 mood_level,
                 confidence_level,
-                recent_contact
+                recent_contact,
+                vinculo_expareja,
+                interaccion_hijos
         """
         with self._connection.cursor() as cursor:
             cursor.execute(
@@ -63,7 +71,18 @@ class EmotionalCheckinRepository:
                     mood_level,
                     confidence_level,
                     recent_contact,
+                    vinculo_expareja,
+                    interaccion_hijos,
                 ),
             )
             row = cursor.fetchone()
         return dict(row)
+
+    def delete_all_for_user(self, *, user_id: UUID) -> int:
+        query = """
+            DELETE FROM emotional_checkins
+            WHERE user_id = %s
+        """
+        with self._connection.cursor() as cursor:
+            cursor.execute(query, (str(user_id),))
+            return int(cursor.rowcount or 0)

@@ -31,6 +31,8 @@ class FakeEmotionalCheckinRepository:
         mood_level: int,
         confidence_level: int,
         recent_contact: bool,
+        vinculo_expareja: int | None,
+        interaccion_hijos: int | None,
     ):
         created = {
             "id": uuid4(),
@@ -39,6 +41,8 @@ class FakeEmotionalCheckinRepository:
             "mood_level": mood_level,
             "confidence_level": confidence_level,
             "recent_contact": recent_contact,
+            "vinculo_expareja": vinculo_expareja,
+            "interaccion_hijos": interaccion_hijos,
         }
         self.created_payloads.append(created)
         self.today_rows_by_user[user_id] = created
@@ -104,6 +108,7 @@ class TestEmotionalCheckinsRouter(unittest.TestCase):
                 "mood_level": 3,
                 "confidence_level": 2,
                 "recent_contact": True,
+                "vinculo_expareja": 2,
             },
         )
         self.assertEqual(response.status_code, 201)
@@ -111,9 +116,15 @@ class TestEmotionalCheckinsRouter(unittest.TestCase):
         self.assertEqual(body["mood_level"], 3)
         self.assertEqual(body["confidence_level"], 2)
         self.assertTrue(body["recent_contact"])
+        self.assertEqual(body["vinculo_expareja"], 2)
+        self.assertIsNone(body["interaccion_hijos"])
         self.assertEqual(self.fake_uow.emotional_checkins.created_payloads[-1]["user_id"], self.current_user_id)
+        self.assertEqual(self.fake_uow.emotional_checkins.created_payloads[-1]["vinculo_expareja"], 2)
+        self.assertIsNone(self.fake_uow.emotional_checkins.created_payloads[-1]["interaccion_hijos"])
         self.assertEqual(len(self.fake_uow.memory_items.saved), 1)
         self.assertEqual(self.fake_uow.memory_items.saved[0]["memory_type"], "mood_checkin")
+        self.assertEqual(self.fake_uow.memory_items.saved[0]["memory_metadata"]["vinculo_expareja"], 2)
+        self.assertIsNone(self.fake_uow.memory_items.saved[0]["memory_metadata"]["interaccion_hijos"])
 
     def test_get_today_status_with_existing_checkin(self):
         existing = {
@@ -123,6 +134,8 @@ class TestEmotionalCheckinsRouter(unittest.TestCase):
             "mood_level": 4,
             "confidence_level": 1,
             "recent_contact": False,
+            "vinculo_expareja": 5,
+            "interaccion_hijos": None,
         }
         self.fake_uow.emotional_checkins.today_rows_by_user[self.current_user_id] = existing
 
@@ -134,6 +147,8 @@ class TestEmotionalCheckinsRouter(unittest.TestCase):
         self.assertEqual(body["today_checkin"]["mood_level"], 4)
         self.assertEqual(body["today_checkin"]["confidence_level"], 1)
         self.assertFalse(body["today_checkin"]["recent_contact"])
+        self.assertEqual(body["today_checkin"]["vinculo_expareja"], 5)
+        self.assertIsNone(body["today_checkin"]["interaccion_hijos"])
 
 
 if __name__ == "__main__":

@@ -52,6 +52,22 @@ const DAILY_CONFIDENCE_OPTIONS: CheckinOption[] = [
   { value: 4, label: "Muy firme" },
 ];
 
+const EX_RELATIONSHIP_OPTIONS: CheckinOption[] = [
+  { value: 1, label: "Demasiado conflictivo" },
+  { value: 2, label: "Tenso pero sin conflicto" },
+  { value: 3, label: "Neutro" },
+  { value: 4, label: "Mejorando" },
+  { value: 5, label: "En paz" },
+];
+
+const CHILDREN_INTERACTION_OPTIONS: CheckinOption[] = [
+  { value: 1, label: "Muy difícil" },
+  { value: 2, label: "Con tensión" },
+  { value: 3, label: "Normal" },
+  { value: 4, label: "Tranquila" },
+  { value: 5, label: "Muy bien" },
+];
+
 const ADVISOR_MICROCOPY: Record<string, string> = {
   laura: "Espacio breve para bajar intensidad y ordenar lo que sientes.",
   robert: "Mirada clara para poner foco y recuperar perspectiva.",
@@ -119,6 +135,14 @@ function getMoodSummaryLabel(level: number | null | undefined) {
 
 function getConfidenceSummaryLabel(level: number | null | undefined) {
   return DAILY_CONFIDENCE_OPTIONS.find((option) => option.value === level)?.label ?? null;
+}
+
+function getRelationshipSummaryLabel(level: number | null | undefined) {
+  return EX_RELATIONSHIP_OPTIONS.find((option) => option.value === level)?.label ?? null;
+}
+
+function getChildrenInteractionSummaryLabel(level: number | null | undefined) {
+  return CHILDREN_INTERACTION_OPTIONS.find((option) => option.value === level)?.label ?? null;
 }
 
 function getMessageTypeLabel(messageType: MessageSummary["message_type"]) {
@@ -285,20 +309,27 @@ function CheckinSliderQuestion({
   options,
   value,
   onChange,
+  helperText,
 }: {
   title: string;
   options: CheckinOption[];
   value: number | null;
   onChange: (nextValue: number) => void;
+  helperText?: string;
 }) {
-  const normalizedValue = value ?? 2;
-  const fillPercent = `${(normalizedValue / (options.length - 1)) * 100}%`;
-  const activeLabel = value === null ? "Elige un nivel" : options[normalizedValue]?.label ?? "";
+  const optionIndex = value === null ? -1 : options.findIndex((option) => option.value === value);
+  const fallbackIndex = Math.max(0, Math.floor((options.length - 1) / 2));
+  const normalizedIndex = optionIndex >= 0 ? optionIndex : fallbackIndex;
+  const fillPercent = `${(normalizedIndex / Math.max(1, options.length - 1)) * 100}%`;
+  const activeLabel = value === null ? "Elige un nivel" : options[normalizedIndex]?.label ?? "";
 
   return (
     <section className={styles.checkinQuestionBlock}>
       <div className={styles.checkinSliderHeader}>
-        <p className={styles.checkinQuestionTitle}>{title}</p>
+        <div>
+          <p className={styles.checkinQuestionTitle}>{title}</p>
+          {helperText ? <p className={styles.checkinQuestionHelper}>{helperText}</p> : null}
+        </div>
         <span className={styles.checkinSliderValue}>{activeLabel}</span>
       </div>
       <div
@@ -314,8 +345,14 @@ function CheckinSliderQuestion({
           min={0}
           max={options.length - 1}
           step={1}
-          value={normalizedValue}
-          onChange={(event) => onChange(Number(event.target.value))}
+          value={normalizedIndex}
+          onChange={(event) => {
+            const nextIndex = Number(event.target.value);
+            const nextOption = options[nextIndex];
+            if (nextOption) {
+              onChange(nextOption.value);
+            }
+          }}
           className={styles.checkinSlider}
           aria-label={title}
         />
@@ -370,11 +407,15 @@ export function MvpEntryFlow() {
   const [draftMoodLevel, setDraftMoodLevel] = useState<number | null>(null);
   const [draftConfidenceLevel, setDraftConfidenceLevel] = useState<number | null>(null);
   const [draftRecentContact, setDraftRecentContact] = useState<boolean | null>(null);
+  const [draftRelationshipLevel, setDraftRelationshipLevel] = useState<number | null>(null);
+  const [draftChildrenInteractionLevel, setDraftChildrenInteractionLevel] = useState<number | null>(null);
 
   function syncCheckinDrafts(checkin: EmotionalCheckinSummary | null) {
     setDraftMoodLevel(checkin?.mood_level ?? null);
     setDraftConfidenceLevel(checkin?.confidence_level ?? null);
     setDraftRecentContact(checkin?.recent_contact ?? null);
+    setDraftRelationshipLevel(checkin?.vinculo_expareja ?? null);
+    setDraftChildrenInteractionLevel(checkin?.interaccion_hijos ?? null);
   }
 
   useEffect(() => {
@@ -443,6 +484,19 @@ export function MvpEntryFlow() {
     };
   }, []);
 
+  useEffect(() => {
+    function handleHistoryCleared() {
+      setTodayCheckin(null);
+      syncCheckinDrafts(null);
+      setCheckinError(null);
+    }
+
+    window.addEventListener("mvp:history-cleared", handleHistoryCleared);
+    return () => {
+      window.removeEventListener("mvp:history-cleared", handleHistoryCleared);
+    };
+  }, []);
+
   const greeting = useMemo(
     () => `${getGreetingLabel()}, ${getFirstName(displayName)}`.toLocaleUpperCase("es-UY"),
     [displayName],
@@ -492,7 +546,20 @@ export function MvpEntryFlow() {
   );
 
   const canSubmitCheckin =
-    draftMoodLevel !== null && draftConfidenceLevel !== null && draftRecentContact !== null && !checkinSubmitting;
+    draftMoodLevel !== null &&
+    draftConfidenceLevel !== null &&
+    draftRecentContact !== null &&
+    draftRelationshipLevel !== null &&
+    !checkinSubmitting;
+
+  const shouldShowChildrenInteractionQuestion =
+    draftRelationshipLevel === 1 || draftRelationshipLevel === 2;
+
+  useEffect(() => {
+    if (!shouldShowChildrenInteractionQuestion && draftChildrenInteractionLevel !== null) {
+      setDraftChildrenInteractionLevel(null);
+    }
+  }, [draftChildrenInteractionLevel, shouldShowChildrenInteractionQuestion]);
 
   useEffect(() => {
     setHistoryPanelOpen(false);
@@ -617,6 +684,8 @@ export function MvpEntryFlow() {
         mood_level: draftMoodLevel,
         confidence_level: draftConfidenceLevel,
         recent_contact: draftRecentContact,
+        vinculo_expareja: draftRelationshipLevel,
+        interaccion_hijos: shouldShowChildrenInteractionQuestion ? draftChildrenInteractionLevel : null,
       });
       setTodayCheckin(created);
       syncCheckinDrafts(created);
@@ -1024,6 +1093,12 @@ export function MvpEntryFlow() {
                 value={draftConfidenceLevel}
                 onChange={setDraftConfidenceLevel}
               />
+              <CheckinSliderQuestion
+                title="Como esta el vinculo con tu expareja actualmente?"
+                options={EX_RELATIONSHIP_OPTIONS}
+                value={draftRelationshipLevel}
+                onChange={setDraftRelationshipLevel}
+              />
 
               <section className={styles.checkinQuestionBlock}>
                 <p className={styles.checkinQuestionTitle}>
@@ -1048,6 +1123,15 @@ export function MvpEntryFlow() {
                   </button>
                 </div>
               </section>
+              {shouldShowChildrenInteractionQuestion ? (
+                <CheckinSliderQuestion
+                  title="Si esto aplica en tu caso, como sentiste la interaccion reciente alrededor de tus hijos?"
+                  helperText="Opcional. Puedes dejarlo sin responder si hoy no aplica para ti."
+                  options={CHILDREN_INTERACTION_OPTIONS}
+                  value={draftChildrenInteractionLevel}
+                  onChange={setDraftChildrenInteractionLevel}
+                />
+              ) : null}
             </div>
 
             {checkinError ? <p className={styles.checkinError}>{checkinError}</p> : null}

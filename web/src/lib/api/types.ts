@@ -213,17 +213,26 @@ export type EmotionalCheckinSummary = {
   mood_level: number;
   confidence_level: number;
   recent_contact: boolean;
+  vinculo_expareja: number | null;
+  interaccion_hijos: number | null;
 };
 
 export type EmotionalCheckinCreateRequest = {
   mood_level: number;
   confidence_level: number;
   recent_contact: boolean;
+  vinculo_expareja: number | null;
+  interaccion_hijos?: number | null;
 };
 
 export type EmotionalCheckinTodayResponse = {
   has_checkin_today: boolean;
   today_checkin: EmotionalCheckinSummary | null;
+};
+
+export type EmotionalHistoryDeleteResponse = {
+  emotional_checkins_deleted: number;
+  memory_items_deleted: number;
 };
 
 export type MemoryType = "mood_checkin" | "advisor_session_summary" | "coparenting_exchange_summary";

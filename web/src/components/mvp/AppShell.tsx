@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -11,6 +11,7 @@ import type { SidebarConversationSummary } from "@/components/mvp/MvpShellContex
 import styles from "@/components/mvp/MvpShell.module.css";
 import { ADVISOR_PROFILES } from "@/data/advisors";
 import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
+import { deleteEmotionalHistory } from "@/lib/api/client";
 import { getConversationMessages } from "@/lib/api/client";
 import { getConversations, getMemoryItems, postConversation } from "@/lib/api/client";
 import { postAdvisorChat } from "@/lib/api/client";
@@ -33,15 +34,51 @@ const CONFIDENCE_LABELS = [
   "Bastante firme",
   "Muy firme",
 ] as const;
+const EX_RELATIONSHIP_LABELS = [
+  "Demasiado conflictivo",
+  "Tenso pero sin conflicto",
+  "Neutro",
+  "Mejorando",
+  "En paz",
+] as const;
+const CHILDREN_INTERACTION_LABELS = [
+  "Muy difícil",
+  "Con tensión",
+  "Normal",
+  "Tranquila",
+  "Muy bien",
+] as const;
 
 type HistorySectionKey = "mood" | "advisor" | "ex";
 
 type MoodHistoryItem = {
   id: string;
-  timestampLabel: string;
+  createdAt: string;
+  dateLabel: string;
+  timeLabel: string;
+  moodLevel: number | null;
+  confidenceLevel: number | null;
+  recentContact: boolean | null;
+  relationshipLevel: number | null;
+  childrenInteractionLevel: number | null;
   moodLabel: string;
   confidenceLabel: string;
   recentContactLabel: string;
+  relationshipLabel: string;
+  childrenInteractionLabel: string;
+  safeSummary: string;
+};
+
+type DiaryMetricKey =
+  | "mood"
+  | "confidence"
+  | "recentContact"
+  | "relationship"
+  | "childrenInteraction";
+
+type DiaryMetricRow = {
+  key: DiaryMetricKey;
+  label: string;
 };
 
 type SafeHistoryEntry = {
@@ -360,6 +397,34 @@ function getConfidenceSummaryLabel(level: number | null | undefined) {
   return typeof level === "number" ? CONFIDENCE_LABELS[level] ?? null : null;
 }
 
+function getRelationshipSummaryLabel(level: number | null | undefined) {
+  if (typeof level !== "number") return null;
+  return EX_RELATIONSHIP_LABELS[level - 1] ?? null;
+}
+
+function getChildrenInteractionSummaryLabel(level: number | null | undefined) {
+  if (typeof level !== "number") return null;
+  return CHILDREN_INTERACTION_LABELS[level - 1] ?? null;
+}
+
+function formatJournalDate(value: string) {
+  const parsedDate = new Date(value);
+  if (Number.isNaN(parsedDate.getTime())) return "—";
+  return new Intl.DateTimeFormat("es-UY", {
+    day: "2-digit",
+    month: "2-digit",
+  }).format(parsedDate);
+}
+
+function formatJournalTime(value: string) {
+  const parsedDate = new Date(value);
+  if (Number.isNaN(parsedDate.getTime())) return "—";
+  return new Intl.DateTimeFormat("es-UY", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(parsedDate);
+}
+
 function getLatestMessageByType(messages: MessageSummary[], messageType: MessageSummary["message_type"]) {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index];
@@ -630,6 +695,40 @@ function getSafeToneLabel(value: string | null | undefined) {
   return normalizeSafeLabel(normalized, "En revision");
 }
 
+function getDiaryMetricLabel(item: MoodHistoryItem, metric: DiaryMetricKey) {
+  if (metric === "mood") return item.moodLabel;
+  if (metric === "confidence") return item.confidenceLabel;
+  if (metric === "recentContact") return item.recentContactLabel;
+  if (metric === "relationship") return item.relationshipLabel;
+  return item.childrenInteractionLabel;
+}
+
+function getDiaryMetricTone(
+  item: MoodHistoryItem,
+  metric: DiaryMetricKey,
+): "low" | "steady" | "high" | "alert" | "calm" | "neutral" {
+  if (metric === "recentContact") {
+    if (item.recentContact === true) return "alert";
+    if (item.recentContact === false) return "calm";
+    return "neutral";
+  }
+
+  const level =
+    metric === "mood"
+      ? item.moodLevel
+      : metric === "confidence"
+        ? item.confidenceLevel
+        : metric === "relationship"
+          ? item.relationshipLevel
+          : item.childrenInteractionLevel;
+
+  if (level === null) return "neutral";
+  if (level <= 1) return "low";
+  if (level >= 4) return "high";
+  if (level === 2 || level === 3) return "steady";
+  return "neutral";
+}
+
 function getSafeOriginLabel(sourceKind: MemoryItemSummary["source_kind"]) {
   if (sourceKind === "ex_chat_capture") return "Captura";
   if (sourceKind === "ex_chat_pasted") return "Texto pegado";
@@ -651,6 +750,9 @@ export function AppShell({ children }: AppShellProps) {
   const [advisorChatOpen, setAdvisorChatOpen] = useState(false);
   const [advisorChatIndex, setAdvisorChatIndex] = useState<number | null>(null);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [historyDeleting, setHistoryDeleting] = useState(false);
+  const [settingsActionError, setSettingsActionError] = useState<string | null>(null);
   const [advisorChatInput, setAdvisorChatInput] = useState("");
   const [advisorChatSending, setAdvisorChatSending] = useState(false);
   const [advisorChatDebugPayload, setAdvisorChatDebugPayload] = useState<Record<string, unknown> | null>(null);
@@ -666,7 +768,7 @@ export function AppShell({ children }: AppShellProps) {
   const [memoryItemsLoading, setMemoryItemsLoading] = useState(true);
   const [historyNotice, setHistoryNotice] = useState<string | null>(null);
   const [sectionExpanded, setSectionExpanded] = useState<Record<HistorySectionKey, boolean>>({
-    mood: true,
+    mood: false,
     advisor: true,
     ex: true,
   });
@@ -863,25 +965,27 @@ export function AppShell({ children }: AppShellProps) {
         const moodLevel = getNumberMetadataValue(metadata, "mood_level");
         const confidenceLevel = getNumberMetadataValue(metadata, "confidence_level");
         const recentContact = getBooleanMetadataValue(metadata, "recent_contact");
+        const relationshipLevel = getNumberMetadataValue(metadata, "vinculo_expareja");
+        const childrenInteractionLevel = getNumberMetadataValue(metadata, "interaccion_hijos");
         return {
           id: item.id,
-          section: "mood",
           createdAt: item.created_at,
-          dayLabel: getProcessDayLabel(item.created_at),
-          timeLabel: formatProcessTime(item.created_at),
-          safeTitle: item.safe_title,
+          dateLabel: formatJournalDate(item.created_at),
+          timeLabel: formatJournalTime(item.created_at),
+          moodLevel,
+          confidenceLevel,
+          recentContact,
+          relationshipLevel,
+          childrenInteractionLevel,
           safeSummary: item.safe_summary,
-          toneValue: item.tone,
-          toneLabel: getSafeToneLabel(item.tone),
-          riskValue: item.risk_level,
-          riskLabel: getSafeRiskLabel(item.risk_level),
-          recommendationLabel: item.recommended_next_step ?? "Seguir registrando como evoluciona el dia.",
-          isSensitive: item.is_sensitive,
-          moodLabel: getMoodSummaryLabel(moodLevel) ?? "Sin definir",
-          confidenceLabel: getConfidenceSummaryLabel(confidenceLevel) ?? "Sin definir",
-          recentContactLabel: recentContact === null ? "Sin dato" : recentContact ? "Si" : "No",
-        } satisfies ProcessSidebarItem;
-      });
+          moodLabel: getMoodSummaryLabel(moodLevel) ?? "-",
+          confidenceLabel: getConfidenceSummaryLabel(confidenceLevel) ?? "-",
+          recentContactLabel: recentContact === null ? "-" : recentContact ? "Si" : "No",
+          relationshipLabel: getRelationshipSummaryLabel(relationshipLevel) ?? "-",
+          childrenInteractionLabel: getChildrenInteractionSummaryLabel(childrenInteractionLevel) ?? "-",
+        } satisfies MoodHistoryItem;
+      })
+      .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
   }, [memoryItems]);
 
   const exPartnerHistoryEntries = useMemo(
@@ -933,7 +1037,23 @@ export function AppShell({ children }: AppShellProps) {
     [memoryItems],
   );
 
-  const groupedMoodHistory = useMemo(() => groupProcessItems(moodHistoryItems), [moodHistoryItems]);
+  const recentMoodHistoryItems = useMemo(() => moodHistoryItems.slice(-5), [moodHistoryItems]);
+  const shouldShowChildrenInteractionRow = useMemo(
+    () => moodHistoryItems.some((item) => item.childrenInteractionLevel !== null),
+    [moodHistoryItems],
+  );
+  const diaryMetricRows = useMemo(() => {
+    const rows: DiaryMetricRow[] = [
+      { key: "mood", label: "Animo" },
+      { key: "confidence", label: "Confianza" },
+      { key: "recentContact", label: "Contacto reciente" },
+      { key: "relationship", label: "Vinculo con tu expareja" },
+    ];
+    if (shouldShowChildrenInteractionRow) {
+      rows.push({ key: "childrenInteraction", label: "Interaccion con tus hijos" });
+    }
+    return rows;
+  }, [shouldShowChildrenInteractionRow]);
   const groupedExPartnerHistory = useMemo(() => groupProcessItems(exPartnerHistoryEntries), [exPartnerHistoryEntries]);
   const groupedAdvisorHistory = useMemo(() => groupProcessItems(advisorHistoryEntries), [advisorHistoryEntries]);
   const totalVisibleProcessItems = moodHistoryItems.length + exPartnerHistoryEntries.length;
@@ -941,7 +1061,7 @@ export function AppShell({ children }: AppShellProps) {
   useEffect(() => {
     if (!selectedProcessItem) return;
 
-    const refreshedItem = [...moodHistoryItems, ...exPartnerHistoryEntries, ...advisorHistoryEntries].find(
+    const refreshedItem = [...exPartnerHistoryEntries, ...advisorHistoryEntries].find(
       (item) => item.id === selectedProcessItem.id,
     );
     if (!refreshedItem) {
@@ -949,7 +1069,7 @@ export function AppShell({ children }: AppShellProps) {
       return;
     }
     setSelectedProcessItem(refreshedItem);
-  }, [advisorHistoryEntries, exPartnerHistoryEntries, moodHistoryItems, selectedProcessItem]);
+  }, [advisorHistoryEntries, exPartnerHistoryEntries, selectedProcessItem]);
 
   function handleSelectProcessItem(item: ProcessSidebarItem) {
     setSelectedProcessItem(item);
@@ -960,9 +1080,35 @@ export function AppShell({ children }: AppShellProps) {
     setSelectedProcessItem(null);
   }
 
+  async function handleDeleteHistory() {
+    if (historyDeleting) return;
+    if (typeof window !== "undefined") {
+      const confirmed = window.confirm("¿Estás seguro? Esta acción no se puede deshacer");
+      if (!confirmed) return;
+    }
+
+    setHistoryDeleting(true);
+    setSettingsActionError(null);
+    try {
+      await deleteEmotionalHistory();
+      setSelectedProcessItem(null);
+      setHistoryModalOpen(false);
+      setSettingsModalOpen(false);
+      await refreshMemoryItems();
+      setHistoryNotice("Historial borrado correctamente.");
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("mvp:history-cleared"));
+      }
+    } catch (error) {
+      setSettingsActionError(toUiErrorMessage(error, "No pudimos borrar el historial por ahora."));
+    } finally {
+      setHistoryDeleting(false);
+    }
+  }
+
   const selectedProcessSectionLabel = useMemo(() => {
     if (!selectedProcessItem) return "";
-    if (selectedProcessItem.section === "mood") return "Como estas";
+    if (selectedProcessItem.section === "mood") return "Diario emocional";
     if (selectedProcessItem.section === "ex") return "Situaciones analizadas";
     return "Consejos recibidos";
   }, [selectedProcessItem]);
@@ -1411,9 +1557,9 @@ export function AppShell({ children }: AppShellProps) {
                             </svg>
                           </span>
                           <div>
-                            <p className={styles.processSectionTitle}>Check-ins diarios</p>
-                            <p className={styles.processSectionCopy}>Cómo te venís sintiendo y si hubo contacto.</p>
-                          </div>
+                            <p className={styles.processSectionTitle}>Diario emocional</p>
+                            <p className={styles.processSectionCopy}>Tu memoria reciente, ordenada para leerla de un vistazo.</p>
+                        </div>
                         </div>
                         <div className={styles.processSectionMeta}>
                           <span className={styles.shellHistoryCountPill}>{moodHistoryItems.length}</span>
@@ -1436,49 +1582,60 @@ export function AppShell({ children }: AppShellProps) {
                         </div>
                       </button>
                       {sectionExpanded.mood ? (
-                        groupedMoodHistory.length > 0 ? (
-                          <div className={styles.processSectionBody}>
-                            {groupedMoodHistory.map((group) => (
-                              <div key={group.label} className={styles.processDateGroup}>
-                                <p className={styles.processDateLabel}>{group.label}</p>
-                                <div className={styles.processItemList}>
-                                  {group.items.map((item) => (
-                                    <button
-                                      key={item.id}
-                                      type="button"
-                                      className={`${styles.processItemCard} ${
-                                        selectedProcessItem?.id === item.id ? styles.processItemSelected : ""
-                                      }`}
-                                      onClick={() => handleSelectProcessItem(item)}
-                                    >
-                                      <div className={styles.processItemHeader}>
-                                        <div>
-                                          <p className={styles.processItemTitle}>Registro diario emocional</p>
-                                          <p className={styles.processItemMeta}>{item.dayLabel} · {item.timeLabel}</p>
-                                        </div>
-                                        <span className={styles.processItemArrow} aria-hidden="true">
-                                          ›
+                        recentMoodHistoryItems.length > 0 ? (
+                          <div className={styles.diaryPanel}>
+                            <p className={styles.diarySubtitle}>Últimos días</p>
+                            <div
+                              className={styles.diaryTable}
+                              style={{
+                                gridTemplateColumns: `minmax(136px, 1.2fr) repeat(${recentMoodHistoryItems.length}, minmax(78px, 1fr))`,
+                              }}
+                            >
+                              <div className={styles.diaryCornerCell} />
+                              {recentMoodHistoryItems.map((item) => (
+                                <div key={item.id} className={styles.diaryHeaderCell}>
+                                  <span className={styles.diaryHeaderDate}>{item.dateLabel}</span>
+                                  <span className={styles.diaryHeaderTime}>{item.timeLabel}</span>
+                                </div>
+                              ))}
+                              {diaryMetricRows.map((row) => (
+                                <Fragment key={row.key}>
+                                  <div className={styles.diaryRowLabel}>{row.label}</div>
+                                  {recentMoodHistoryItems.map((item) => {
+                                    const tone = getDiaryMetricTone(item, row.key);
+                                    return (
+                                      <div key={`${row.key}-${item.id}`} className={styles.diaryValueCell}>
+                                        <span
+                                          className={`${styles.diaryValueChip} ${
+                                            tone === "low"
+                                              ? styles.diaryValueLow
+                                              : tone === "high"
+                                                ? styles.diaryValueHigh
+                                                : tone === "steady"
+                                                  ? styles.diaryValueSteady
+                                                  : tone === "alert"
+                                                    ? styles.diaryValueAlert
+                                                    : tone === "calm"
+                                                      ? styles.diaryValueCalm
+                                                      : styles.diaryValueNeutral
+                                          }`}
+                                        >
+                                          <span className={styles.diaryValueDot} aria-hidden="true" />
+                                          <span className={styles.diaryValueText}>{getDiaryMetricLabel(item, row.key)}</span>
                                         </span>
                                       </div>
-                                      <div className={styles.processMoodGrid}>
-                                        <div className={styles.processMetricCard}>
-                                          <span className={styles.processMetricLabel}>Animo</span>
-                                          <span className={styles.processMetricValue}>{item.moodLabel}</span>
-                                        </div>
-                                        <div className={styles.processMetricCard}>
-                                          <span className={styles.processMetricLabel}>Confianza</span>
-                                          <span className={styles.processMetricValue}>{item.confidenceLabel}</span>
-                                        </div>
-                                        <div className={styles.processMetricCard}>
-                                          <span className={styles.processMetricLabel}>Contacto reciente</span>
-                                          <span className={styles.processMetricValue}>{item.recentContactLabel}</span>
-                                        </div>
-                                      </div>
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                            ))}
+                                    );
+                                  })}
+                                </Fragment>
+                              ))}
+                            </div>
+                            <button
+                              type="button"
+                              className={styles.diaryHistoryButton}
+                              onClick={() => setHistoryModalOpen(true)}
+                            >
+                              Ver historial completo
+                            </button>
                           </div>
                         ) : (
                           <p className={styles.shellSidebarEmpty}>Todavia no hay registros emocionales guardados.</p>
@@ -1671,7 +1828,10 @@ export function AppShell({ children }: AppShellProps) {
                 <button
                   type="button"
                   className={styles.shellSidebarSettingsButton}
-                  onClick={() => setSettingsModalOpen(true)}
+                  onClick={() => {
+                    setSettingsActionError(null);
+                    setSettingsModalOpen(true);
+                  }}
                 >
                   <span className={styles.shellSidebarSettingsIcon} aria-hidden="true">
                     <svg viewBox="0 0 20 20" className={styles.shellSidebarSettingsSvg} fill="none">
@@ -1780,11 +1940,77 @@ export function AppShell({ children }: AppShellProps) {
         </div>
       ) : null}
 
+      {historyModalOpen ? (
+        <div
+          className={styles.historyReportBackdrop}
+          role="presentation"
+          onClick={() => setHistoryModalOpen(false)}
+        >
+          <section
+            className={styles.settingsModal}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="history-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className={styles.historyReportHeader}>
+              <div className={styles.processDrawerHeaderContent}>
+                <p className={styles.historyReportEyebrow}>Diario emocional</p>
+                <h2 id="history-modal-title" className={styles.processDrawerHeading}>
+                  Historico completo
+                </h2>
+                <p className={styles.processDrawerContextCopy}>
+                  Desde tu primer registro, con fecha, hora y cada valor tal como fue guardado.
+                </p>
+              </div>
+              <button
+                type="button"
+                className={styles.historyReportClose}
+                aria-label="Cerrar historico"
+                onClick={() => setHistoryModalOpen(false)}
+              >
+                X
+              </button>
+            </div>
+
+            <div className={styles.historyModalBody}>
+              {moodHistoryItems.length > 0 ? (
+                moodHistoryItems.map((item) => (
+                  <article key={item.id} className={styles.historyModalEntry}>
+                    <div className={styles.historyModalEntryHeader}>
+                      <div>
+                        <p className={styles.historyModalEntryDate}>{item.dateLabel}</p>
+                        <p className={styles.historyModalEntryTime}>{item.timeLabel}</p>
+                      </div>
+                      <span className={styles.historyModalEntryBadge}>Registro</span>
+                    </div>
+                    <div className={styles.historyModalGrid}>
+                      {diaryMetricRows.map((row) => (
+                        <div key={`${item.id}-${row.key}`} className={styles.historyModalRow}>
+                          <span className={styles.historyModalRowLabel}>{row.label}</span>
+                          <span className={styles.historyModalRowValue}>{getDiaryMetricLabel(item, row.key)}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <p className={styles.historyModalSummary}>{item.safeSummary || "-"}</p>
+                  </article>
+                ))
+              ) : (
+                <p className={styles.shellSidebarEmpty}>Todavía no hay historial emocional para mostrar.</p>
+              )}
+            </div>
+          </section>
+        </div>
+      ) : null}
+
       {settingsModalOpen ? (
         <div
           className={styles.historyReportBackdrop}
           role="presentation"
-          onClick={() => setSettingsModalOpen(false)}
+          onClick={() => {
+            setSettingsActionError(null);
+            setSettingsModalOpen(false);
+          }}
         >
           <section
             className={styles.settingsModal}
@@ -1807,7 +2033,10 @@ export function AppShell({ children }: AppShellProps) {
                 type="button"
                 className={styles.historyReportClose}
                 aria-label="Cerrar configuración"
-                onClick={() => setSettingsModalOpen(false)}
+                onClick={() => {
+                  setSettingsActionError(null);
+                  setSettingsModalOpen(false);
+                }}
               >
                 ×
               </button>
@@ -1819,13 +2048,19 @@ export function AppShell({ children }: AppShellProps) {
                   <p className={styles.settingsActionEyebrow}>Historial</p>
                   <h3 className={styles.settingsActionTitle}>Borrar historial</h3>
                   <p className={styles.settingsActionText}>
-                    Esta acción va a quedar disponible cuando exista soporte completo del backend para limpiar la memoria segura.
+                    Borra check-ins y memoria segura de situaciones analizadas para reiniciar tu diario sin dejar residuos.
                   </p>
                 </div>
-                <button type="button" disabled className={styles.settingsActionButton}>
-                  Próximamente
+                <button
+                  type="button"
+                  className={styles.settingsActionButton}
+                  onClick={() => void handleDeleteHistory()}
+                  disabled={historyDeleting}
+                >
+                  {historyDeleting ? "Borrando..." : "Borrar historial"}
                 </button>
               </section>
+              {settingsActionError ? <p className={styles.settingsActionError}>{settingsActionError}</p> : null}
             </div>
           </section>
         </div>

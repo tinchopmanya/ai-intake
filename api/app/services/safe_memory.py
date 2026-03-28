@@ -72,9 +72,13 @@ class SafeMemoryService:
         mood_level: int,
         confidence_level: int,
         recent_contact: bool,
+        vinculo_expareja: int | None = None,
+        interaccion_hijos: int | None = None,
     ) -> SafeMemoryDraft:
         mood_label = _CHECKIN_MOOD_LABELS.get(mood_level, "sin definir")
         confidence_label = _CHECKIN_CONFIDENCE_LABELS.get(confidence_level, "sin definir")
+        relationship_label = _CHECKIN_RELATIONSHIP_LABELS.get(vinculo_expareja)
+        children_interaction_label = _CHECKIN_CHILDREN_INTERACTION_LABELS.get(interaccion_hijos)
         tone = _resolve_checkin_tone(mood_level=mood_level, confidence_level=confidence_level)
         risk_level = _resolve_checkin_risk(mood_level=mood_level, confidence_level=confidence_level, recent_contact=recent_contact)
         recommended_next_step = _resolve_checkin_recommendation(
@@ -82,14 +86,22 @@ class SafeMemoryService:
             confidence_level=confidence_level,
             recent_contact=recent_contact,
         )
+        summary_parts = [
+            f"Registro emocional del dia con animo {mood_label}, confianza {confidence_label}",
+            f"y contacto reciente {'si' if recent_contact else 'no'}",
+        ]
+        if relationship_label:
+            summary_parts.append(f". Vinculo con la expareja {relationship_label}")
+        if children_interaction_label:
+            summary_parts.append(f" e interaccion vinculada a hijos {children_interaction_label}")
+        safe_summary = "".join(summary_parts).strip()
+        if not safe_summary.endswith("."):
+            safe_summary = f"{safe_summary}."
         return SafeMemoryDraft(
             memory_type="mood_checkin",
             source_kind="checkin",
             safe_title="Check-in emocional",
-            safe_summary=(
-                f"Registro emocional del dia con animo {mood_label}, confianza {confidence_label} "
-                f"y contacto reciente {'si' if recent_contact else 'no'}."
-            ),
+            safe_summary=safe_summary,
             tone=tone,
             risk_level=risk_level,
             recommended_next_step=recommended_next_step,
@@ -98,6 +110,8 @@ class SafeMemoryService:
                 "mood_level": mood_level,
                 "confidence_level": confidence_level,
                 "recent_contact": recent_contact,
+                "vinculo_expareja": vinculo_expareja,
+                "interaccion_hijos": interaccion_hijos,
             },
         )
 
@@ -530,6 +544,23 @@ _CHECKIN_CONFIDENCE_LABELS = {
     2: "estable",
     3: "firme",
     4: "muy firme",
+}
+
+
+_CHECKIN_RELATIONSHIP_LABELS = {
+    1: "demasiado conflictivo",
+    2: "tenso pero sin conflicto",
+    3: "neutro",
+    4: "mejorando",
+    5: "en paz",
+}
+
+_CHECKIN_CHILDREN_INTERACTION_LABELS = {
+    1: "muy dificil",
+    2: "con tension",
+    3: "normal",
+    4: "tranquila",
+    5: "muy bien",
 }
 
 
