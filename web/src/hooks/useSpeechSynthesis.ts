@@ -11,6 +11,7 @@ type UseSpeechSynthesisOptions = {
   lang?: string;
   voice?: SupportedTtsVoice;
   voicePreset?: TtsVoicePreset;
+  preferBuffered?: boolean;
   onPlaybackStart?: (payload: {
     text: string;
     voice: SupportedTtsVoice;
@@ -88,6 +89,7 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
   const receivedAudioChunkRef = useRef(false);
   const remoteTtsRetryAtRef = useRef(0);
   const lang = options?.lang ?? "es-ES";
+  const preferBuffered = options?.preferBuffered ?? false;
 
   useEffect(() => {
     optionsRef.current = options;
@@ -303,6 +305,15 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
       });
       pushDebug("speak_requested", { voice: selectedVoice, textLength: text.length });
 
+      if (preferBuffered) {
+        await playBufferedAudio({
+          text,
+          voice: selectedVoice,
+          reason: "tts_buffered_preferred",
+        });
+        return;
+      }
+
       if (!canUseMediaSourceStreaming()) {
         startBrowserFallback({
           text,
@@ -485,7 +496,7 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
         abortControllerRef.current = null;
       }
     },
-    [cleanupStreamingAudio, flushQueue, playBufferedAudio, pushDebug, startBrowserFallback, stop],
+    [cleanupStreamingAudio, flushQueue, playBufferedAudio, preferBuffered, pushDebug, startBrowserFallback, stop],
   );
 
   useEffect(() => {

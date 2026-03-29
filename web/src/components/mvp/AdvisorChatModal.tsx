@@ -175,6 +175,7 @@ export function AdvisorChatModal({
   const speechSynthesis = useSpeechSynthesis({
     lang: preferredVoiceLang,
     voicePreset: advisorAvatarRuntime.voicePreset,
+    preferBuffered: true,
     onPlaybackFallback: () => {
       setVoicePlaybackNotice("La voz natural no estuvo disponible. Seguimos con la voz del navegador.");
     },
