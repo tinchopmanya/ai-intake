@@ -75,6 +75,7 @@ function shouldCooldownRemoteTts(error: unknown): boolean {
 export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
   const [supported] = useState(() => typeof window !== "undefined");
   const [speaking, setSpeaking] = useState(false);
+  const isDevelopment = process.env.NODE_ENV !== "production";
   const optionsRef = useRef(options);
   const activeUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -91,6 +92,18 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
   useEffect(() => {
     optionsRef.current = options;
   }, [options]);
+
+  const pushDebug = useCallback(
+    (event: string, details?: Record<string, unknown>) => {
+      if (!isDevelopment) return;
+      if (details) {
+        console.debug("[voice][tts]", event, details);
+      } else {
+        console.debug("[voice][tts]", event);
+      }
+    },
+    [isDevelopment],
+  );
 
   const cleanupStreamingAudio = useCallback(() => {
     const audio = audioRef.current;
@@ -147,6 +160,7 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
   }, [finishIfReady]);
 
   const stop = useCallback(() => {
+    pushDebug("stop");
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
     if (canUseBrowserSpeechSynthesis()) {
@@ -156,11 +170,12 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
     cleanupStreamingAudio();
     setSpeaking(false);
     optionsRef.current?.onPlaybackEnd?.();
-  }, [cleanupStreamingAudio]);
+  }, [cleanupStreamingAudio, pushDebug]);
 
   const speakWithBrowserFallback = useCallback(
     (text: string, selectedVoice: SupportedTtsVoice) => {
       if (!text.trim() || !canUseBrowserSpeechSynthesis()) return;
+      pushDebug("browser_fallback_start", { voice: selectedVoice, textLength: text.length });
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = lang;
@@ -176,11 +191,13 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
         });
       };
       utterance.onend = () => {
+        pushDebug("playback_end", { via: "browser", voice: selectedVoice });
         setSpeaking(false);
         activeUtteranceRef.current = null;
         optionsRef.current?.onPlaybackEnd?.();
       };
       utterance.onerror = () => {
+        pushDebug("browser_fallback_error", { voice: selectedVoice });
         setSpeaking(false);
         activeUtteranceRef.current = null;
         optionsRef.current?.onPlaybackError?.("browser_tts_failed");
@@ -189,17 +206,22 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
       activeUtteranceRef.current = utterance;
       window.speechSynthesis.speak(utterance);
     },
-    [lang],
+    [lang, pushDebug],
   );
 
   const startBrowserFallback = useCallback(
     (payload: { text: string; voice: SupportedTtsVoice; reason: string }) => {
       if (!canUseBrowserSpeechSynthesis()) return false;
+      pushDebug("browser_fallback_requested", {
+        voice: payload.voice,
+        reason: payload.reason,
+        textLength: payload.text.length,
+      });
       optionsRef.current?.onPlaybackFallback?.(payload);
       speakWithBrowserFallback(payload.text, payload.voice);
       return true;
     },
-    [speakWithBrowserFallback],
+    [pushDebug, speakWithBrowserFallback],
   );
 
   const playBufferedAudio = useCallback(
@@ -209,6 +231,11 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
       signal?: AbortSignal;
       reason: string;
     }) => {
+      pushDebug("buffered_fallback_start", {
+        voice: payload.voice,
+        reason: payload.reason,
+        textLength: payload.text.length,
+      });
       const audioBlob = await postTtsAudio(
         {
           text: payload.text,
@@ -223,11 +250,13 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
       audio.src = objectUrl;
       audio.preload = "auto";
       audio.onended = () => {
+        pushDebug("playback_end", { via: "buffered", voice: payload.voice });
         setSpeaking(false);
         cleanupStreamingAudio();
         optionsRef.current?.onPlaybackEnd?.();
       };
       audio.onerror = () => {
+        pushDebug("buffered_fallback_audio_error", { voice: payload.voice, reason: payload.reason });
         setSpeaking(false);
         cleanupStreamingAudio();
         if (
@@ -244,6 +273,7 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
       };
 
       setSpeaking(true);
+      pushDebug("playback_start", { via: "buffered", voice: payload.voice });
       optionsRef.current?.onPlaybackFallback?.({
         text: payload.text,
         voice: payload.voice,
@@ -257,7 +287,7 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
       });
       await audio.play();
     },
-    [cleanupStreamingAudio, startBrowserFallback],
+    [cleanupStreamingAudio, pushDebug, startBrowserFallback],
   );
 
   const speak = useCallback(
@@ -266,9 +296,10 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
       stop();
 
       const selectedVoice = resolveVoice({
-        voice: speakOptions?.voice ?? options?.voice,
-        voicePreset: speakOptions?.voicePreset ?? options?.voicePreset,
+        voice: speakOptions?.voice ?? optionsRef.current?.voice,
+        voicePreset: speakOptions?.voicePreset ?? optionsRef.current?.voicePreset,
       });
+      pushDebug("speak_requested", { voice: selectedVoice, textLength: text.length });
 
       if (!canUseMediaSourceStreaming()) {
         startBrowserFallback({
@@ -346,6 +377,7 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
       });
 
       try {
+        pushDebug("stream_request_start", { voice: selectedVoice, textLength: text.length });
         const response = await postTtsStream({
           text,
           voice: selectedVoice,
@@ -356,6 +388,7 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
         }
 
         setSpeaking(true);
+        pushDebug("playback_start", { via: "stream", voice: selectedVoice });
         optionsRef.current?.onPlaybackStart?.({
           text,
           voice: selectedVoice,
@@ -386,6 +419,10 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
         flushQueue();
       } catch (error) {
         console.error("tts_stream_failed", error);
+        pushDebug("stream_request_failed", {
+          voice: selectedVoice,
+          error: getPlaybackErrorCode(error),
+        });
         if (shouldCooldownRemoteTts(error)) {
           remoteTtsRetryAtRef.current = Date.now() + REMOTE_TTS_RETRY_COOLDOWN_MS;
         }
@@ -410,6 +447,10 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
             return;
           } catch (bufferedError) {
             console.error("tts_buffered_fallback_failed", bufferedError);
+            pushDebug("buffered_fallback_failed", {
+              voice: selectedVoice,
+              error: getPlaybackErrorCode(bufferedError),
+            });
             if (shouldCooldownRemoteTts(bufferedError)) {
               remoteTtsRetryAtRef.current = Date.now() + REMOTE_TTS_RETRY_COOLDOWN_MS;
             }
@@ -430,7 +471,7 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
         abortControllerRef.current = null;
       }
     },
-    [cleanupStreamingAudio, flushQueue, playBufferedAudio, startBrowserFallback, stop],
+    [cleanupStreamingAudio, flushQueue, playBufferedAudio, pushDebug, startBrowserFallback, stop],
   );
 
   useEffect(() => {
