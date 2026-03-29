@@ -46,6 +46,7 @@ export class AuthApiError extends Error {
 
 const SESSION_STORAGE_KEY = "zc_auth_session_v1";
 const ACCESS_SKEW_MS = 30_000;
+const AUTH_REQUEST_TIMEOUT_MS = 15_000;
 
 function buildNetworkErrorResponse(): Response {
   return new Response(
@@ -143,14 +144,45 @@ function resolvePreferredLanguage(): string {
 }
 
 async function postJson<T>(path: string, payload: unknown): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Accept-Language": resolvePreferredLanguage(),
-    },
-    body: JSON.stringify(payload),
-  });
+  const abortController = typeof AbortController !== "undefined" ? new AbortController() : null;
+  const timeoutHandle =
+    abortController !== null
+      ? globalThis.setTimeout(() => {
+          abortController.abort();
+        }, AUTH_REQUEST_TIMEOUT_MS)
+      : null;
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}${path}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept-Language": resolvePreferredLanguage(),
+      },
+      body: JSON.stringify(payload),
+      signal: abortController?.signal,
+    });
+  } catch (error) {
+    if (timeoutHandle !== null) {
+      globalThis.clearTimeout(timeoutHandle);
+    }
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new AuthApiError({
+        code: "auth_request_timeout",
+        status: 408,
+        backendMessage: "La autenticacion demoro demasiado. Intenta nuevamente.",
+      });
+    }
+    throw new AuthApiError({
+      code: "network_unavailable",
+      status: 503,
+      backendMessage: "No se pudo conectar con el backend.",
+    });
+  }
+  if (timeoutHandle !== null) {
+    globalThis.clearTimeout(timeoutHandle);
+  }
   if (!response.ok) {
     const errorPayload = (await response.json().catch(() => null)) as
       | { message?: string; detail?: string }

@@ -52,6 +52,8 @@ const LOGIN_ERROR_MESSAGES: Record<string, string> = {
     "La configuracion de Google OAuth no esta lista en el backend.",
   google_auth_library_missing: "Falta una dependencia de autenticacion en el backend.",
   invalid_google_token: "Google devolvio un token invalido. Intenta nuevamente.",
+  auth_request_timeout: "La autenticacion demoro demasiado. Intenta nuevamente.",
+  network_unavailable: "No se pudo conectar con el backend.",
   database_unavailable: "La base de datos no esta disponible temporalmente.",
   user_persistence_failed: "No se pudo crear o actualizar tu usuario.",
   session_persistence_failed: "No se pudo iniciar tu sesion. Reintenta.",
@@ -125,17 +127,27 @@ function LoginPageContent() {
   const [googleInitState, setGoogleInitState] = useState<GoogleInitState>("idle");
   const [manualToken, setManualToken] = useState("");
   const googleClientId = readGoogleClientId();
+  const loadingRef = useRef(false);
 
   const nextFromQuery = resolveSafeNextPath(searchParams.get("next"));
 
+  useEffect(() => {
+    loadingRef.current = loading;
+  }, [loading]);
+
   const handleLogin = useCallback(
     async (idToken: string) => {
+      if (loadingRef.current) return;
       setLoading(true);
       setErrorMessage(null);
       try {
         const user = await loginWithGoogleIdToken(idToken);
         const nextPath = user.onboarding_completed ? nextFromQuery || "/mvp" : "/onboarding";
-        router.replace(nextPath);
+        if (typeof window !== "undefined") {
+          window.location.assign(nextPath);
+        } else {
+          router.replace(nextPath);
+        }
       } catch (exc) {
         setErrorMessage(mapLoginError(exc));
       } finally {

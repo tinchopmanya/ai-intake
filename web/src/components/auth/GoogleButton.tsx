@@ -40,10 +40,10 @@ export function GoogleButton({
 }: GoogleButtonProps) {
   return (
     <div className="space-y-3">
-      {!googleReady || loading ? (
+      {!googleReady ? (
         <div className="inline-flex w-full items-center justify-center gap-3 rounded-full border border-[var(--login-border)] bg-white/5 px-5 py-3 text-sm font-medium text-[var(--login-text-primary)] opacity-70">
           <GoogleIcon />
-          <span>{loading ? "Autenticando..." : statusLabel}</span>
+          <span>{statusLabel}</span>
         </div>
       ) : null}
 
@@ -53,6 +53,9 @@ export function GoogleButton({
           googleReady && !loading ? "opacity-100" : "pointer-events-none opacity-60"
         }`}
       />
+      {googleReady && loading ? (
+        <p className="text-center text-sm text-[var(--login-text-muted)]">Autenticando...</p>
+      ) : null}
     </div>
   );
 }
