@@ -136,6 +136,14 @@ type ProcessSidebarGroup = {
   items: ProcessSidebarItem[];
 };
 
+type ProcessHistoryMeaningGroup = {
+  id: string;
+  label: string;
+  items: ProcessSidebarItem[];
+};
+
+type ProcessProgressTone = "positive" | "steady" | "challenging";
+
 function getAdvisorAvatar(
   advisor: (typeof ADVISOR_PROFILES)[number] | undefined,
   variant: "64" | "128",
@@ -481,6 +489,127 @@ function getSituationRiskCopy(value: string | null | undefined) {
   if (riskBucket === "low") return "No hay senales de conflicto importante";
   if (riskBucket === "high") return "Hay senales de que esto podria escalar";
   return "Hay algo de tension y conviene ir con cuidado";
+}
+
+function getRiskBucketScore(value: string | null | undefined) {
+  const riskBucket = getRiskLevelBucket(value);
+  if (riskBucket === "low") return 1;
+  if (riskBucket === "high") return 3;
+  return 2;
+}
+
+function getPredominantToneCopy(items: ProcessSidebarItem[]) {
+  const toneCounts = new Map<string, number>();
+  for (const item of items) {
+    const toneKey = item.toneValue?.trim().toLowerCase() ?? "neutral";
+    toneCounts.set(toneKey, (toneCounts.get(toneKey) ?? 0) + 1);
+  }
+
+  const topTone = [...toneCounts.entries()].sort((left, right) => right[1] - left[1])[0]?.[0] ?? "neutral";
+  if (topTone === "calm" || topTone === "neutral" || topTone === "supportive") {
+    return "de forma calmada";
+  }
+  if (topTone === "firm") return "con mas firmeza";
+  if (topTone === "acompanado") return "con mas perspectiva";
+  return "con cuidado";
+}
+
+function getPredominantRiskCopy(items: ProcessSidebarItem[]) {
+  const averageRisk =
+    items.reduce((total, item) => total + getRiskBucketScore(item.riskValue), 0) / Math.max(1, items.length);
+  if (averageRisk <= 1.4) return "con bajo nivel de conflicto";
+  if (averageRisk >= 2.4) return "con situaciones mas delicadas";
+  return "con algo de tension, pero sin perder del todo el control";
+}
+
+function getProcessEvolutionSummary(items: ProcessSidebarItem[]) {
+  if (items.length === 0) return "Todavia no analizaste suficientes situaciones para ver tu evolucion.";
+  const label = items.length === 1 ? "situacion" : "situaciones";
+  return `Analizaste ${items.length} ${label}. En general estas manejando las conversaciones ${getPredominantToneCopy(items)}, ${getPredominantRiskCopy(items)}.`;
+}
+
+function getProcessTrendCopy(items: ProcessSidebarItem[]) {
+  const sample = items.slice(0, 5).reverse();
+  if (sample.length < 2) return "Recien estas empezando a mirar este proceso con mas perspectiva.";
+
+  const midpoint = Math.max(1, Math.floor(sample.length / 2));
+  const older = sample.slice(0, midpoint);
+  const newer = sample.slice(midpoint);
+  const olderAverage = older.reduce((total, item) => total + getRiskBucketScore(item.riskValue), 0) / older.length;
+  const newerAverage = newer.reduce((total, item) => total + getRiskBucketScore(item.riskValue), 0) / newer.length;
+  const delta = newerAverage - olderAverage;
+
+  if (delta <= -0.35) return "Vas manejando mejor las situaciones.";
+  if (delta >= 0.35) return "Algunas situaciones estan siendo mas desafiantes.";
+  return "Estas manteniendo un manejo estable.";
+}
+
+function getSituationLearningCopy(item: ProcessSidebarItem) {
+  const riskBucket = getRiskLevelBucket(item.riskValue);
+  const normalizedTone = item.toneValue?.trim().toLowerCase();
+
+  if (normalizedTone === "acompanado") {
+    return "Pudiste mantener una mirada reflexiva.";
+  }
+  if (riskBucket === "low") {
+    return "Evitaste que el conflicto escale.";
+  }
+  if (riskBucket === "high") {
+    return "Fue una situacion dificil de manejar.";
+  }
+  if (normalizedTone === "firm") {
+    return "Marcaste un limite sin perder del todo el control.";
+  }
+  return "Hubo tension, pero se mantuvo controlada.";
+}
+
+function getSituationProgressTone(item: ProcessSidebarItem): ProcessProgressTone {
+  const riskBucket = getRiskLevelBucket(item.riskValue);
+  if (riskBucket === "low") return "positive";
+  if (riskBucket === "high") return "challenging";
+  return "steady";
+}
+
+function getSituationProgressLabel(item: ProcessSidebarItem) {
+  const progressTone = getSituationProgressTone(item);
+  if (progressTone === "positive") return "Manejo positivo";
+  if (progressTone === "challenging") return "Situacion dificil";
+  return "Tension contenida";
+}
+
+function getSituationThemeKey(item: ProcessSidebarItem) {
+  const normalized = `${item.safeTitle} ${item.safeSummary}`.toLowerCase();
+  if (/(gasto|pago|cuota|transferencia|dinero|plata|reintegro)/.test(normalized)) return "gastos";
+  if (/(visita|retiro|entrega|fin de semana|horario|agenda|turno|coordin)/.test(normalized)) return "coordinacion";
+  if (/(hijo|hija|hijos|colegio|escuela|medico|famil)/.test(normalized)) return "familia";
+  if (/(limite|presion|respeto|control|tono)/.test(normalized)) return "limites";
+  return null;
+}
+
+function getSimilarSituationCopy(item: ProcessSidebarItem, recentItems: ProcessSidebarItem[]) {
+  const themeKey = getSituationThemeKey(item);
+  if (!themeKey) return null;
+  const hasSimilarRecent = recentItems.some((candidate) => candidate.id !== item.id && getSituationThemeKey(candidate) === themeKey);
+  return hasSimilarRecent ? "Esto es similar a otra situacion reciente." : null;
+}
+
+function getProcessHistoryMeaningGroups(items: ProcessSidebarItem[]): ProcessHistoryMeaningGroup[] {
+  if (items.length <= 3) {
+    return [{ id: "recent", label: "Mas recientes", items }];
+  }
+
+  return [
+    {
+      id: "recent",
+      label: "Mas recientes",
+      items: items.slice(0, 3),
+    },
+    {
+      id: "previous",
+      label: "Situaciones anteriores",
+      items: items.slice(3),
+    },
+  ].filter((group) => group.items.length > 0);
 }
 
 function getMoodSummaryLabel(level: number | null | undefined) {
@@ -1151,6 +1280,16 @@ export function AppShell({ children }: AppShellProps) {
   }, [shouldShowChildrenInteractionRow]);
   const groupedExPartnerHistory = useMemo(() => groupProcessItems(exPartnerHistoryEntries), [exPartnerHistoryEntries]);
   const groupedAdvisorHistory = useMemo(() => groupProcessItems(advisorHistoryEntries), [advisorHistoryEntries]);
+  const recentExPartnerItems = useMemo(() => exPartnerHistoryEntries.slice(0, 5), [exPartnerHistoryEntries]);
+  const processHistoryMeaningGroups = useMemo(
+    () => getProcessHistoryMeaningGroups(exPartnerHistoryEntries),
+    [exPartnerHistoryEntries],
+  );
+  const processEvolutionSummary = useMemo(
+    () => getProcessEvolutionSummary(recentExPartnerItems),
+    [recentExPartnerItems],
+  );
+  const processTrendCopy = useMemo(() => getProcessTrendCopy(recentExPartnerItems), [recentExPartnerItems]);
   useEffect(() => {
     if (!selectedProcessItem) return;
 
@@ -2191,12 +2330,21 @@ export function AppShell({ children }: AppShellProps) {
             </div>
 
             <div className={styles.processHistoryModalBody}>
-              {groupedExPartnerHistory.length > 0 ? (
-                groupedExPartnerHistory.map((group) => (
-                  <section key={group.label} className={styles.processHistorySection}>
-                    <p className={styles.processDateLabel}>{group.label}</p>
+              {processHistoryMeaningGroups.length > 0 ? (
+                <>
+                  <section className={styles.processEvolutionCard}>
+                    <p className={styles.processEvolutionEyebrow}>Tu evolucion</p>
+                    <p className={styles.processEvolutionSummary}>{processEvolutionSummary}</p>
+                    <p className={styles.processEvolutionTrend}>{processTrendCopy}</p>
+                  </section>
+                  {processHistoryMeaningGroups.map((group) => (
+                  <section key={group.id} className={styles.processHistorySection}>
+                    <p className={styles.processHistoryGroupTitle}>{group.label}</p>
                     <div className={styles.processItemList}>
-                      {group.items.map((item) => (
+                      {group.items.map((item) => {
+                        const progressTone = getSituationProgressTone(item);
+                        const similarCopy = getSimilarSituationCopy(item, recentExPartnerItems);
+                        return (
                         <button
                           key={item.id}
                           type="button"
@@ -2207,6 +2355,19 @@ export function AppShell({ children }: AppShellProps) {
                         >
                           <div className={styles.processItemHeader}>
                             <div>
+                              <div className={styles.processItemStatusRow}>
+                                <span
+                                  className={`${styles.processProgressDot} ${
+                                    progressTone === "positive"
+                                      ? styles.processProgressDotPositive
+                                      : progressTone === "challenging"
+                                        ? styles.processProgressDotChallenging
+                                        : styles.processProgressDotSteady
+                                  }`}
+                                  aria-hidden="true"
+                                />
+                                <span className={styles.processProgressLabel}>{getSituationProgressLabel(item)}</span>
+                              </div>
                               <p className={styles.processItemTitle}>{item.safeTitle}</p>
                               <p className={styles.processItemMeta}>{item.dayLabel} · {item.timeLabel}</p>
                             </div>
@@ -2233,7 +2394,18 @@ export function AppShell({ children }: AppShellProps) {
                                 {getSituationNextTimeCopy(item.toneValue, item.riskValue)}
                               </p>
                             </div>
+
+                            <div className={styles.processHistoryBlock}>
+                              <p className={styles.processHistoryBlockLabel}>Aprendizaje</p>
+                              <p className={styles.processHistoryBlockText}>{getSituationLearningCopy(item)}</p>
+                            </div>
                           </div>
+
+                          {similarCopy ? (
+                            <p className={styles.processHistorySimilarity}>
+                              {similarCopy}
+                            </p>
+                          ) : null}
 
                           <div className={styles.processHistoryMetaRow}>
                             <span className={styles.processHistoryMetaChip}>{getSituationToneCopy(item.toneValue)}</span>
@@ -2246,10 +2418,15 @@ export function AppShell({ children }: AppShellProps) {
                           </div>
                           <p className={styles.processRecommendationPreview}>{item.recommendationLabel}</p>
                         </button>
-                      ))}
+                        );
+                      })}
                     </div>
                   </section>
-                ))
+                ))}
+                  <p className={styles.processHistoryClosing}>
+                    Seguir revisando estas situaciones te ayuda a responder con mas claridad.
+                  </p>
+                </>
               ) : (
                 <div className={styles.processHistoryEmpty}>
                   <p className={styles.processHistoryEmptyTitle}>Todavia no analizaste ninguna situacion</p>
