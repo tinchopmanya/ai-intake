@@ -162,6 +162,41 @@ function getSavedItemsLabel(count: number) {
   return `${count} elementos guardados`;
 }
 
+function getSavedProcessMomentsTitle(count: number) {
+  if (count <= 0) return "Tu proceso puede empezar a guardarse desde hoy";
+  if (count === 1) return "Tu proceso ya tiene 1 momento util guardado";
+  return `Tu proceso ya tiene ${count} momentos utiles guardados`;
+}
+
+function getSavedProcessMomentsCopy(count: number) {
+  if (count <= 0) {
+    return "Lo que trabajes aqui queda resumido para que no tengas que empezar de cero.";
+  }
+  if (count === 1) {
+    return "Lo guardamos para que puedas volver a esto con mas claridad cuando lo necesites.";
+  }
+  return "Lo guardamos resumido para que puedas volver a esto sin cargar con todos los mensajes.";
+}
+
+function getTodayStartingPointCopy(checkin: EmotionalCheckinSummary | null) {
+  if (!checkin) return null;
+  const { mood_level: moodLevel, confidence_level: confidenceLevel, recent_contact: recentContact } = checkin;
+
+  if (recentContact && (moodLevel <= 1 || confidenceLevel <= 1)) {
+    return "Conviene darte un poco de aire antes de decidir que hacer.";
+  }
+  if (moodLevel >= 3 && confidenceLevel >= 3) {
+    return "Eso puede ayudarte a decidir con mas calma.";
+  }
+  if (!recentContact && confidenceLevel >= 2) {
+    return "Es un buen punto de partida para mirar la situacion con mas perspectiva.";
+  }
+  if (moodLevel <= 1 || confidenceLevel <= 1) {
+    return "Quizas hoy te convenga responder sin apuro y volver a esto con mas claridad.";
+  }
+  return "Puede servirte para elegir el siguiente paso con mas claridad.";
+}
+
 function getLatestMessageContent(
   messages: MessageSummary[],
   messageType: MessageSummary["message_type"],
@@ -402,6 +437,7 @@ export function MvpEntryFlow() {
     activeConversation,
     activeConversationMessages,
     activeConversationMessagesLoading,
+    savedProcessMomentsCount,
     openAdvisorConversation,
   } = useMvpShell();
   const [view, setView] = useState<FlowView>("entry");
@@ -528,8 +564,17 @@ export function MvpEntryFlow() {
     const moodLabel = getMoodSummaryLabel(todayCheckin.mood_level);
     const confidenceLabel = getConfidenceSummaryLabel(todayCheckin.confidence_level);
     if (!moodLabel || !confidenceLabel) return null;
-    return `Hoy: ánimo ${moodLabel.toLowerCase()} · confianza ${confidenceLabel.toLowerCase()}`;
+    return `Animo ${moodLabel.toLowerCase()} · confianza ${confidenceLabel.toLowerCase()}`;
   }, [todayCheckin]);
+  const processValueTitle = useMemo(
+    () => getSavedProcessMomentsTitle(savedProcessMomentsCount),
+    [savedProcessMomentsCount],
+  );
+  const processValueCopy = useMemo(
+    () => getSavedProcessMomentsCopy(savedProcessMomentsCount),
+    [savedProcessMomentsCount],
+  );
+  const todayStartingPointCopy = useMemo(() => getTodayStartingPointCopy(todayCheckin), [todayCheckin]);
 
   const sessionTitleLabel =
     sidebarConversation?.title.trim() &&
@@ -734,6 +779,24 @@ export function MvpEntryFlow() {
                   </p>
                 </div>
 
+                <section className={styles.valueSignalCard}>
+                  <span className={styles.valueSignalIcon} aria-hidden="true">
+                    <svg viewBox="0 0 20 20" className={styles.valueSignalIconSvg} fill="none">
+                      <path
+                        d="M4.75 10.25 8 13.5l7.25-7.25"
+                        stroke="currentColor"
+                        strokeWidth="1.7"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </span>
+                  <div className={styles.valueSignalTextBlock}>
+                    <p className={styles.valueSignalTitle}>{processValueTitle}</p>
+                    <p className={styles.valueSignalCopy}>{processValueCopy}</p>
+                  </div>
+                </section>
+
                 {checkinSummaryLine || (sidebarConversation && lastSessionMeta) || activeConversationSummary ? (
                   <div className={styles.contextSummaryGrid}>
                     {checkinSummaryLine ? (
@@ -835,7 +898,9 @@ export function MvpEntryFlow() {
                     </span>
                     <span className={styles.actionTextBlock}>
                       <span className={styles.actionTitle}>Solo quiero desahogarme</span>
-                      <span className={styles.actionCopy}>{"Habl\u00e1 con un consejero sobre c\u00f3mo te sent\u00eds"}</span>
+                      <span className={styles.actionCopy}>
+                        Habla con un consejero para ordenar lo que sientes y decidir con mas calma.
+                      </span>
                     </span>
                   </button>
                   <button type="button" className={styles.secondaryAction} onClick={handleAnalyzeConversation}>
@@ -858,7 +923,7 @@ export function MvpEntryFlow() {
                     </span>
                     <span className={styles.actionTextBlock}>
                       <span className={styles.actionTitle}>Tengo una conversación para analizar</span>
-                      <span className={styles.actionCopy}>Revisar contexto, ver el análisis y decidir con más claridad.</span>
+                      <span className={styles.actionCopy}>Trae el contexto, mira que paso y decide con mas claridad.</span>
                     </span>
                   </button>
                   <button
@@ -879,7 +944,7 @@ export function MvpEntryFlow() {
                     </span>
                     <span className={styles.actionTextBlock}>
                       <span className={styles.actionTitle}>Quiero escribirle a mi ex</span>
-                      <span className={styles.actionCopy}>Elegir consejero y después preparar mejor tu próximo mensaje.</span>
+                      <span className={styles.actionCopy}>Prepara tu mensaje con apoyo y menos desgaste.</span>
                     </span>
                   </button>
                 </div>
@@ -889,7 +954,9 @@ export function MvpEntryFlow() {
                     <div className={styles.contextSummarySectionHeader}>
                       <div>
                         <p className={styles.contextSummarySectionEyebrow}>Tu proceso hoy</p>
-                        <p className={styles.contextSummarySectionTitle}>Un vistazo simple para volver a ubicarse.</p>
+                        <p className={styles.contextSummarySectionTitle}>
+                          Un punto de partida simple para decidir con mas claridad.
+                        </p>
                       </div>
                       {todayCheckin ? (
                         <button type="button" className={styles.summaryInlineButton} onClick={handleOpenCheckinEditor}>
@@ -904,10 +971,13 @@ export function MvpEntryFlow() {
                           <div className={styles.summaryCardHeaderRow}>
                             <div>
                               <p className={styles.contextSummaryLabel}>Resumen de hoy</p>
-                              <p className={styles.todayStateTitle}>Tu estado de hoy</p>
+                              <p className={styles.todayStateTitle}>Tu punto de partida hoy</p>
                             </div>
                             <span className={styles.todayStateChip}>{checkinSummaryLine ?? "Check-in listo"}</span>
                           </div>
+                          {todayStartingPointCopy ? (
+                            <p className={styles.todayStateSupport}>{todayStartingPointCopy}</p>
+                          ) : null}
                           <div className={styles.todayStateMetrics}>
                             <TodayStateMetric
                               label="Animo"

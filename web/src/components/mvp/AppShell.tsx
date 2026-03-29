@@ -1290,6 +1290,10 @@ export function AppShell({ children }: AppShellProps) {
     [recentExPartnerItems],
   );
   const processTrendCopy = useMemo(() => getProcessTrendCopy(recentExPartnerItems), [recentExPartnerItems]);
+  const savedProcessMomentsCount = useMemo(
+    () => moodHistoryItems.length + exPartnerHistoryEntries.length + advisorHistoryEntries.length,
+    [advisorHistoryEntries.length, exPartnerHistoryEntries.length, moodHistoryItems.length],
+  );
   useEffect(() => {
     if (!selectedProcessItem) return;
 
@@ -1603,6 +1607,7 @@ export function AppShell({ children }: AppShellProps) {
         activeConversation,
         activeConversationMessages,
         activeConversationMessagesLoading,
+        savedProcessMomentsCount,
         ensureActiveConversation,
         createSidebarConversation,
         updateSidebarConversation,
@@ -1737,7 +1742,14 @@ export function AppShell({ children }: AppShellProps) {
           aria-label="Tu proceso"
         >
           <div className={styles.shellSidebarHeader}>
-            {sidebarOpen ? <span className={styles.shellSidebarTitle}>Tu proceso</span> : <span />}
+            {sidebarOpen ? (
+              <div className={styles.shellSidebarHeading}>
+                <span className={styles.shellSidebarTitle}>Tu proceso</span>
+                <span className={styles.shellSidebarSubtitle}>Lo que ya puedes revisar con mas claridad</span>
+              </div>
+            ) : (
+              <span />
+            )}
             <button
               type="button"
               className={styles.shellSidebarToggle}
@@ -1795,8 +1807,8 @@ export function AppShell({ children }: AppShellProps) {
                           </span>
                           <div>
                             <p className={styles.processSectionTitle}>Diario emocional</p>
-                            <p className={styles.processSectionCopy}>Tu memoria reciente, ordenada para leerla de un vistazo.</p>
-                        </div>
+                            <p className={styles.processSectionCopy}>Para entender como vienes antes de responder.</p>
+                          </div>
                         </div>
                         <div className={styles.processSectionMeta}>
                           <span className={styles.shellHistoryCountPill}>{moodHistoryItems.length}</span>
@@ -1902,7 +1914,7 @@ export function AppShell({ children }: AppShellProps) {
                           </span>
                           <div>
                             <p className={styles.processSectionTitle}>Situaciones analizadas</p>
-                            <p className={styles.processSectionCopy}>Lecturas seguras para decidir con más claridad.</p>
+                            <p className={styles.processSectionCopy}>Para revisar que paso y que te conviene hacer.</p>
                           </div>
                         </div>
                         <div className={styles.processSectionMeta}>
