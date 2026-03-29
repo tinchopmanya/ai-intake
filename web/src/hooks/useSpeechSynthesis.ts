@@ -99,9 +99,9 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
     (event: string, details?: Record<string, unknown>) => {
       if (!isDevelopment) return;
       if (details) {
-        console.debug("[voice][tts]", event, details);
+        console.log("[voice][tts]", event, details);
       } else {
-        console.debug("[voice][tts]", event);
+        console.log("[voice][tts]", event);
       }
     },
     [isDevelopment],
