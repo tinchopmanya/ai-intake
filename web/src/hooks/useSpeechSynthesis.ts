@@ -75,6 +75,7 @@ function shouldCooldownRemoteTts(error: unknown): boolean {
 export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
   const [supported] = useState(() => typeof window !== "undefined");
   const [speaking, setSpeaking] = useState(false);
+  const optionsRef = useRef(options);
   const activeUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -86,6 +87,10 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
   const receivedAudioChunkRef = useRef(false);
   const remoteTtsRetryAtRef = useRef(0);
   const lang = options?.lang ?? "es-ES";
+
+  useEffect(() => {
+    optionsRef.current = options;
+  }, [options]);
 
   const cleanupStreamingAudio = useCallback(() => {
     const audio = audioRef.current;
@@ -150,8 +155,8 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
     activeUtteranceRef.current = null;
     cleanupStreamingAudio();
     setSpeaking(false);
-    options?.onPlaybackEnd?.();
-  }, [cleanupStreamingAudio, options]);
+    optionsRef.current?.onPlaybackEnd?.();
+  }, [cleanupStreamingAudio]);
 
   const speakWithBrowserFallback = useCallback(
     (text: string, selectedVoice: SupportedTtsVoice) => {
@@ -163,7 +168,7 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
       utterance.pitch = 1.02;
       utterance.onstart = () => {
         setSpeaking(true);
-        options?.onPlaybackStart?.({
+        optionsRef.current?.onPlaybackStart?.({
           text,
           voice: selectedVoice,
           audioElement: null,
@@ -173,28 +178,28 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
       utterance.onend = () => {
         setSpeaking(false);
         activeUtteranceRef.current = null;
-        options?.onPlaybackEnd?.();
+        optionsRef.current?.onPlaybackEnd?.();
       };
       utterance.onerror = () => {
         setSpeaking(false);
         activeUtteranceRef.current = null;
-        options?.onPlaybackError?.("browser_tts_failed");
-        options?.onPlaybackEnd?.();
+        optionsRef.current?.onPlaybackError?.("browser_tts_failed");
+        optionsRef.current?.onPlaybackEnd?.();
       };
       activeUtteranceRef.current = utterance;
       window.speechSynthesis.speak(utterance);
     },
-    [lang, options],
+    [lang],
   );
 
   const startBrowserFallback = useCallback(
     (payload: { text: string; voice: SupportedTtsVoice; reason: string }) => {
       if (!canUseBrowserSpeechSynthesis()) return false;
-      options?.onPlaybackFallback?.(payload);
+      optionsRef.current?.onPlaybackFallback?.(payload);
       speakWithBrowserFallback(payload.text, payload.voice);
       return true;
     },
-    [options, speakWithBrowserFallback],
+    [speakWithBrowserFallback],
   );
 
   const playBufferedAudio = useCallback(
@@ -220,7 +225,7 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
       audio.onended = () => {
         setSpeaking(false);
         cleanupStreamingAudio();
-        options?.onPlaybackEnd?.();
+        optionsRef.current?.onPlaybackEnd?.();
       };
       audio.onerror = () => {
         setSpeaking(false);
@@ -234,17 +239,17 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
         ) {
           return;
         }
-        options?.onPlaybackError?.("audio_element_error");
-        options?.onPlaybackEnd?.();
+        optionsRef.current?.onPlaybackError?.("audio_element_error");
+        optionsRef.current?.onPlaybackEnd?.();
       };
 
       setSpeaking(true);
-      options?.onPlaybackFallback?.({
+      optionsRef.current?.onPlaybackFallback?.({
         text: payload.text,
         voice: payload.voice,
         reason: payload.reason,
       });
-      options?.onPlaybackStart?.({
+      optionsRef.current?.onPlaybackStart?.({
         text: payload.text,
         voice: payload.voice,
         audioElement: audio,
@@ -252,7 +257,7 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
       });
       await audio.play();
     },
-    [cleanupStreamingAudio, options, startBrowserFallback],
+    [cleanupStreamingAudio, startBrowserFallback],
   );
 
   const speak = useCallback(
@@ -309,7 +314,7 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
       audio.onended = () => {
         setSpeaking(false);
         cleanupStreamingAudio();
-        options?.onPlaybackEnd?.();
+        optionsRef.current?.onPlaybackEnd?.();
       };
       audio.onerror = () => {
         setSpeaking(false);
@@ -324,8 +329,8 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
         ) {
           return;
         }
-        options?.onPlaybackError?.("audio_element_error");
-        options?.onPlaybackEnd?.();
+        optionsRef.current?.onPlaybackError?.("audio_element_error");
+        optionsRef.current?.onPlaybackEnd?.();
       };
 
       const abortController = new AbortController();
@@ -351,7 +356,7 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
         }
 
         setSpeaking(true);
-        options?.onPlaybackStart?.({
+        optionsRef.current?.onPlaybackStart?.({
           text,
           voice: selectedVoice,
           audioElement: audio,
@@ -419,16 +424,26 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
         ) {
           return;
         }
-        options?.onPlaybackError?.(error);
-        options?.onPlaybackEnd?.();
+        optionsRef.current?.onPlaybackError?.(error);
+        optionsRef.current?.onPlaybackEnd?.();
       } finally {
         abortControllerRef.current = null;
       }
     },
-    [cleanupStreamingAudio, flushQueue, options, playBufferedAudio, startBrowserFallback, stop],
+    [cleanupStreamingAudio, flushQueue, playBufferedAudio, startBrowserFallback, stop],
   );
 
-  useEffect(() => stop, [stop]);
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+      abortControllerRef.current = null;
+      if (canUseBrowserSpeechSynthesis()) {
+        window.speechSynthesis.cancel();
+      }
+      activeUtteranceRef.current = null;
+      cleanupStreamingAudio();
+    };
+  }, [cleanupStreamingAudio]);
 
   return {
     supported,
