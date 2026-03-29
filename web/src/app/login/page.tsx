@@ -52,6 +52,10 @@ const LOGIN_ERROR_MESSAGES: Record<string, string> = {
     "La configuracion de Google OAuth no esta lista en el backend.",
   google_auth_library_missing: "Falta una dependencia de autenticacion en el backend.",
   invalid_google_token: "Google devolvio un token invalido. Intenta nuevamente.",
+  google_token_verification_timeout:
+    "Google esta demorando demasiado en validar el acceso. Intenta nuevamente.",
+  google_token_verification_unavailable:
+    "Google no pudo validar el acceso en este momento. Intenta nuevamente.",
   auth_request_timeout: "La autenticacion demoro demasiado. Intenta nuevamente.",
   network_unavailable: "No se pudo conectar con el backend.",
   database_unavailable: "La base de datos no esta disponible temporalmente.",

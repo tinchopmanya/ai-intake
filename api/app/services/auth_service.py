@@ -18,6 +18,7 @@ from app.repositories.protocols import ConnectionFactory
 from app.repositories.users import UserRepository
 
 logger = logging.getLogger(__name__)
+GOOGLE_TOKEN_VERIFY_TIMEOUT_SECONDS = 8.0
 
 
 class AuthError(Exception):
@@ -200,13 +201,30 @@ class AuthService:
             raise AuthError(status_code=503, detail="google_auth_library_missing") from exc
 
         try:
-            request = google_requests.Request()
+            base_request = google_requests.Request()
+
+            class GoogleRequestWithTimeout:
+                def __init__(self, request_impl: Any) -> None:
+                    self._request_impl = request_impl
+
+                def __call__(self, *args: Any, **kwargs: Any) -> Any:
+                    kwargs.setdefault("timeout", GOOGLE_TOKEN_VERIFY_TIMEOUT_SECONDS)
+                    return self._request_impl(*args, **kwargs)
+
+            request = GoogleRequestWithTimeout(base_request)
             claims: dict[str, Any] = google_id_token.verify_oauth2_token(
                 id_token_value,
                 request,
                 audience=self._google_client_id,
             )
         except Exception as exc:
+            normalized_error = str(exc).strip().lower()
+            if "timeout" in normalized_error or "timed out" in normalized_error:
+                logger.warning("Google token verification timed out: %s", exc)
+                raise AuthError(status_code=503, detail="google_token_verification_timeout") from exc
+            if "transport" in normalized_error or "certificate" in normalized_error:
+                logger.warning("Google token verification unavailable: %s", exc)
+                raise AuthError(status_code=503, detail="google_token_verification_unavailable") from exc
             raise AuthError(status_code=401, detail="invalid_google_token") from exc
 
         issuer = str(claims.get("iss", ""))
