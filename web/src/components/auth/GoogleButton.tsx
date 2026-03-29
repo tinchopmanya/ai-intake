@@ -3,11 +3,10 @@
 import type { RefObject } from "react";
 
 type GoogleButtonProps = {
-  disabled: boolean;
   loading: boolean;
   googleReady: boolean;
+  statusLabel: string;
   buttonHostRef: RefObject<HTMLDivElement | null>;
-  onClick: () => void;
 };
 
 function GoogleIcon() {
@@ -34,28 +33,24 @@ function GoogleIcon() {
 }
 
 export function GoogleButton({
-  disabled,
   loading,
   googleReady,
+  statusLabel,
   buttonHostRef,
-  onClick,
 }: GoogleButtonProps) {
   return (
     <div className="space-y-3">
-      <button
-        type="button"
-        onClick={onClick}
-        disabled={disabled}
-        className="group inline-flex w-full items-center justify-center gap-3 rounded-full border border-[var(--login-border)] bg-white/5 px-5 py-3 text-sm font-medium text-[var(--login-text-primary)] transition duration-200 hover:border-[color:var(--login-accent)]/60 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--login-accent)]/60 disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        <GoogleIcon />
-        <span>{loading ? "Autenticando..." : "Continuar con Google"}</span>
-      </button>
+      {!googleReady || loading ? (
+        <div className="inline-flex w-full items-center justify-center gap-3 rounded-full border border-[var(--login-border)] bg-white/5 px-5 py-3 text-sm font-medium text-[var(--login-text-primary)] opacity-70">
+          <GoogleIcon />
+          <span>{loading ? "Autenticando..." : statusLabel}</span>
+        </div>
+      ) : null}
 
       <div
         ref={buttonHostRef}
         className={`flex min-h-[44px] items-center justify-center overflow-hidden rounded-full border border-[var(--login-border)] bg-black/20 p-1 ${
-          googleReady ? "opacity-100" : "opacity-60"
+          googleReady && !loading ? "opacity-100" : "pointer-events-none opacity-60"
         }`}
       />
     </div>

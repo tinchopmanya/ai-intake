@@ -39,6 +39,14 @@ type GoogleApi = {
   };
 };
 
+type GoogleInitState =
+  | "idle"
+  | "loading_sdk"
+  | "missing_client_id"
+  | "sdk_load_failed"
+  | "sdk_unavailable"
+  | "ready";
+
 const LOGIN_ERROR_MESSAGES: Record<string, string> = {
   google_client_id_not_configured:
     "La configuracion de Google OAuth no esta lista en el backend.",
@@ -51,7 +59,7 @@ const LOGIN_ERROR_MESSAGES: Record<string, string> = {
 };
 
 function readGoogleClientId(): string {
-  return process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
+  return process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.trim() ?? "";
 }
 
 function resolveSafeNextPath(raw: string | null): string | null {
@@ -75,6 +83,38 @@ function mapLoginError(error: unknown): string {
   return "No se pudo iniciar sesion en este momento.";
 }
 
+function getGoogleInitErrorMessage(state: GoogleInitState): string | null {
+  switch (state) {
+    case "missing_client_id":
+      return "Falta NEXT_PUBLIC_GOOGLE_CLIENT_ID para iniciar sesion con Google.";
+    case "sdk_load_failed":
+      return "No se pudo cargar Google Sign-In. Reintenta en unos segundos.";
+    case "sdk_unavailable":
+      return "Google Sign-In no esta disponible en este navegador.";
+    default:
+      return null;
+  }
+}
+
+function getGoogleStatusLabel(state: GoogleInitState, loading: boolean): string {
+  if (loading) return "Autenticando...";
+  switch (state) {
+    case "loading_sdk":
+      return "Cargando Google Sign-In...";
+    case "missing_client_id":
+      return "Google Sign-In no configurado";
+    case "sdk_load_failed":
+      return "No se pudo cargar Google";
+    case "sdk_unavailable":
+      return "Google Sign-In no disponible";
+    case "ready":
+      return "Continuar con Google";
+    case "idle":
+    default:
+      return "Preparando Google...";
+  }
+}
+
 function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -82,7 +122,9 @@ function LoginPageContent() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [googleReady, setGoogleReady] = useState(false);
+  const [googleInitState, setGoogleInitState] = useState<GoogleInitState>("idle");
   const [manualToken, setManualToken] = useState("");
+  const googleClientId = readGoogleClientId();
 
   const nextFromQuery = resolveSafeNextPath(searchParams.get("next"));
 
@@ -103,46 +145,32 @@ function LoginPageContent() {
     [nextFromQuery, router],
   );
 
-  useEffect(() => {
-    let mounted = true;
-
-    async function redirectWhenAlreadyAuthenticated() {
-      const user = await getCurrentUser();
-      if (!mounted || !user) return;
-      const nextPath = user.onboarding_completed ? nextFromQuery || "/mvp" : "/onboarding";
-      router.replace(nextPath);
+  const initializeGoogleSignIn = useCallback(() => {
+    if (!googleClientId) {
+      setGoogleReady(false);
+      setGoogleInitState("missing_client_id");
+      setLoading(false);
+      setErrorMessage("Falta NEXT_PUBLIC_GOOGLE_CLIENT_ID para iniciar sesion con Google.");
+      return false;
     }
 
-    void redirectWhenAlreadyAuthenticated();
-
-    const clientId = readGoogleClientId();
-    if (!clientId) {
-      setErrorMessage("Falta NEXT_PUBLIC_GOOGLE_CLIENT_ID para renderizar Google Sign-In.");
-      return;
+    const googleApi = (window as { google?: GoogleApi }).google;
+    if (!googleApi?.accounts?.id || !buttonHostRef.current) {
+      setGoogleReady(false);
+      setGoogleInitState("sdk_unavailable");
+      setLoading(false);
+      setErrorMessage("Google Sign-In no esta disponible en este navegador.");
+      return false;
     }
 
-    const script = document.createElement("script");
-    script.src = GOOGLE_GSI_SRC;
-    script.async = true;
-    script.defer = true;
-    script.onerror = () => {
-      if (mounted) {
-        setErrorMessage("No se pudo cargar Google Sign-In. Reintenta en unos segundos.");
-      }
-    };
-    script.onload = () => {
-      if (!mounted) return;
-      const googleApi = (window as { google?: GoogleApi }).google;
-      if (!googleApi?.accounts?.id || !buttonHostRef.current) {
-        setErrorMessage("Google Sign-In no disponible en este navegador.");
-        return;
-      }
-
+    try {
+      buttonHostRef.current.replaceChildren();
       googleApi.accounts.id.initialize({
-        client_id: clientId,
+        client_id: googleClientId,
         callback: async (response: GoogleCredentialResponse) => {
-          const credential = response.credential;
+          const credential = response.credential?.trim();
           if (!credential) {
+            setLoading(false);
             setErrorMessage("Google no devolvio credenciales.");
             return;
           }
@@ -158,35 +186,95 @@ function LoginPageContent() {
         theme: "filled_black",
         width: 320,
       });
+
       setGoogleReady(true);
+      setGoogleInitState("ready");
+      setLoading(false);
+      setErrorMessage(null);
+      return true;
+    } catch {
+      setGoogleReady(false);
+      setGoogleInitState("sdk_unavailable");
+      setLoading(false);
+      setErrorMessage("No se pudo preparar Google Sign-In. Reintenta en unos segundos.");
+      return false;
+    }
+  }, [googleClientId, handleLogin]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function redirectWhenAlreadyAuthenticated() {
+      const user = await getCurrentUser();
+      if (!mounted || !user) return;
+      const nextPath = user.onboarding_completed ? nextFromQuery || "/mvp" : "/onboarding";
+      router.replace(nextPath);
+    }
+
+    void redirectWhenAlreadyAuthenticated();
+
+    if (!googleClientId) {
+      setGoogleReady(false);
+      setGoogleInitState("missing_client_id");
+      setLoading(false);
+      setErrorMessage("Falta NEXT_PUBLIC_GOOGLE_CLIENT_ID para iniciar sesion con Google.");
+      return;
+    }
+
+    setGoogleReady(false);
+    setGoogleInitState("loading_sdk");
+    setLoading(false);
+
+    const onGoogleLoaded = () => {
+      if (!mounted) return;
+      initializeGoogleSignIn();
     };
-    document.head.appendChild(script);
+
+    const onGoogleLoadError = () => {
+      if (!mounted) return;
+      setGoogleReady(false);
+      setGoogleInitState("sdk_load_failed");
+      setLoading(false);
+      setErrorMessage("No se pudo cargar Google Sign-In. Reintenta en unos segundos.");
+    };
+
+    const existingScript = document.querySelector<HTMLScriptElement>(`script[src="${GOOGLE_GSI_SRC}"]`);
+    const script = existingScript ?? document.createElement("script");
+
+    if ((window as { google?: GoogleApi }).google?.accounts?.id) {
+      onGoogleLoaded();
+    } else {
+      script.addEventListener("load", onGoogleLoaded);
+      script.addEventListener("error", onGoogleLoadError);
+
+      if (!existingScript) {
+        script.src = GOOGLE_GSI_SRC;
+        script.async = true;
+        script.defer = true;
+        document.head.appendChild(script);
+      }
+    }
 
     return () => {
       mounted = false;
-      script.remove();
+      script.removeEventListener("load", onGoogleLoaded);
+      script.removeEventListener("error", onGoogleLoadError);
     };
-  }, [handleLogin, nextFromQuery, router]);
+  }, [googleClientId, initializeGoogleSignIn, nextFromQuery, router]);
 
-  function handleGoogleButtonClick() {
-    const trigger = buttonHostRef.current?.querySelector<HTMLElement>('[role="button"]');
-    if (trigger) {
-      trigger.click();
-      return;
-    }
-    setErrorMessage("Google Sign-In todavia no esta listo. Intenta de nuevo en unos segundos.");
-  }
+  const googleStatusLabel = getGoogleStatusLabel(googleInitState, loading);
+  const googleInitError = getGoogleInitErrorMessage(googleInitState);
+  const resolvedErrorMessage = errorMessage ?? googleInitError;
 
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[var(--login-bg)] p-4 sm:p-6">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_25%_20%,rgba(99,102,241,0.25),transparent_45%),radial-gradient(circle_at_80%_80%,rgba(99,102,241,0.12),transparent_45%)]" />
-      <LoginCard errorMessage={errorMessage}>
+      <LoginCard errorMessage={resolvedErrorMessage}>
         <GoogleButton
-          disabled={!googleReady || loading}
           loading={loading}
           googleReady={googleReady}
+          statusLabel={googleStatusLabel}
           buttonHostRef={buttonHostRef}
-          onClick={handleGoogleButtonClick}
         />
 
         <div className="my-5 flex items-center gap-3">
