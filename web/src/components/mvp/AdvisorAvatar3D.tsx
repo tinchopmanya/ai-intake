@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import styles from "@/components/mvp/AdvisorAvatar3D.module.css";
 
@@ -25,7 +25,10 @@ type AdvisorAvatar3DProps = {
 };
 
 type TalkingHeadInstance = {
-  showAvatar: (avatar: Record<string, unknown>) => Promise<void>;
+  showAvatar: (
+    avatar: Record<string, unknown>,
+    onProgress?: ((event: ProgressEvent<EventTarget>) => void) | null,
+  ) => Promise<void>;
   streamStart: (
     options?: Record<string, unknown>,
     onAudioStart?: (() => void) | null,
@@ -56,10 +59,33 @@ function loadTalkingHeadModule() {
 
 export function preloadAdvisorAvatarAssets(modelUrl?: string | null) {
   if (typeof window === "undefined") return;
+  const isDevelopment = process.env.NODE_ENV !== "production";
+  const preloadStartedAt = performance.now();
   void loadTalkingHeadModule();
   if (!modelUrl || preloadedAvatarModels.has(modelUrl)) return;
   preloadedAvatarModels.add(modelUrl);
-  void fetch(modelUrl, { cache: "force-cache" }).catch(() => undefined);
+  if (isDevelopment) {
+    console.log("[voice][avatar]", "preload_start", { modelUrl });
+  }
+  void fetch(modelUrl, { cache: "force-cache" })
+    .then((response) => {
+      if (isDevelopment) {
+        console.log("[voice][avatar]", "preload_complete", {
+          modelUrl,
+          ok: response.ok,
+          elapsedMs: Math.round(performance.now() - preloadStartedAt),
+        });
+      }
+    })
+    .catch((error) => {
+      if (isDevelopment) {
+        console.log("[voice][avatar]", "preload_failed", {
+          modelUrl,
+          elapsedMs: Math.round(performance.now() - preloadStartedAt),
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    });
 }
 
 function resolveReadyPlayerMeUrl(avatarVariant: AvatarVariant, explicitUrl?: string | null) {
@@ -207,6 +233,7 @@ export function AdvisorAvatar3D({
   playbackId = 0,
   onRuntimeStateChange,
 }: AdvisorAvatar3DProps) {
+  const isDevelopment = process.env.NODE_ENV !== "production";
   const containerRef = useRef<HTMLDivElement | null>(null);
   const headRef = useRef<TalkingHeadInstance | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -214,6 +241,7 @@ export function AdvisorAvatar3D({
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
   const sourceAudioElementRef = useRef<HTMLAudioElement | null>(null);
   const activePlaybackRef = useRef<number>(-1);
+  const loadProgressBucketRef = useRef(-1);
   const [loadState, setLoadState] = useState<Exclude<AvatarStatus, "speaking">>("loading");
 
   const resolvedModelUrl = useMemo(
@@ -234,9 +262,22 @@ export function AdvisorAvatar3D({
       ? "error"
       : loadState;
 
+  const pushDebug = useCallback(
+    (event: string, details?: Record<string, unknown>) => {
+      if (!isDevelopment) return;
+      if (details) {
+        console.log("[voice][avatar]", event, details);
+      } else {
+        console.log("[voice][avatar]", event);
+      }
+    },
+    [isDevelopment],
+  );
+
   useEffect(() => {
     onRuntimeStateChange?.(runtimeState);
-  }, [onRuntimeStateChange, runtimeState]);
+    pushDebug("runtime_state", { state: runtimeState });
+  }, [onRuntimeStateChange, pushDebug, runtimeState]);
 
   useEffect(() => {
     if (!containerRef.current || !resolvedModelUrl) {
@@ -246,36 +287,50 @@ export function AdvisorAvatar3D({
     let cancelled = false;
 
     async function loadAvatar() {
+      const runtimeStartedAt = performance.now();
       try {
         setLoadState("loading");
+        loadProgressBucketRef.current = -1;
+        pushDebug("runtime_init_start", { modelUrl: resolvedModelUrl });
         const { TalkingHead } = await loadTalkingHeadModule();
         if (cancelled || !containerRef.current) return;
 
         const head = new TalkingHead(containerRef.current, {
-          cameraView: "head",
+          cameraView: "upper",
           cameraRotateEnable: false,
           cameraPanEnable: false,
           cameraZoomEnable: false,
           // We drive speaking with explicit viseme tracks, so skip the vendor's
           // default eager loading of bundled lipsync processors.
           lipsyncModules: [],
-          modelFPS: 30,
-          modelPixelRatio: 1,
+          modelFPS: 24,
+          modelPixelRatio: 0.85,
           lightAmbientIntensity: 2.1,
           lightDirectIntensity: 20,
           lightDirectPhi: 0.18,
           lightDirectTheta: 2.2,
           avatarMood: "neutral",
-          avatarIdleEyeContact: 0.2,
-          avatarIdleHeadMove: 0.12,
-          avatarSpeakingEyeContact: 0.28,
-          avatarSpeakingHeadMove: 0.18,
+          avatarIdleEyeContact: 0.42,
+          avatarIdleHeadMove: 0.06,
+          avatarSpeakingEyeContact: 0.6,
+          avatarSpeakingHeadMove: 0.1,
         }) as unknown as TalkingHeadInstance;
 
+        pushDebug("show_avatar_start", { modelUrl: resolvedModelUrl });
         await head.showAvatar({
           url: resolvedModelUrl,
           body: avatarVariant === "male" ? "M" : "F",
           avatarMood: "neutral",
+        }, (progressEvent) => {
+          const total = progressEvent.total ?? 0;
+          const bucket = total > 0 ? Math.min(5, Math.floor((progressEvent.loaded / total) * 5)) : -1;
+          if (bucket === loadProgressBucketRef.current) return;
+          loadProgressBucketRef.current = bucket;
+          pushDebug("show_avatar_progress", {
+            loadedKb: Math.round(progressEvent.loaded / 1024),
+            totalKb: total > 0 ? Math.round(total / 1024) : null,
+            progressPct: total > 0 ? Math.round((progressEvent.loaded / total) * 100) : null,
+          });
         });
 
         if (cancelled) {
@@ -286,9 +341,18 @@ export function AdvisorAvatar3D({
         }
 
         headRef.current = head;
+        head.lookAtCamera(1600);
+        pushDebug("show_avatar_ready", {
+          modelUrl: resolvedModelUrl,
+          elapsedMs: Math.round(performance.now() - runtimeStartedAt),
+        });
         setLoadState("ready");
       } catch (error) {
         console.error("avatar_3d_load_failed", error);
+        pushDebug("show_avatar_failed", {
+          modelUrl: resolvedModelUrl,
+          error: error instanceof Error ? error.message : String(error),
+        });
         setLoadState("error");
       }
     }
@@ -303,7 +367,7 @@ export function AdvisorAvatar3D({
       headRef.current?.stop?.();
       headRef.current = null;
     };
-  }, [avatarVariant, resolvedModelUrl]);
+  }, [avatarVariant, pushDebug, resolvedModelUrl]);
 
   useEffect(() => {
     return () => {
@@ -358,8 +422,12 @@ export function AdvisorAvatar3D({
           listeningActiveThresholdLevel: 72,
           listeningSilenceThresholdLevel: 36,
         });
+        pushDebug("audio_analyzer_attached");
       } catch (error) {
         console.warn("avatar_audio_analyzer_failed", error);
+        pushDebug("audio_analyzer_failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
 
@@ -369,7 +437,7 @@ export function AdvisorAvatar3D({
     if (!isSpeaking) {
       head.stopListening();
     }
-  }, [audioElement, isSpeaking]);
+  }, [audioElement, isSpeaking, pushDebug]);
 
   useEffect(() => {
     const head = headRef.current;
@@ -380,7 +448,7 @@ export function AdvisorAvatar3D({
       head.streamInterrupt();
       head.streamStop();
       head.stopListening();
-      head.lookAhead(800);
+      head.lookAtCamera(1400);
       return;
     }
 
@@ -397,17 +465,24 @@ export function AdvisorAvatar3D({
           waitForAudioChunks: false,
           lipsyncType: "visemes",
         });
-        activeHead.lookAtCamera(1200);
+        pushDebug("speech_animation_start", {
+          textLength: speechText?.length ?? 0,
+          playbackId,
+        });
+        activeHead.lookAtCamera(1800);
         activeHead.setMood("neutral");
         activeHead.streamAudio(visemeTrack);
       } catch (error) {
         console.error("avatar_3d_speaking_failed", error);
+        pushDebug("speech_animation_failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
         setLoadState("error");
       }
     }
 
     void animateSpeech();
-  }, [isSpeaking, playbackId, speechText]);
+  }, [isSpeaking, playbackId, pushDebug, speechText]);
 
   const resolvedWidth = width ?? size;
   const resolvedHeight = height ?? size;

@@ -22,6 +22,12 @@ export type AdvisorChatMessage = {
 export type AdvisorChatEntryMode = "advisor_conversation" | "advisor_refine_response";
 type VoiceSessionTurn = { role: "user" | "advisor"; text: string };
 type AvatarRuntimeState = "loading" | "ready" | "error";
+type VoicePerfKey =
+  | "popupOpenedAt"
+  | "submitStartedAt"
+  | "advisorResponseAt"
+  | "ttsStartedAt"
+  | "ttsEndedAt";
 type VoiceFlowPhase =
   | "countdown"
   | "initializing_media"
@@ -161,6 +167,36 @@ export function AdvisorChatModal({
   const [avatarAudioElement, setAvatarAudioElement] = useState<HTMLAudioElement | null>(null);
   const [avatarSpeechText, setAvatarSpeechText] = useState<string>("");
   const [avatarRuntimeState, setAvatarRuntimeState] = useState<AvatarRuntimeState>("loading");
+  const perfMarksRef = useRef<Record<VoicePerfKey, number | null>>({
+    popupOpenedAt: null,
+    submitStartedAt: null,
+    advisorResponseAt: null,
+    ttsStartedAt: null,
+    ttsEndedAt: null,
+  });
+  const previousAvatarRuntimeStateRef = useRef<AvatarRuntimeState>("loading");
+
+  const pushMetric = useCallback(
+    (event: string, details?: Record<string, unknown>) => {
+      if (!isDevelopment) return;
+      if (details) {
+        console.log("[voice][metrics]", event, details);
+      } else {
+        console.log("[voice][metrics]", event);
+      }
+    },
+    [isDevelopment],
+  );
+
+  const markPerf = useCallback((key: VoicePerfKey) => {
+    perfMarksRef.current[key] = performance.now();
+    return perfMarksRef.current[key];
+  }, []);
+
+  const getElapsed = useCallback((key: VoicePerfKey) => {
+    const mark = perfMarksRef.current[key];
+    return mark === null ? null : Math.round(performance.now() - mark);
+  }, []);
 
   const headerAvatar = useMemo(() => resolveAvatarVariant(advisorAvatarSrc, "128"), [advisorAvatarSrc]);
   const heroAvatar = useMemo(() => resolveAvatarVariant(advisorAvatarSrc, "256"), [advisorAvatarSrc]);
@@ -182,11 +218,26 @@ export function AdvisorChatModal({
       setVoicePlaybackNotice("La voz natural no estuvo disponible. Seguimos con la voz del navegador.");
     },
     onPlaybackStart: ({ audioElement, text }) => {
+      markPerf("ttsStartedAt");
+      pushMetric("tts_playback_started", {
+        textLength: text.length,
+        popupToAudioMs: getElapsed("popupOpenedAt"),
+        submitToAudioMs: getElapsed("submitStartedAt"),
+        advisorToAudioMs: getElapsed("advisorResponseAt"),
+      });
       setAvatarAudioElement(audioElement);
       setAvatarSpeechText(text);
       setAvatarPlaybackId((current) => current + 1);
     },
     onPlaybackEnd: () => {
+      markPerf("ttsEndedAt");
+      pushMetric("tts_playback_ended", {
+        playbackDurationMs:
+          perfMarksRef.current.ttsStartedAt !== null
+            ? Math.round((perfMarksRef.current.ttsEndedAt ?? performance.now()) - perfMarksRef.current.ttsStartedAt)
+            : null,
+        submitToEndMs: getElapsed("submitStartedAt"),
+      });
       setAvatarAudioElement(null);
       setAvatarSpeechText("");
     },
@@ -197,6 +248,17 @@ export function AdvisorChatModal({
     },
   });
   const voiceSpeaking = speechSynthesis.speaking;
+
+  useEffect(() => {
+    if (!voiceOpen) return;
+    const previous = previousAvatarRuntimeStateRef.current;
+    if (previous === avatarRuntimeState) return;
+    previousAvatarRuntimeStateRef.current = avatarRuntimeState;
+    pushMetric("avatar_runtime_state", {
+      state: avatarRuntimeState,
+      popupElapsedMs: getElapsed("popupOpenedAt"),
+    });
+  }, [avatarRuntimeState, getElapsed, pushMetric, voiceOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -337,6 +399,12 @@ export function AdvisorChatModal({
           return;
         }
         const userVoiceText = transcriptText || "Mensaje de voz";
+        markPerf("submitStartedAt");
+        pushMetric("advisor_submit_started", {
+          transcriptLength: userVoiceText.length,
+          hasAudio: Boolean(payload.audioBlob),
+          popupElapsedMs: getElapsed("popupOpenedAt"),
+        });
 
         recorder.setStatus("sending");
         setVoiceSendError(null);
@@ -384,6 +452,12 @@ export function AdvisorChatModal({
             });
 
         const advisorReply = result.message.trim() || "No pude responder ahora. Intenta nuevamente.";
+        markPerf("advisorResponseAt");
+        pushMetric("advisor_response_received", {
+          submitToResponseMs: getElapsed("submitStartedAt"),
+          popupToResponseMs: getElapsed("popupOpenedAt"),
+          replyLength: advisorReply.length,
+        });
         const newTurns: VoiceSessionTurn[] = [
           { role: "user", text: userVoiceText },
           { role: "advisor", text: advisorReply },
@@ -426,12 +500,15 @@ export function AdvisorChatModal({
       autoSendOnVoiceComplete,
       caseId,
       entryMode,
+      getElapsed,
       isDevelopment,
+      markPerf,
       messages,
       onDraftChange,
       onSend,
       onVoiceExchangeComplete,
       onVoiceSessionSync,
+      pushMetric,
       recorder,
       speechSynthesis,
       syncVoiceTurnsLive,
@@ -500,6 +577,17 @@ export function AdvisorChatModal({
     entryMode === "advisor_conversation" ? "Escribi tu mensaje..." : "Escribi como queres ajustarlo...";
 
   const openVoice = () => {
+    markPerf("popupOpenedAt");
+    perfMarksRef.current.submitStartedAt = null;
+    perfMarksRef.current.advisorResponseAt = null;
+    perfMarksRef.current.ttsStartedAt = null;
+    perfMarksRef.current.ttsEndedAt = null;
+    previousAvatarRuntimeStateRef.current = "loading";
+    pushMetric("popup_opened", {
+      advisorId: advisorId ?? "unknown",
+      expandedDefault:
+        typeof window !== "undefined" ? window.matchMedia("(min-width: 1024px)").matches : false,
+    });
     setVoiceTranscriptOpen(false);
     setVoiceSendError(null);
     setVoicePlaybackNotice(null);

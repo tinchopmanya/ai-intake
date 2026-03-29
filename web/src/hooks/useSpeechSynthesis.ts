@@ -88,6 +88,8 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
   const streamEndedRef = useRef(false);
   const receivedAudioChunkRef = useRef(false);
   const remoteTtsRetryAtRef = useRef(0);
+  const speakRequestedAtRef = useRef<number | null>(null);
+  const playbackStartedAtRef = useRef<number | null>(null);
   const lang = options?.lang ?? "es-ES";
   const preferBuffered = options?.preferBuffered ?? false;
 
@@ -107,6 +109,19 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
     [isDevelopment],
   );
 
+  const getOrCreateAudioElement = useCallback(() => {
+    if (!audioRef.current) {
+      const audio = new Audio();
+      audio.preload = "auto";
+      audio.volume = 1;
+      audio.muted = false;
+      audio.setAttribute("playsinline", "true");
+      audioRef.current = audio;
+      pushDebug("audio_element_primed");
+    }
+    return audioRef.current;
+  }, [pushDebug]);
+
   const cleanupStreamingAudio = useCallback(() => {
     const audio = audioRef.current;
     if (audio) {
@@ -114,7 +129,6 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
       audio.removeAttribute("src");
       audio.load();
     }
-    audioRef.current = null;
     if (objectUrlRef.current && typeof URL !== "undefined") {
       URL.revokeObjectURL(objectUrlRef.current);
     }
@@ -184,7 +198,14 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
       utterance.rate = 0.95;
       utterance.pitch = 1.02;
       utterance.onstart = () => {
+        playbackStartedAtRef.current = performance.now();
         setSpeaking(true);
+        pushDebug("playback_start", {
+          via: "browser",
+          voice: selectedVoice,
+          queueToAudioMs:
+            speakRequestedAtRef.current !== null ? Math.round(playbackStartedAtRef.current - speakRequestedAtRef.current) : null,
+        });
         optionsRef.current?.onPlaybackStart?.({
           text,
           voice: selectedVoice,
@@ -193,7 +214,12 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
         });
       };
       utterance.onend = () => {
-        pushDebug("playback_end", { via: "browser", voice: selectedVoice });
+        pushDebug("playback_end", {
+          via: "browser",
+          voice: selectedVoice,
+          playbackDurationMs:
+            playbackStartedAtRef.current !== null ? Math.round(performance.now() - playbackStartedAtRef.current) : null,
+        });
         setSpeaking(false);
         activeUtteranceRef.current = null;
         optionsRef.current?.onPlaybackEnd?.();
@@ -233,6 +259,7 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
       signal?: AbortSignal;
       reason: string;
     }) => {
+      const bufferedRequestStartedAt = performance.now();
       pushDebug("buffered_fallback_start", {
         voice: payload.voice,
         reason: payload.reason,
@@ -245,16 +272,20 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
         },
         { signal: payload.signal },
       );
-      const audio = new Audio();
+      const audio = getOrCreateAudioElement();
       const objectUrl = URL.createObjectURL(audioBlob);
       objectUrlRef.current = objectUrl;
-      audioRef.current = audio;
       audio.src = objectUrl;
       audio.preload = "auto";
       audio.volume = 1;
       audio.muted = false;
       audio.onended = () => {
-        pushDebug("playback_end", { via: "buffered", voice: payload.voice });
+        pushDebug("playback_end", {
+          via: "buffered",
+          voice: payload.voice,
+          playbackDurationMs:
+            playbackStartedAtRef.current !== null ? Math.round(performance.now() - playbackStartedAtRef.current) : null,
+        });
         setSpeaking(false);
         cleanupStreamingAudio();
         optionsRef.current?.onPlaybackEnd?.();
@@ -276,8 +307,19 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
         optionsRef.current?.onPlaybackEnd?.();
       };
 
+      pushDebug("buffered_audio_ready", {
+        voice: payload.voice,
+        requestMs: Math.round(performance.now() - bufferedRequestStartedAt),
+        audioBytes: audioBlob.size,
+      });
       setSpeaking(true);
-      pushDebug("playback_start", { via: "buffered", voice: payload.voice });
+      playbackStartedAtRef.current = performance.now();
+      pushDebug("playback_start", {
+        via: "buffered",
+        voice: payload.voice,
+        queueToAudioMs:
+          speakRequestedAtRef.current !== null ? Math.round(playbackStartedAtRef.current - speakRequestedAtRef.current) : null,
+      });
       optionsRef.current?.onPlaybackFallback?.({
         text: payload.text,
         voice: payload.voice,
@@ -291,13 +333,14 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
       });
       await audio.play();
     },
-    [cleanupStreamingAudio, pushDebug, startBrowserFallback],
+    [cleanupStreamingAudio, getOrCreateAudioElement, pushDebug, startBrowserFallback],
   );
 
   const speak = useCallback(
     async (text: string, speakOptions?: SpeakOptions) => {
       if (!text.trim()) return;
       stop();
+      speakRequestedAtRef.current = performance.now();
 
       const selectedVoice = resolveVoice({
         voice: speakOptions?.voice ?? optionsRef.current?.voice,
@@ -348,16 +391,21 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
       }
 
       const mediaSource = new MediaSource();
-      const audio = new Audio();
+      const audio = getOrCreateAudioElement();
       const objectUrl = URL.createObjectURL(mediaSource);
       objectUrlRef.current = objectUrl;
       mediaSourceRef.current = mediaSource;
-      audioRef.current = audio;
       audio.src = objectUrl;
       audio.preload = "auto";
       audio.volume = 1;
       audio.muted = false;
       audio.onended = () => {
+        pushDebug("playback_end", {
+          via: "stream",
+          voice: selectedVoice,
+          playbackDurationMs:
+            playbackStartedAtRef.current !== null ? Math.round(performance.now() - playbackStartedAtRef.current) : null,
+        });
         setSpeaking(false);
         cleanupStreamingAudio();
         optionsRef.current?.onPlaybackEnd?.();
@@ -421,8 +469,16 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
               try {
                 await audio.play();
                 playbackStarted = true;
+                playbackStartedAtRef.current = performance.now();
                 setSpeaking(true);
-                pushDebug("playback_start", { via: "stream", voice: selectedVoice });
+                pushDebug("playback_start", {
+                  via: "stream",
+                  voice: selectedVoice,
+                  queueToAudioMs:
+                    speakRequestedAtRef.current !== null
+                      ? Math.round(playbackStartedAtRef.current - speakRequestedAtRef.current)
+                      : null,
+                });
                 optionsRef.current?.onPlaybackStart?.({
                   text,
                   voice: selectedVoice,
@@ -496,8 +552,13 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
         abortControllerRef.current = null;
       }
     },
-    [cleanupStreamingAudio, flushQueue, playBufferedAudio, preferBuffered, pushDebug, startBrowserFallback, stop],
+    [cleanupStreamingAudio, flushQueue, getOrCreateAudioElement, playBufferedAudio, preferBuffered, pushDebug, startBrowserFallback, stop],
   );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    getOrCreateAudioElement();
+  }, [getOrCreateAudioElement]);
 
   useEffect(() => {
     return () => {
@@ -508,6 +569,7 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
       }
       activeUtteranceRef.current = null;
       cleanupStreamingAudio();
+      audioRef.current = null;
     };
   }, [cleanupStreamingAudio]);
 

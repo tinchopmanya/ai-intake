@@ -208,9 +208,9 @@ export function useSpeechToText(options?: UseSpeechToTextOptions) {
       };
       setDebugEvents((current) => [...current.slice(-79), entry]);
       if (details) {
-        console.debug("[voice][stt]", event, details);
+        console.log("[voice][stt]", event, details);
       } else {
-        console.debug("[voice][stt]", event);
+        console.log("[voice][stt]", event);
       }
     },
     [isDevelopment],
