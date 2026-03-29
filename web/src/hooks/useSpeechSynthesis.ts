@@ -249,6 +249,8 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
       audioRef.current = audio;
       audio.src = objectUrl;
       audio.preload = "auto";
+      audio.volume = 1;
+      audio.muted = false;
       audio.onended = () => {
         pushDebug("playback_end", { via: "buffered", voice: payload.voice });
         setSpeaking(false);
@@ -342,6 +344,8 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
       audioRef.current = audio;
       audio.src = objectUrl;
       audio.preload = "auto";
+      audio.volume = 1;
+      audio.muted = false;
       audio.onended = () => {
         setSpeaking(false);
         cleanupStreamingAudio();
@@ -387,17 +391,7 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
           throw new Error("tts_stream_body_unavailable");
         }
 
-        setSpeaking(true);
-        pushDebug("playback_start", { via: "stream", voice: selectedVoice });
-        optionsRef.current?.onPlaybackStart?.({
-          text,
-          voice: selectedVoice,
-          audioElement: audio,
-          usingStream: true,
-        });
-        void audio.play().catch(() => {
-          // If autoplay is blocked we still keep buffering and fallback on audio error if needed.
-        });
+        let playbackStarted = false;
 
         while (true) {
           if (abortController.signal.aborted) {
@@ -412,6 +406,26 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
               value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength),
             );
             flushQueue();
+            if (!playbackStarted) {
+              try {
+                await audio.play();
+                playbackStarted = true;
+                setSpeaking(true);
+                pushDebug("playback_start", { via: "stream", voice: selectedVoice });
+                optionsRef.current?.onPlaybackStart?.({
+                  text,
+                  voice: selectedVoice,
+                  audioElement: audio,
+                  usingStream: true,
+                });
+              } catch (playError) {
+                pushDebug("stream_audio_play_failed", {
+                  voice: selectedVoice,
+                  error: getPlaybackErrorCode(playError),
+                });
+                throw playError;
+              }
+            }
           }
         }
 
