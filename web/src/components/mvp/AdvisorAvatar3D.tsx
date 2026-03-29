@@ -40,6 +40,23 @@ type TalkingHeadInstance = {
 
 const DEFAULT_READY_PLAYER_ME_FEMALE_URL =
   "https://models.readyplayer.me/64bfa15f0e72c63d7c3934a6.glb?morphTargets=ARKit,Oculus+Visemes,mouthOpen,mouthSmile,eyesClosed,eyesLookUp,eyesLookDown&textureSizeLimit=1024&textureFormat=png";
+let talkingHeadModulePromise: Promise<typeof import("@/vendor/talkinghead/talkinghead.mjs")> | null = null;
+const preloadedAvatarModels = new Set<string>();
+
+function loadTalkingHeadModule() {
+  if (!talkingHeadModulePromise) {
+    talkingHeadModulePromise = import("@/vendor/talkinghead/talkinghead.mjs");
+  }
+  return talkingHeadModulePromise;
+}
+
+export function preloadAdvisorAvatarAssets(modelUrl?: string | null) {
+  if (typeof window === "undefined") return;
+  void loadTalkingHeadModule();
+  if (!modelUrl || preloadedAvatarModels.has(modelUrl)) return;
+  preloadedAvatarModels.add(modelUrl);
+  void fetch(modelUrl, { cache: "force-cache" }).catch(() => undefined);
+}
 
 function resolveReadyPlayerMeUrl(avatarVariant: AvatarVariant, explicitUrl?: string | null) {
   if (explicitUrl) return explicitUrl;
@@ -191,18 +208,25 @@ export function AdvisorAvatar3D({
   const zeroGainRef = useRef<GainNode | null>(null);
   const sourceAudioElementRef = useRef<HTMLAudioElement | null>(null);
   const activePlaybackRef = useRef<number>(-1);
-  const [status, setStatus] = useState<AvatarStatus>("loading");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [loadState, setLoadState] = useState<Exclude<AvatarStatus, "speaking">>("loading");
+  const [runtimeErrorMessage, setRuntimeErrorMessage] = useState<string | null>(null);
 
   const resolvedModelUrl = useMemo(
     () => resolveReadyPlayerMeUrl(avatarVariant, modelUrl),
     [avatarVariant, modelUrl],
   );
+  const modelUnavailable = !resolvedModelUrl;
+  const status: AvatarStatus = modelUnavailable
+    ? "error"
+    : loadState === "error"
+      ? "error"
+      : isSpeaking
+        ? "speaking"
+        : loadState;
+  const errorMessage = modelUnavailable ? "Avatar 3D no disponible" : runtimeErrorMessage;
 
   useEffect(() => {
     if (!containerRef.current || !resolvedModelUrl) {
-      setStatus("error");
-      setErrorMessage("Avatar 3D no disponible");
       return;
     }
 
@@ -210,9 +234,9 @@ export function AdvisorAvatar3D({
 
     async function loadAvatar() {
       try {
-        setStatus("loading");
-        setErrorMessage(null);
-        const { TalkingHead } = await import("@/vendor/talkinghead/talkinghead.mjs");
+        setLoadState("loading");
+        setRuntimeErrorMessage(null);
+        const { TalkingHead } = await loadTalkingHeadModule();
         if (cancelled || !containerRef.current) return;
 
         const head = new TalkingHead(containerRef.current, {
@@ -250,11 +274,11 @@ export function AdvisorAvatar3D({
         }
 
         headRef.current = head;
-        setStatus("ready");
+        setLoadState("ready");
       } catch (error) {
         console.error("avatar_3d_load_failed", error);
-        setStatus("error");
-        setErrorMessage("No pudimos cargar el avatar 3D");
+        setLoadState("error");
+        setRuntimeErrorMessage("No pudimos cargar el avatar 3D");
       }
     }
 
@@ -353,9 +377,6 @@ export function AdvisorAvatar3D({
       head.streamStop();
       head.stopListening();
       head.lookAhead(800);
-      if (status !== "error") {
-        setStatus("ready");
-      }
       return;
     }
 
@@ -375,16 +396,15 @@ export function AdvisorAvatar3D({
         activeHead.lookAtCamera(1200);
         activeHead.setMood("neutral");
         activeHead.streamAudio(visemeTrack);
-        setStatus("speaking");
       } catch (error) {
         console.error("avatar_3d_speaking_failed", error);
-        setStatus("error");
-        setErrorMessage("No pudimos sincronizar el avatar");
+        setLoadState("error");
+        setRuntimeErrorMessage("No pudimos sincronizar el avatar");
       }
     }
 
     void animateSpeech();
-  }, [isSpeaking, playbackId, speechText, status]);
+  }, [isSpeaking, playbackId, speechText]);
 
   const avatarSizeStyle = {
     width: `${size}px`,

@@ -41,7 +41,9 @@ class TtsVoiceNotSupportedError(ValueError):
 
 
 class TtsProviderUnavailableError(RuntimeError):
-    pass
+    def __init__(self, detail: str = "tts_unavailable") -> None:
+        super().__init__(detail)
+        self.detail = detail
 
 
 def resolve_tts_voice(voice: str | None) -> str:
@@ -115,7 +117,7 @@ def _split_tts_text_chunks(normalized_text: str) -> list[str]:
 
 async def stream_tts_audio(*, text: str, voice: str | None = None) -> AsyncIterator[bytes]:
     if not _HAS_EDGE_TTS:
-        raise TtsProviderUnavailableError("edge_tts_not_installed")
+        raise TtsProviderUnavailableError("tts_dependency_missing")
 
     normalized_text = normalize_tts_text(text)
     if not normalized_text:
@@ -140,4 +142,4 @@ async def stream_tts_audio(*, text: str, voice: str | None = None) -> AsyncItera
                     yield data
     except Exception as exc:  # pragma: no cover - exercised through router tests with mocking
         logger.exception("tts_stream_failed voice=%s text_length=%s", resolved_voice, len(normalized_text))
-        raise TtsProviderUnavailableError("tts_stream_failed") from exc
+        raise TtsProviderUnavailableError("tts_provider_unavailable") from exc

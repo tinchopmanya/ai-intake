@@ -56,5 +56,5 @@ async def stream_tts(
     except TtsProviderUnavailableError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="tts_unavailable",
+            detail=exc.detail,
         ) from exc

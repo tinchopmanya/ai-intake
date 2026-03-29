@@ -115,7 +115,17 @@ class TestTtsRouter(unittest.TestCase):
             )
 
         self.assertEqual(response.status_code, 503)
-        self.assertEqual(response.json()["detail"], "tts_unavailable")
+        self.assertEqual(response.json()["detail"], "tts_provider_unavailable")
+
+    def test_stream_endpoint_reports_missing_dependency(self) -> None:
+        with patch("app.services.tts_service._HAS_EDGE_TTS", False):
+            response = self.client.post(
+                "/v1/tts/stream",
+                json={"text": "Hola"},
+            )
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["detail"], "tts_dependency_missing")
 
 
 if __name__ == "__main__":

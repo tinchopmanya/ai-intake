@@ -148,6 +148,7 @@ export function AdvisorChatModal({
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [voiceTranscriptOpen, setVoiceTranscriptOpen] = useState(false);
   const [voiceSendError, setVoiceSendError] = useState<string | null>(null);
+  const [voicePlaybackNotice, setVoicePlaybackNotice] = useState<string | null>(null);
   const [voiceTurns, setVoiceTurns] = useState<VoiceSessionTurn[]>([]);
   const [voiceChatExpanded, setVoiceChatExpanded] = useState(false);
   const [finalizeInFlight, setFinalizeInFlight] = useState(false);
@@ -174,6 +175,9 @@ export function AdvisorChatModal({
   const speechSynthesis = useSpeechSynthesis({
     lang: preferredVoiceLang,
     voicePreset: advisorAvatarRuntime.voicePreset,
+    onPlaybackFallback: () => {
+      setVoicePlaybackNotice("La voz natural no estuvo disponible. Seguimos con la voz del navegador.");
+    },
     onPlaybackStart: ({ audioElement, text }) => {
       setAvatarAudioElement(audioElement);
       setAvatarSpeechText(text);
@@ -186,9 +190,17 @@ export function AdvisorChatModal({
     onPlaybackError: () => {
       setAvatarAudioElement(null);
       setAvatarSpeechText("");
+      setVoicePlaybackNotice("La respuesta se mostro en texto, pero no pudimos reproducir la voz.");
     },
   });
   const voiceSpeaking = speechSynthesis.speaking;
+
+  useEffect(() => {
+    if (!isOpen) return;
+    void import("@/components/mvp/AdvisorAvatar3D").then((mod) => {
+      mod.preloadAdvisorAvatarAssets?.(advisorAvatarRuntime.avatarModelUrl);
+    });
+  }, [advisorAvatarRuntime.avatarModelUrl, isOpen]);
 
   useEffect(() => {
     if (!voiceChatExpanded) return;
@@ -291,6 +303,7 @@ export function AdvisorChatModal({
       setVoiceOpen(false);
       setVoiceTranscriptOpen(false);
       setVoiceSendError(null);
+      setVoicePlaybackNotice(null);
       setVoiceTurns([]);
       setFinalizeInFlight(false);
       setVoiceChatExpanded(false);
@@ -318,6 +331,7 @@ export function AdvisorChatModal({
 
         recorder.setStatus("sending");
         setVoiceSendError(null);
+        setVoicePlaybackNotice(null);
         const history = syncVoiceTurnsLive
           ? messages.map((item) => ({ role: item.role, content: item.text }))
           : [
@@ -437,6 +451,7 @@ export function AdvisorChatModal({
   const beginNextTurnRecording = useCallback(async () => {
     if (finalizeInFlight || flowPhase === "sending" || flowPhase === "initializing_media") return;
     setVoiceSendError(null);
+    setVoicePlaybackNotice(null);
     setReadyForNextTurn(false);
     recorder.resetRecording();
     await recorder.startRecording();
@@ -478,6 +493,7 @@ export function AdvisorChatModal({
   const openVoice = () => {
     setVoiceTranscriptOpen(false);
     setVoiceSendError(null);
+    setVoicePlaybackNotice(null);
     setVoiceTurns([]);
     setFinalizeInFlight(false);
     setReadyForNextTurn(false);
@@ -579,6 +595,9 @@ export function AdvisorChatModal({
                       Esta experiencia usa el dictado del navegador. El advisor responde a partir de la transcripcion.
                     </div>
                     {voiceSendError || recorder.errorMessage ? <p className={styles.vpError}>{voiceSendError ?? recorder.errorMessage}</p> : null}
+                    {voicePlaybackNotice ? (
+                      <p className="px-1 text-center text-xs text-white/70">{voicePlaybackNotice}</p>
+                    ) : null}
                     <div className="mt-auto flex w-full gap-2.5">
                       <button
                         type="button"
