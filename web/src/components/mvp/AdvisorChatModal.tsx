@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 
 import { Button, Textarea } from "@/components/mvp/ui";
 import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
@@ -76,6 +77,15 @@ function resolveAvatarVariant(src: string | null | undefined, variant: "128" | "
   return src.replace("_64", "_256").replace("_128", "_256");
 }
 
+function getAdvisorAvatarVariant(advisorId?: string): "female" | "male" {
+  return advisorId === "robert" ? "male" : "female";
+}
+
+const AdvisorAvatar3D = dynamic(
+  () => import("@/components/mvp/AdvisorAvatar3D").then((mod) => mod.AdvisorAvatar3D),
+  { ssr: false },
+);
+
 export function AdvisorChatModal({
   isOpen,
   advisorName,
@@ -112,9 +122,13 @@ export function AdvisorChatModal({
   const autoStartGuardRef = useRef(false);
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
   const wasSpeakingRef = useRef(false);
+  const [avatarPlaybackId, setAvatarPlaybackId] = useState(0);
+  const [avatarAudioElement, setAvatarAudioElement] = useState<HTMLAudioElement | null>(null);
+  const [avatarSpeechText, setAvatarSpeechText] = useState<string>("");
 
   const headerAvatar = useMemo(() => resolveAvatarVariant(advisorAvatarSrc, "128"), [advisorAvatarSrc]);
   const heroAvatar = useMemo(() => resolveAvatarVariant(advisorAvatarSrc, "256"), [advisorAvatarSrc]);
+  const avatarVariant = useMemo(() => getAdvisorAvatarVariant(advisorId), [advisorId]);
   const preferredVoiceLang = useMemo(
     () =>
       typeof navigator !== "undefined" && navigator.language.toLowerCase().startsWith("es-uy")
@@ -126,6 +140,19 @@ export function AdvisorChatModal({
   const speechSynthesis = useSpeechSynthesis({
     lang: preferredVoiceLang,
     voice: "es-AR-ElenaNeural",
+    onPlaybackStart: ({ audioElement, text }) => {
+      setAvatarAudioElement(audioElement);
+      setAvatarSpeechText(text);
+      setAvatarPlaybackId((current) => current + 1);
+    },
+    onPlaybackEnd: () => {
+      setAvatarAudioElement(null);
+      setAvatarSpeechText("");
+    },
+    onPlaybackError: () => {
+      setAvatarAudioElement(null);
+      setAvatarSpeechText("");
+    },
   });
   const voiceSpeaking = speechSynthesis.speaking;
 
@@ -242,6 +269,8 @@ export function AdvisorChatModal({
       setVoiceLastDebug(null);
       setFinalizeInFlight(false);
       setVoiceChatExpanded(false);
+      setAvatarAudioElement(null);
+      setAvatarSpeechText("");
     },
     [commitVoiceSession, recorder, stopTts],
   );
@@ -443,31 +472,26 @@ export function AdvisorChatModal({
                       <span className={`${styles.vpRing} ${styles.vpRing1} ${voiceSpeaking ? styles.vpRingSpeaking : ""} ${(flowPhase === "user_recording" || flowPhase === "user_paused") ? styles.vpRingListening : ""}`} />
                       <span className={`${styles.vpRing} ${styles.vpRing2} ${voiceSpeaking ? styles.vpRingSpeaking : ""} ${(flowPhase === "user_recording" || flowPhase === "user_paused") ? styles.vpRingListening : ""}`} />
                       <span className={`${styles.vpRing} ${styles.vpRing3} ${voiceSpeaking ? styles.vpRingSpeaking : ""} ${(flowPhase === "user_recording" || flowPhase === "user_paused") ? styles.vpRingListening : ""}`} />
-                      {heroAvatar ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (voiceSpeaking) stopTts();
-                          }}
-                          disabled={!voiceSpeaking}
-                          className={`relative z-[2] rounded-full ${voiceSpeaking ? "cursor-pointer" : "cursor-default"}`}
-                          aria-label={voiceSpeaking ? "Detener voz del advisor" : "Avatar del advisor"}
-                        >
-                          <Image src={heroAvatar} alt={advisorName} width={168} height={168} priority className={styles.vpAvatarHero} />
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (voiceSpeaking) stopTts();
-                          }}
-                          disabled={!voiceSpeaking}
-                          className={`relative z-[2] rounded-full ${voiceSpeaking ? "cursor-pointer" : "cursor-default"}`}
-                          aria-label={voiceSpeaking ? "Detener voz del advisor" : "Avatar del advisor"}
-                        >
-                          <span className={styles.vpAvatarHeroFallback}>{(getInitials(advisorName) || "A")[0]}</span>
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (voiceSpeaking) stopTts();
+                        }}
+                        disabled={!voiceSpeaking}
+                        className={`relative z-[2] rounded-full ${voiceSpeaking ? "cursor-pointer" : "cursor-default"}`}
+                        aria-label={voiceSpeaking ? "Detener voz del advisor" : "Avatar del advisor"}
+                      >
+                        <AdvisorAvatar3D
+                          audioElement={avatarAudioElement}
+                          speechText={avatarSpeechText}
+                          isSpeaking={voiceSpeaking}
+                          avatarVariant={avatarVariant}
+                          fallbackImageSrc={heroAvatar}
+                          label={advisorName}
+                          playbackId={avatarPlaybackId}
+                          size={168}
+                        />
+                      </button>
                       {recorder.status === "countdown" ? <span className={styles.vpCountdown}>{recorder.countdown}</span> : null}
                     </div>
 

@@ -10,6 +10,14 @@ type UseSpeechSynthesisOptions = {
   lang?: string;
   voice?: SupportedTtsVoice;
   voicePreset?: TtsVoicePreset;
+  onPlaybackStart?: (payload: {
+    text: string;
+    voice: SupportedTtsVoice;
+    audioElement: HTMLAudioElement | null;
+    usingStream: boolean;
+  }) => void;
+  onPlaybackEnd?: () => void;
+  onPlaybackError?: (error: unknown) => void;
 };
 
 type SpeakOptions = {
@@ -118,7 +126,8 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
     activeUtteranceRef.current = null;
     cleanupStreamingAudio();
     setSpeaking(false);
-  }, [cleanupStreamingAudio]);
+    options?.onPlaybackEnd?.();
+  }, [cleanupStreamingAudio, options]);
 
   const speakWithBrowserFallback = useCallback(
     (text: string) => {
@@ -128,19 +137,30 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
       utterance.lang = lang;
       utterance.rate = 0.95;
       utterance.pitch = 1.02;
-      utterance.onstart = () => setSpeaking(true);
+      utterance.onstart = () => {
+        setSpeaking(true);
+        options?.onPlaybackStart?.({
+          text,
+          voice: resolveVoice(options),
+          audioElement: null,
+          usingStream: false,
+        });
+      };
       utterance.onend = () => {
         setSpeaking(false);
         activeUtteranceRef.current = null;
+        options?.onPlaybackEnd?.();
       };
       utterance.onerror = () => {
         setSpeaking(false);
         activeUtteranceRef.current = null;
+        options?.onPlaybackError?.("browser_tts_failed");
+        options?.onPlaybackEnd?.();
       };
       activeUtteranceRef.current = utterance;
       window.speechSynthesis.speak(utterance);
     },
-    [lang],
+    [lang, options],
   );
 
   const speak = useCallback(
@@ -169,6 +189,7 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
       audio.onended = () => {
         setSpeaking(false);
         cleanupStreamingAudio();
+        options?.onPlaybackEnd?.();
       };
       audio.onerror = () => {
         setSpeaking(false);
@@ -176,6 +197,8 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
         if (!receivedAudioChunkRef.current) {
           speakWithBrowserFallback(text);
         }
+        options?.onPlaybackError?.("audio_element_error");
+        options?.onPlaybackEnd?.();
       };
 
       const abortController = new AbortController();
@@ -201,6 +224,12 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
         }
 
         setSpeaking(true);
+        options?.onPlaybackStart?.({
+          text,
+          voice: selectedVoice,
+          audioElement: audio,
+          usingStream: true,
+        });
         void audio.play().catch(() => {
           // If autoplay is blocked we still keep buffering and fallback on audio error if needed.
         });
@@ -227,14 +256,17 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
         console.error("tts_stream_failed", error);
         cleanupStreamingAudio();
         setSpeaking(false);
+        options?.onPlaybackError?.(error);
         if (!receivedAudioChunkRef.current) {
           speakWithBrowserFallback(text);
+          return;
         }
+        options?.onPlaybackEnd?.();
       } finally {
         abortControllerRef.current = null;
       }
     },
-    [cleanupStreamingAudio, flushQueue, options?.voice, options?.voicePreset, speakWithBrowserFallback, stop],
+    [cleanupStreamingAudio, flushQueue, options, speakWithBrowserFallback, stop],
   );
 
   useEffect(() => stop, [stop]);
