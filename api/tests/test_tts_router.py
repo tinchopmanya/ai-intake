@@ -71,10 +71,10 @@ class TestTtsRouter(unittest.TestCase):
         self.assertTrue(response.headers["content-type"].startswith("audio/mpeg"))
         self.assertEqual(response.headers["x-tts-voice"], "es-AR-ElenaNeural")
         self.assertEqual(_FakeCommunicate.last_voice, "es-AR-ElenaNeural")
-        self.assertEqual(_FakeCommunicate.last_rate, "-10%")
+        self.assertEqual(_FakeCommunicate.last_rate, "-5%")
         self.assertEqual(_FakeCommunicate.last_pitch, "+0Hz")
         self.assertTrue(_FakeCommunicate.last_text.endswith("."))
-        self.assertIn(". ", _FakeCommunicate.last_text)
+        self.assertIn("\n\n", _FakeCommunicate.last_text)
 
     def test_stream_endpoint_accepts_supported_voice_override(self) -> None:
         with patch("app.services.tts_service._HAS_EDGE_TTS", True), patch(
@@ -90,14 +90,19 @@ class TestTtsRouter(unittest.TestCase):
         self.assertEqual(response.headers["x-tts-voice"], "es-ES-AlvaroNeural")
         self.assertEqual(_FakeCommunicate.last_voice, "es-ES-AlvaroNeural")
 
-    def test_stream_endpoint_rejects_unsupported_voice(self) -> None:
-        response = self.client.post(
-            "/v1/tts/stream",
-            json={"text": "Hola", "voice": "es-AR-UnknownNeural"},
-        )
+    def test_stream_endpoint_falls_back_to_default_for_unsupported_voice(self) -> None:
+        with patch("app.services.tts_service._HAS_EDGE_TTS", True), patch(
+            "app.services.tts_service.edge_tts.Communicate",
+            _FakeCommunicate,
+        ):
+            response = self.client.post(
+                "/v1/tts/stream",
+                json={"text": "Hola", "voice": "es-AR-UnknownNeural"},
+            )
 
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["detail"], "unsupported_tts_voice")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["x-tts-voice"], "es-AR-ElenaNeural")
+        self.assertEqual(_FakeCommunicate.last_voice, "es-AR-ElenaNeural")
 
     def test_stream_endpoint_maps_provider_failures(self) -> None:
         with patch("app.services.tts_service._HAS_EDGE_TTS", True), patch(
