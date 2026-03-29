@@ -1425,9 +1425,104 @@
   padding-right: 4px;
 }
 
+.processHistoryModalBody .processItemTagRow,
+.processHistoryModalBody .processRecommendationPreview {
+  display: none;
+}
+
 .processHistorySection {
   display: grid;
   gap: 10px;
+}
+
+.processHistoryBlocks {
+  display: grid;
+  gap: 8px;
+}
+
+.processHistoryBlock {
+  display: grid;
+  gap: 4px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.035);
+  padding: 10px 11px;
+}
+
+.processHistoryBlockLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(214, 226, 241, 0.54);
+}
+
+.processHistoryBlockText {
+  font-size: 12px;
+  line-height: 1.55;
+  color: rgba(241, 247, 255, 0.9);
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.processHistoryMetaRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.processHistoryMetaChip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(45, 107, 228, 0.18);
+  background: rgba(45, 107, 228, 0.1);
+  padding: 5px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(223, 237, 255, 0.92);
+}
+
+.processHistoryEmpty {
+  display: grid;
+  gap: 12px;
+  justify-items: flex-start;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(circle at top left, rgba(244, 201, 93, 0.08) 0%, transparent 28%),
+    linear-gradient(180deg, rgba(17, 32, 51, 0.94) 0%, rgba(10, 21, 32, 0.98) 100%);
+  padding: 16px;
+}
+
+.processHistoryEmptyTitle {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: rgba(248, 251, 255, 0.96);
+}
+
+.processHistoryEmptyButton {
+  min-height: 42px;
+  border-radius: 14px;
+  border: 1px solid rgba(45, 107, 228, 0.24);
+  background:
+    radial-gradient(circle at top left, rgba(45, 107, 228, 0.16) 0%, transparent 32%),
+    linear-gradient(180deg, rgba(17, 32, 51, 0.98) 0%, rgba(10, 21, 32, 0.98) 100%);
+  color: rgba(231, 241, 255, 0.94);
+  padding: 0 14px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.processHistoryEmptyButton:hover {
+  transform: translateY(-1px);
+  border-color: rgba(120, 179, 255, 0.34);
+  box-shadow: 0 16px 28px rgba(0, 0, 0, 0.18);
 }
 
 .shellContent {

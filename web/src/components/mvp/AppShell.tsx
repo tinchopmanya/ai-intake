@@ -389,6 +389,100 @@ function getLearningCopy(value: string | null | undefined) {
   return "Conviene responder con cuidado para evitar escalar.";
 }
 
+function getFirstShortSentence(value: string) {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (!normalized) return "";
+  const match = normalized.match(/[^.!?]+[.!?]?/);
+  return (match?.[0] ?? normalized).trim();
+}
+
+function ensureSentence(value: string) {
+  const normalized = value.trim();
+  if (!normalized) return "";
+  return /[.!?]$/.test(normalized) ? normalized : `${normalized}.`;
+}
+
+function lowercaseLeading(value: string) {
+  if (!value) return value;
+  return `${value.charAt(0).toLowerCase()}${value.slice(1)}`;
+}
+
+function getSituationImportantCopy(item: ProcessSidebarItem) {
+  const firstSentence = getFirstShortSentence(item.safeSummary);
+  if (firstSentence) {
+    return truncateCopy(ensureSentence(firstSentence), 108);
+  }
+
+  const riskBucket = getRiskLevelBucket(item.riskValue);
+  if (riskBucket === "low") {
+    return "Esto parece mas una diferencia de enfoque que un conflicto importante.";
+  }
+  if (riskBucket === "high") {
+    return "Aca hay senales de que la situacion podria escalar si se responde desde la tension.";
+  }
+  return "Aca hay tension y conviene cuidar mucho como sigue la conversacion.";
+}
+
+function getSituationActionCopy(value: string) {
+  const normalized = value.trim().replace(/[.!?]+$/, "");
+  if (!normalized) {
+    return "Podrias darte un momento y volver a esta situacion cuando tengas mas claridad.";
+  }
+
+  const lower = normalized.toLowerCase();
+  if (lower.startsWith("mantener ")) return `Podrias ${lower}.`;
+  if (lower.startsWith("responder ")) return `Podrias ${lower}.`;
+  if (lower.startsWith("esperar ")) return `Podrias ${lower}.`;
+  if (lower.startsWith("revisar ")) return `Podrias ${lower}.`;
+  if (lower.startsWith("sostener ")) return `Podrias ${lower}.`;
+  return `Podrias ${lowercaseLeading(normalized)}.`;
+}
+
+function getSituationNextTimeCopy(tone: string | null | undefined, risk: string | null | undefined) {
+  const riskBucket = getRiskLevelBucket(risk);
+  const normalizedTone = tone?.trim().toLowerCase();
+
+  if (riskBucket === "low") {
+    if (normalizedTone === "firm") {
+      return "Podes responder con calma y sostener el limite sin apurarte.";
+    }
+    return "Podes responder con calma, sin apurarte.";
+  }
+
+  if (riskBucket === "high") {
+    if (normalizedTone === "acompanado") {
+      return "Quizas te ayude pausar y buscar perspectiva antes de responder.";
+    }
+    if (normalizedTone === "firm") {
+      return "Quizas sea mejor no responder en caliente y volver con un limite claro.";
+    }
+    return "Quizas sea mejor no responder en caliente.";
+  }
+
+  if (normalizedTone === "firm") {
+    return "Conviene tomarte un momento y volver con un limite claro.";
+  }
+  return "Conviene tomarte un momento antes de responder.";
+}
+
+function getSituationToneCopy(value: string | null | undefined) {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return "Se manejo de forma contenida";
+  if (normalized === "calm" || normalized === "neutral" || normalized === "supportive") {
+    return "Se manejo de forma serena";
+  }
+  if (normalized === "firm") return "Se manejo con firmeza";
+  if (normalized === "acompanado") return "Se miro con mas perspectiva";
+  return `Se manejo de forma ${normalizeSafeLabel(normalized, "serena").toLowerCase()}`;
+}
+
+function getSituationRiskCopy(value: string | null | undefined) {
+  const riskBucket = getRiskLevelBucket(value);
+  if (riskBucket === "low") return "No hay senales de conflicto importante";
+  if (riskBucket === "high") return "Hay senales de que esto podria escalar";
+  return "Hay algo de tension y conviene ir con cuidado";
+}
+
 function getMoodSummaryLabel(level: number | null | undefined) {
   return typeof level === "number" ? MOOD_LABELS[level] ?? null : null;
 }
@@ -2083,7 +2177,7 @@ export function AppShell({ children }: AppShellProps) {
                   Historial de situaciones
                 </h2>
                 <p className={styles.processDrawerContextCopy}>
-                  Abre una situacion para ver su lectura completa sin cargar el sidebar.
+                  Estas son situaciones que ya analizaste para que puedas verlas con mas claridad ahora.
                 </p>
               </div>
               <button
@@ -2120,6 +2214,32 @@ export function AppShell({ children }: AppShellProps) {
                               ›
                             </span>
                           </div>
+                          <div className={styles.processHistoryBlocks}>
+                            <div className={styles.processHistoryBlock}>
+                              <p className={styles.processHistoryBlockLabel}>Esto es lo importante</p>
+                              <p className={styles.processHistoryBlockText}>{getSituationImportantCopy(item)}</p>
+                            </div>
+
+                            <div className={styles.processHistoryBlock}>
+                              <p className={styles.processHistoryBlockLabel}>Que podrias hacer</p>
+                              <p className={styles.processHistoryBlockText}>
+                                {getSituationActionCopy(item.recommendationLabel)}
+                              </p>
+                            </div>
+
+                            <div className={styles.processHistoryBlock}>
+                              <p className={styles.processHistoryBlockLabel}>Si vuelve a pasar</p>
+                              <p className={styles.processHistoryBlockText}>
+                                {getSituationNextTimeCopy(item.toneValue, item.riskValue)}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className={styles.processHistoryMetaRow}>
+                            <span className={styles.processHistoryMetaChip}>{getSituationToneCopy(item.toneValue)}</span>
+                            <span className={styles.processHistoryMetaChip}>{getSituationRiskCopy(item.riskValue)}</span>
+                          </div>
+
                           <div className={styles.processItemTagRow}>
                             <span className={styles.processRiskBadge}>{item.riskLabel}</span>
                             <span className={styles.processActionHint}>Ver detalle</span>
@@ -2131,7 +2251,21 @@ export function AppShell({ children }: AppShellProps) {
                   </section>
                 ))
               ) : (
-                <p className={styles.shellSidebarEmpty}>Todavia no hay situaciones analizadas para mostrar.</p>
+                <div className={styles.processHistoryEmpty}>
+                  <p className={styles.processHistoryEmptyTitle}>Todavia no analizaste ninguna situacion</p>
+                  <button
+                    type="button"
+                    className={styles.processHistoryEmptyButton}
+                    onClick={() => {
+                      setProcessHistoryModalOpen(false);
+                      if (typeof window !== "undefined") {
+                        window.dispatchEvent(new Event("mvp:new-conversation"));
+                      }
+                    }}
+                  >
+                    Analizar mi primera conversacion
+                  </button>
+                </div>
               )}
             </div>
           </section>
