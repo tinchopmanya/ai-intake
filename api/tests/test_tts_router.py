@@ -127,6 +127,20 @@ class TestTtsRouter(unittest.TestCase):
         self.assertEqual(response.status_code, 503)
         self.assertEqual(response.json()["detail"], "tts_dependency_missing")
 
+    def test_audio_endpoint_returns_buffered_audio(self) -> None:
+        with patch("app.services.tts_service._HAS_EDGE_TTS", True), patch(
+            "app.services.tts_service.edge_tts.Communicate",
+            _FakeCommunicate,
+        ):
+            response = self.client.post(
+                "/v1/tts/audio",
+                json={"text": "Hola buffered"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, b"chunk-1chunk-2")
+        self.assertTrue(response.headers["content-type"].startswith("audio/mpeg"))
+
 
 if __name__ == "__main__":
     unittest.main()

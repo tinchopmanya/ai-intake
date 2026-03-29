@@ -166,6 +166,29 @@ export async function postTtsStream(payload: TtsStreamRequest, options?: { signa
   return response;
 }
 
+export async function postTtsAudio(payload: TtsStreamRequest, options?: { signal?: AbortSignal }): Promise<Blob> {
+  const response = await authFetch(`${API_URL}/v1/tts/audio`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal: options?.signal,
+  });
+
+  if (!response.ok) {
+    const errorPayload = (await response.json().catch(() => null)) as
+      | { error_code?: string; message?: string; detail?: string }
+      | null;
+    throw new Error(
+      errorPayload?.error_code ||
+        errorPayload?.detail ||
+        errorPayload?.message ||
+        `http_${response.status}`,
+    );
+  }
+
+  return await response.blob();
+}
+
 /**
  * Emits wizard product events (ex: reply copied) for MVP adoption metrics.
  */

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { postTtsAudio } from "@/lib/api/client";
 import { postTtsStream } from "@/lib/api/client";
 import type { SupportedTtsVoice } from "@/lib/api/types";
 import type { TtsVoicePreset } from "@/lib/api/types";
@@ -196,6 +197,64 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
     [options, speakWithBrowserFallback],
   );
 
+  const playBufferedAudio = useCallback(
+    async (payload: {
+      text: string;
+      voice: SupportedTtsVoice;
+      signal?: AbortSignal;
+      reason: string;
+    }) => {
+      const audioBlob = await postTtsAudio(
+        {
+          text: payload.text,
+          voice: payload.voice,
+        },
+        { signal: payload.signal },
+      );
+      const audio = new Audio();
+      const objectUrl = URL.createObjectURL(audioBlob);
+      objectUrlRef.current = objectUrl;
+      audioRef.current = audio;
+      audio.src = objectUrl;
+      audio.preload = "auto";
+      audio.onended = () => {
+        setSpeaking(false);
+        cleanupStreamingAudio();
+        options?.onPlaybackEnd?.();
+      };
+      audio.onerror = () => {
+        setSpeaking(false);
+        cleanupStreamingAudio();
+        if (
+          startBrowserFallback({
+            text: payload.text,
+            voice: payload.voice,
+            reason: `${payload.reason}_audio_error`,
+          })
+        ) {
+          return;
+        }
+        options?.onPlaybackError?.("audio_element_error");
+        options?.onPlaybackEnd?.();
+      };
+
+      setSpeaking(true);
+      options?.onPlaybackFallback?.({
+        text: payload.text,
+        voice: payload.voice,
+        reason: payload.reason,
+      });
+      options?.onPlaybackStart?.({
+        text: payload.text,
+        voice: payload.voice,
+        audioElement: audio,
+        usingStream: false,
+      });
+      await audio.play();
+    },
+    [cleanupStreamingAudio, options, startBrowserFallback],
+  );
+
   const speak = useCallback(
     async (text: string, speakOptions?: SpeakOptions) => {
       if (!text.trim()) return;
@@ -219,12 +278,24 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
         canUseBrowserSpeechSynthesis() &&
         remoteTtsRetryAtRef.current > Date.now()
       ) {
-        startBrowserFallback({
-          text,
-          voice: selectedVoice,
-          reason: "tts_remote_temporarily_unavailable",
-        });
-        return;
+        try {
+          await playBufferedAudio({
+            text,
+            voice: selectedVoice,
+            reason: "tts_buffered_fallback",
+          });
+          return;
+        } catch (error) {
+          if (
+            startBrowserFallback({
+              text,
+              voice: selectedVoice,
+              reason: getPlaybackErrorCode(error),
+            })
+          ) {
+            return;
+          }
+        }
       }
 
       const mediaSource = new MediaSource();
@@ -321,6 +392,25 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
         cleanupStreamingAudio();
         setSpeaking(false);
         if (
+          shouldCooldownRemoteTts(error) &&
+          !abortController.signal.aborted
+        ) {
+          try {
+            await playBufferedAudio({
+              text,
+              voice: selectedVoice,
+              signal: abortController.signal,
+              reason: "tts_buffered_fallback",
+            });
+            return;
+          } catch (bufferedError) {
+            console.error("tts_buffered_fallback_failed", bufferedError);
+            if (shouldCooldownRemoteTts(bufferedError)) {
+              remoteTtsRetryAtRef.current = Date.now() + REMOTE_TTS_RETRY_COOLDOWN_MS;
+            }
+          }
+        }
+        if (
           startBrowserFallback({
             text,
             voice: selectedVoice,
@@ -335,7 +425,7 @@ export function useSpeechSynthesis(options?: UseSpeechSynthesisOptions) {
         abortControllerRef.current = null;
       }
     },
-    [cleanupStreamingAudio, flushQueue, options, startBrowserFallback, stop],
+    [cleanupStreamingAudio, flushQueue, options, playBufferedAudio, startBrowserFallback, stop],
   );
 
   useEffect(() => stop, [stop]);
