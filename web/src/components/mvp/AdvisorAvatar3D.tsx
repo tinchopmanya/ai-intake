@@ -220,6 +220,9 @@ export function AdvisorAvatar3D({
           cameraRotateEnable: false,
           cameraPanEnable: false,
           cameraZoomEnable: false,
+          // We drive speaking with explicit viseme tracks, so skip the vendor's
+          // default eager loading of bundled lipsync processors.
+          lipsyncModules: [],
           modelFPS: 30,
           modelPixelRatio: 1,
           lightAmbientIntensity: 2.1,
