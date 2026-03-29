@@ -1584,11 +1584,6 @@ export function AppShell({ children }: AppShellProps) {
       text: turn.text,
     }));
     setAdvisorChatMessages((prev) => [...prev, ...newTurns]);
-    const latestAdvisorText =
-      [...payload.turns].reverse().find((turn) => turn.role === "advisor")?.text ?? "";
-    if (speechSynthesis.supported && latestAdvisorText.trim()) {
-      speechSynthesis.speak(latestAdvisorText);
-    }
     if (process.env.NODE_ENV !== "production") {
       setAdvisorChatDebugPayload((previous) => ({
         ...(previous ?? {}),

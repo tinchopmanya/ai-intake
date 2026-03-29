@@ -7,8 +7,10 @@ import dynamic from "next/dynamic";
 
 import { Button, Textarea } from "@/components/mvp/ui";
 import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
+import { postAdvisorChat } from "@/lib/api/client";
 import { postAdvisorVoice } from "@/lib/api/client";
 import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
+import type { TtsVoicePreset } from "@/lib/api/types";
 import styles from "@/components/mvp/AdvisorPopups.module.css";
 
 export type AdvisorChatMessage = {
@@ -77,8 +79,35 @@ function resolveAvatarVariant(src: string | null | undefined, variant: "128" | "
   return src.replace("_64", "_256").replace("_128", "_256");
 }
 
-function getAdvisorAvatarVariant(advisorId?: string): "female" | "male" {
-  return advisorId === "robert" ? "male" : "female";
+type AdvisorAvatarRuntimeConfig = {
+  avatarVariant: "female" | "male";
+  avatarModelUrl: string;
+  voicePreset: TtsVoicePreset;
+};
+
+const ADVISOR_AVATAR_RUNTIME_CONFIG: Record<string, AdvisorAvatarRuntimeConfig> = {
+  laura: {
+    avatarVariant: "female",
+    avatarModelUrl: "/advisors/laura.glb",
+    voicePreset: "female",
+  },
+  lidia: {
+    avatarVariant: "female",
+    avatarModelUrl: "/advisors/lidia.glb",
+    voicePreset: "female",
+  },
+  robert: {
+    avatarVariant: "male",
+    avatarModelUrl: "/advisors/robert.glb",
+    voicePreset: "male",
+  },
+};
+
+function getAdvisorAvatarRuntimeConfig(advisorId?: string): AdvisorAvatarRuntimeConfig {
+  if (!advisorId) {
+    return ADVISOR_AVATAR_RUNTIME_CONFIG.laura;
+  }
+  return ADVISOR_AVATAR_RUNTIME_CONFIG[advisorId] ?? ADVISOR_AVATAR_RUNTIME_CONFIG.laura;
 }
 
 const AdvisorAvatar3D = dynamic(
@@ -114,8 +143,6 @@ export function AdvisorChatModal({
   const [voiceTranscriptOpen, setVoiceTranscriptOpen] = useState(false);
   const [voiceSendError, setVoiceSendError] = useState<string | null>(null);
   const [voiceTurns, setVoiceTurns] = useState<VoiceSessionTurn[]>([]);
-  const [voiceLastSuggestedReply, setVoiceLastSuggestedReply] = useState<string | null>(null);
-  const [voiceLastDebug, setVoiceLastDebug] = useState<Record<string, unknown> | null>(null);
   const [voiceChatExpanded, setVoiceChatExpanded] = useState(false);
   const [finalizeInFlight, setFinalizeInFlight] = useState(false);
   const [readyForNextTurn, setReadyForNextTurn] = useState(false);
@@ -128,7 +155,8 @@ export function AdvisorChatModal({
 
   const headerAvatar = useMemo(() => resolveAvatarVariant(advisorAvatarSrc, "128"), [advisorAvatarSrc]);
   const heroAvatar = useMemo(() => resolveAvatarVariant(advisorAvatarSrc, "256"), [advisorAvatarSrc]);
-  const avatarVariant = useMemo(() => getAdvisorAvatarVariant(advisorId), [advisorId]);
+  const advisorAvatarRuntime = useMemo(() => getAdvisorAvatarRuntimeConfig(advisorId), [advisorId]);
+  const syncVoiceTurnsLive = Boolean(onVoiceSessionSync);
   const preferredVoiceLang = useMemo(
     () =>
       typeof navigator !== "undefined" && navigator.language.toLowerCase().startsWith("es-uy")
@@ -139,7 +167,7 @@ export function AdvisorChatModal({
   const recorder = useVoiceRecorder({ lang: preferredVoiceLang, countdownSeconds: 3 });
   const speechSynthesis = useSpeechSynthesis({
     lang: preferredVoiceLang,
-    voice: "es-AR-ElenaNeural",
+    voicePreset: advisorAvatarRuntime.voicePreset,
     onPlaybackStart: ({ audioElement, text }) => {
       setAvatarAudioElement(audioElement);
       setAvatarSpeechText(text);
@@ -233,14 +261,7 @@ export function AdvisorChatModal({
 
   const commitVoiceSession = useCallback(() => {
     if (voiceTurns.length === 0) return;
-    if (onVoiceSessionSync) {
-      onVoiceSessionSync({
-        turns: voiceTurns,
-        lastSuggestedReply: voiceLastSuggestedReply,
-        debug: voiceLastDebug,
-      });
-      return;
-    }
+    if (onVoiceSessionSync) return;
     if (onVoiceExchangeComplete) {
       for (let index = 0; index < voiceTurns.length - 1; index += 2) {
         const userTurn = voiceTurns[index];
@@ -254,7 +275,7 @@ export function AdvisorChatModal({
         });
       }
     }
-  }, [onVoiceExchangeComplete, onVoiceSessionSync, voiceLastDebug, voiceLastSuggestedReply, voiceTurns]);
+  }, [onVoiceExchangeComplete, onVoiceSessionSync, voiceTurns]);
 
   const closeVoice = useCallback(
     ({ commit = true }: { commit?: boolean } = {}) => {
@@ -265,8 +286,6 @@ export function AdvisorChatModal({
       setVoiceTranscriptOpen(false);
       setVoiceSendError(null);
       setVoiceTurns([]);
-      setVoiceLastSuggestedReply(null);
-      setVoiceLastDebug(null);
       setFinalizeInFlight(false);
       setVoiceChatExpanded(false);
       setAvatarAudioElement(null);
@@ -283,44 +302,66 @@ export function AdvisorChatModal({
           setVoiceSendError("No se encontro el advisor seleccionado. Volve a intentarlo.");
           return;
         }
-        const userVoiceText = payload.transcript.trim() || voiceLiveTranscript || "Mensaje de voz";
-        if (!payload.audioBlob) {
+        const transcriptText = payload.transcript.trim() || voiceLiveTranscript;
+        if (!transcriptText && !payload.audioBlob) {
           recorder.setStatus("error");
-          setVoiceSendError("No se pudo capturar audio valido. Intenta nuevamente.");
+          setVoiceSendError("No pudimos recuperar tu dictado. Intenta nuevamente.");
           return;
         }
+        const userVoiceText = transcriptText || "Mensaje de voz";
 
         recorder.setStatus("sending");
         setVoiceSendError(null);
-        const history = [
-          ...messages.map((item) => ({ role: item.role, content: item.text })),
-          ...voiceTurns.map((item) => ({ role: item.role, content: item.text })),
-        ];
-        const result = await postAdvisorVoice({
-          advisor_id: advisorId,
-          entry_mode: entryMode,
-          transcript: userVoiceText,
-          audio_blob: payload.audioBlob,
-          audio_mime_type: payload.audioBlob.type,
-          messages: [...history, { role: "user", content: userVoiceText }],
-          case_id: caseId,
-          conversation_context: {
-            user_name: userName || null,
-            relationship_type: "otro",
-            extra: { voice_flow: true },
-          },
-          debug: isDevelopment,
-        });
+        const history = syncVoiceTurnsLive
+          ? messages.map((item) => ({ role: item.role, content: item.text }))
+          : [
+              ...messages.map((item) => ({ role: item.role, content: item.text })),
+              ...voiceTurns.map((item) => ({ role: item.role, content: item.text })),
+            ];
+        const conversationContext = {
+          user_name: userName || null,
+          relationship_type: "otro",
+          extra: { voice_flow: true },
+        };
+        const outboundMessages = [...history, { role: "user" as const, content: userVoiceText }];
+        const result = payload.audioBlob
+          ? await postAdvisorVoice({
+              advisor_id: advisorId,
+              entry_mode: entryMode,
+              transcript: userVoiceText,
+              audio_blob: payload.audioBlob,
+              audio_mime_type: payload.audioBlob.type,
+              messages: outboundMessages,
+              case_id: caseId,
+              conversation_context: conversationContext,
+              debug: isDevelopment,
+            })
+          : await postAdvisorChat({
+              advisor_id: advisorId,
+              entry_mode: entryMode,
+              messages: outboundMessages,
+              case_id: caseId,
+              conversation_context: conversationContext,
+              debug: isDevelopment,
+            });
 
         const advisorReply = result.message.trim() || "No pude responder ahora. Intenta nuevamente.";
-        setVoiceTurns((previous) => [
-          ...previous,
+        const newTurns: VoiceSessionTurn[] = [
           { role: "user", text: userVoiceText },
           { role: "advisor", text: advisorReply },
+        ];
+        setVoiceTurns((previous) => [
+          ...previous,
+          ...newTurns,
         ]);
-        setVoiceLastSuggestedReply(result.suggested_reply);
-        setVoiceLastDebug(result.debug ?? null);
         setReadyForNextTurn(false);
+        if (onVoiceSessionSync) {
+          onVoiceSessionSync({
+            turns: newTurns,
+            lastSuggestedReply: result.suggested_reply,
+            debug: result.debug ?? null,
+          });
+        }
         void speechSynthesis.speak(advisorReply);
         recorder.resetRecording();
         recorder.setStatus("idle");
@@ -355,6 +396,7 @@ export function AdvisorChatModal({
       onVoiceSessionSync,
       recorder,
       speechSynthesis,
+      syncVoiceTurnsLive,
       userName,
       voiceLiveTranscript,
       voiceTurns,
@@ -420,8 +462,6 @@ export function AdvisorChatModal({
     setVoiceTranscriptOpen(false);
     setVoiceSendError(null);
     setVoiceTurns([]);
-    setVoiceLastSuggestedReply(null);
-    setVoiceLastDebug(null);
     setFinalizeInFlight(false);
     setReadyForNextTurn(false);
     const desktopDefault =
@@ -485,7 +525,8 @@ export function AdvisorChatModal({
                           audioElement={avatarAudioElement}
                           speechText={avatarSpeechText}
                           isSpeaking={voiceSpeaking}
-                          avatarVariant={avatarVariant}
+                          avatarVariant={advisorAvatarRuntime.avatarVariant}
+                          modelUrl={advisorAvatarRuntime.avatarModelUrl}
                           fallbackImageSrc={heroAvatar}
                           label={advisorName}
                           playbackId={avatarPlaybackId}
