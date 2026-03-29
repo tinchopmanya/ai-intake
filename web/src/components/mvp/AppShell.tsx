@@ -751,6 +751,7 @@ export function AppShell({ children }: AppShellProps) {
   const [advisorChatIndex, setAdvisorChatIndex] = useState<number | null>(null);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [processHistoryModalOpen, setProcessHistoryModalOpen] = useState(false);
   const [historyDeleting, setHistoryDeleting] = useState(false);
   const [settingsActionError, setSettingsActionError] = useState<string | null>(null);
   const [advisorChatInput, setAdvisorChatInput] = useState("");
@@ -1056,8 +1057,6 @@ export function AppShell({ children }: AppShellProps) {
   }, [shouldShowChildrenInteractionRow]);
   const groupedExPartnerHistory = useMemo(() => groupProcessItems(exPartnerHistoryEntries), [exPartnerHistoryEntries]);
   const groupedAdvisorHistory = useMemo(() => groupProcessItems(advisorHistoryEntries), [advisorHistoryEntries]);
-  const totalVisibleProcessItems = moodHistoryItems.length + exPartnerHistoryEntries.length;
-
   useEffect(() => {
     if (!selectedProcessItem) return;
 
@@ -1072,6 +1071,7 @@ export function AppShell({ children }: AppShellProps) {
   }, [advisorHistoryEntries, exPartnerHistoryEntries, selectedProcessItem]);
 
   function handleSelectProcessItem(item: ProcessSidebarItem) {
+    setProcessHistoryModalOpen(false);
     setSelectedProcessItem(item);
     if (!isDesktop) setSidebarOpen(false);
   }
@@ -1093,6 +1093,7 @@ export function AppShell({ children }: AppShellProps) {
       await deleteEmotionalHistory();
       setSelectedProcessItem(null);
       setHistoryModalOpen(false);
+      setProcessHistoryModalOpen(false);
       setSettingsModalOpen(false);
       await refreshMemoryItems();
       setHistoryNotice("Historial borrado correctamente.");
@@ -1535,14 +1536,17 @@ export function AppShell({ children }: AppShellProps) {
                 {historyNotice ? <p className={styles.shellSidebarEmpty}>{historyNotice}</p> : null}
                 {conversationsLoading || memoryItemsLoading ? (
                   <p className={styles.shellSidebarEmpty}>Cargando tu proceso...</p>
-                ) : totalVisibleProcessItems > 0 ? (
-                  <div className={styles.processPanel}>
+                ) : null}
+                <div className={styles.processPanel}>
                     <section className={styles.processSection}>
                       <button
                         type="button"
                         className={styles.processSectionToggle}
-                        onClick={() => toggleHistorySection("mood")}
-                        aria-expanded={sectionExpanded.mood}
+                        onClick={() => {
+                          setHistoryModalOpen(true);
+                          if (!isDesktop) setSidebarOpen(false);
+                        }}
+                        aria-haspopup="dialog"
                       >
                         <div className={styles.processSectionLead}>
                           <span className={`${styles.processSectionIcon} ${styles.processSectionIconMood}`} aria-hidden="true">
@@ -1564,9 +1568,7 @@ export function AppShell({ children }: AppShellProps) {
                         <div className={styles.processSectionMeta}>
                           <span className={styles.shellHistoryCountPill}>{moodHistoryItems.length}</span>
                           <span
-                            className={`${styles.processSectionChevron} ${
-                              sectionExpanded.mood ? styles.processSectionChevronOpen : ""
-                            }`}
+                            className={styles.processSectionChevron}
                             aria-hidden="true"
                           >
                             <svg viewBox="0 0 20 20" className={styles.processSectionChevronSvg} fill="none">
@@ -1581,7 +1583,7 @@ export function AppShell({ children }: AppShellProps) {
                           </span>
                         </div>
                       </button>
-                      {sectionExpanded.mood ? (
+                      {false ? (
                         recentMoodHistoryItems.length > 0 ? (
                           <div className={styles.diaryPanel}>
                             <p className={styles.diarySubtitle}>Últimos días</p>
@@ -1647,8 +1649,11 @@ export function AppShell({ children }: AppShellProps) {
                       <button
                         type="button"
                         className={styles.processSectionToggle}
-                        onClick={() => toggleHistorySection("ex")}
-                        aria-expanded={sectionExpanded.ex}
+                        onClick={() => {
+                          setProcessHistoryModalOpen(true);
+                          if (!isDesktop) setSidebarOpen(false);
+                        }}
+                        aria-haspopup="dialog"
                       >
                         <div className={styles.processSectionLead}>
                           <span className={`${styles.processSectionIcon} ${styles.processSectionIconEx}`} aria-hidden="true">
@@ -1670,9 +1675,7 @@ export function AppShell({ children }: AppShellProps) {
                         <div className={styles.processSectionMeta}>
                           <span className={styles.shellHistoryCountPill}>{exPartnerHistoryEntries.length}</span>
                           <span
-                            className={`${styles.processSectionChevron} ${
-                              sectionExpanded.ex ? styles.processSectionChevronOpen : ""
-                            }`}
+                            className={styles.processSectionChevron}
                             aria-hidden="true"
                           >
                             <svg viewBox="0 0 20 20" className={styles.processSectionChevronSvg} fill="none">
@@ -1687,7 +1690,7 @@ export function AppShell({ children }: AppShellProps) {
                           </span>
                         </div>
                       </button>
-                      {sectionExpanded.ex ? (
+                      {false ? (
                         groupedExPartnerHistory.length > 0 ? (
                           <div className={styles.processSectionBody}>
                             {groupedExPartnerHistory.map((group) => (
@@ -1785,7 +1788,7 @@ export function AppShell({ children }: AppShellProps) {
                       </section>
                     ) : null}
                   </div>
-                ) : false ? (
+                {false ? (
                   <div className={styles.shellSessionList}>
                     {visibleConversations.map((conversation) => {
                       const isActive = conversation.id === activeConversationId;
@@ -1942,12 +1945,12 @@ export function AppShell({ children }: AppShellProps) {
 
       {historyModalOpen ? (
         <div
-          className={styles.historyReportBackdrop}
+          className={styles.overlayBackdrop}
           role="presentation"
           onClick={() => setHistoryModalOpen(false)}
         >
           <section
-            className={styles.settingsModal}
+            className={`${styles.settingsModal} ${styles.historyModal}`}
             role="dialog"
             aria-modal="true"
             aria-labelledby="history-modal-title"
@@ -1975,26 +1978,83 @@ export function AppShell({ children }: AppShellProps) {
 
             <div className={styles.historyModalBody}>
               {moodHistoryItems.length > 0 ? (
-                moodHistoryItems.map((item) => (
-                  <article key={item.id} className={styles.historyModalEntry}>
-                    <div className={styles.historyModalEntryHeader}>
-                      <div>
-                        <p className={styles.historyModalEntryDate}>{item.dateLabel}</p>
-                        <p className={styles.historyModalEntryTime}>{item.timeLabel}</p>
+                <>
+                  <section className={styles.historyModalSection}>
+                    <p className={styles.diarySubtitle}>Ultimas 5 sesiones</p>
+                    <div className={styles.diaryPanel}>
+                      <div
+                        className={styles.diaryTable}
+                        style={{
+                          gridTemplateColumns: `minmax(136px, 1.2fr) repeat(${recentMoodHistoryItems.length}, minmax(90px, 1fr))`,
+                        }}
+                      >
+                        <div className={styles.diaryCornerCell} />
+                        {recentMoodHistoryItems.map((item) => (
+                          <div key={item.id} className={styles.diaryHeaderCell}>
+                            <span className={styles.diaryHeaderDate}>{item.dateLabel}</span>
+                            <span className={styles.diaryHeaderTime}>{item.timeLabel}</span>
+                          </div>
+                        ))}
+                        {diaryMetricRows.map((row) => (
+                          <Fragment key={row.key}>
+                            <div className={styles.diaryRowLabel}>{row.label}</div>
+                            {recentMoodHistoryItems.map((item) => {
+                              const tone = getDiaryMetricTone(item, row.key);
+                              return (
+                                <div key={`${row.key}-${item.id}`} className={styles.diaryValueCell}>
+                                  <span
+                                    className={`${styles.diaryValueChip} ${
+                                      tone === "low"
+                                        ? styles.diaryValueLow
+                                        : tone === "high"
+                                          ? styles.diaryValueHigh
+                                          : tone === "steady"
+                                            ? styles.diaryValueSteady
+                                            : tone === "alert"
+                                              ? styles.diaryValueAlert
+                                              : tone === "calm"
+                                                ? styles.diaryValueCalm
+                                                : styles.diaryValueNeutral
+                                    }`}
+                                  >
+                                    <span className={styles.diaryValueDot} aria-hidden="true" />
+                                    <span className={styles.diaryValueText}>{getDiaryMetricLabel(item, row.key)}</span>
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </Fragment>
+                        ))}
                       </div>
-                      <span className={styles.historyModalEntryBadge}>Registro</span>
                     </div>
-                    <div className={styles.historyModalGrid}>
-                      {diaryMetricRows.map((row) => (
-                        <div key={`${item.id}-${row.key}`} className={styles.historyModalRow}>
-                          <span className={styles.historyModalRowLabel}>{row.label}</span>
-                          <span className={styles.historyModalRowValue}>{getDiaryMetricLabel(item, row.key)}</span>
-                        </div>
+                  </section>
+
+                  <section className={styles.historyModalSection}>
+                    <p className={styles.diarySubtitle}>Historico completo</p>
+                    <div className={styles.historyModalEntries}>
+                      {moodHistoryItems.map((item) => (
+                        <article key={item.id} className={styles.historyModalEntry}>
+                          <div className={styles.historyModalEntryHeader}>
+                            <div>
+                              <p className={styles.historyModalEntryDate}>{item.dateLabel}</p>
+                              <p className={styles.historyModalEntryTime}>{item.timeLabel}</p>
+                            </div>
+                            <span className={styles.historyModalEntryBadge}>Registro</span>
+                          </div>
+                          <div className={styles.historyModalGrid}>
+                            {diaryMetricRows.map((row) => (
+                              <div key={`${item.id}-${row.key}`} className={styles.historyModalRow}>
+                                <span className={styles.historyModalRowLabel}>{row.label}</span>
+                                <span className={styles.historyModalRowValue}>{getDiaryMetricLabel(item, row.key)}</span>
+                              </div>
+                            ))}
+                          </div>
+                          <p className={styles.historyModalSummary}>{item.safeSummary || "-"}</p>
+                        </article>
                       ))}
                     </div>
-                    <p className={styles.historyModalSummary}>{item.safeSummary || "-"}</p>
-                  </article>
-                ))
+                  </section>
+                </>
               ) : (
                 <p className={styles.shellSidebarEmpty}>Todavía no hay historial emocional para mostrar.</p>
               )}
@@ -2003,9 +2063,84 @@ export function AppShell({ children }: AppShellProps) {
         </div>
       ) : null}
 
+      {processHistoryModalOpen ? (
+        <div
+          className={styles.overlayBackdrop}
+          role="presentation"
+          onClick={() => setProcessHistoryModalOpen(false)}
+        >
+          <section
+            className={`${styles.settingsModal} ${styles.processHistoryModal}`}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="process-history-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className={styles.historyReportHeader}>
+              <div className={styles.processDrawerHeaderContent}>
+                <p className={styles.historyReportEyebrow}>Situaciones analizadas</p>
+                <h2 id="process-history-modal-title" className={styles.processDrawerHeading}>
+                  Historial de situaciones
+                </h2>
+                <p className={styles.processDrawerContextCopy}>
+                  Abre una situacion para ver su lectura completa sin cargar el sidebar.
+                </p>
+              </div>
+              <button
+                type="button"
+                className={styles.historyReportClose}
+                aria-label="Cerrar situaciones analizadas"
+                onClick={() => setProcessHistoryModalOpen(false)}
+              >
+                X
+              </button>
+            </div>
+
+            <div className={styles.processHistoryModalBody}>
+              {groupedExPartnerHistory.length > 0 ? (
+                groupedExPartnerHistory.map((group) => (
+                  <section key={group.label} className={styles.processHistorySection}>
+                    <p className={styles.processDateLabel}>{group.label}</p>
+                    <div className={styles.processItemList}>
+                      {group.items.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          className={`${styles.processItemCard} ${styles.processItemInteractive} ${
+                            selectedProcessItem?.id === item.id ? styles.processItemSelected : ""
+                          }`}
+                          onClick={() => handleSelectProcessItem(item)}
+                        >
+                          <div className={styles.processItemHeader}>
+                            <div>
+                              <p className={styles.processItemTitle}>{item.safeTitle}</p>
+                              <p className={styles.processItemMeta}>{item.dayLabel} · {item.timeLabel}</p>
+                            </div>
+                            <span className={styles.processItemArrow} aria-hidden="true">
+                              ›
+                            </span>
+                          </div>
+                          <div className={styles.processItemTagRow}>
+                            <span className={styles.processRiskBadge}>{item.riskLabel}</span>
+                            <span className={styles.processActionHint}>Ver detalle</span>
+                          </div>
+                          <p className={styles.processRecommendationPreview}>{item.recommendationLabel}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                ))
+              ) : (
+                <p className={styles.shellSidebarEmpty}>Todavia no hay situaciones analizadas para mostrar.</p>
+              )}
+            </div>
+          </section>
+        </div>
+      ) : null}
+
       {settingsModalOpen ? (
         <div
-          className={styles.historyReportBackdrop}
+          className={styles.overlayBackdrop}
           role="presentation"
           onClick={() => {
             setSettingsActionError(null);

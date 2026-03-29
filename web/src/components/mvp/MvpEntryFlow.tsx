@@ -310,27 +310,40 @@ function CheckinSliderQuestion({
   value,
   onChange,
   helperText,
+  className,
 }: {
   title: string;
   options: CheckinOption[];
   value: number | null;
   onChange: (nextValue: number) => void;
   helperText?: string;
+  className?: string;
 }) {
+  const isAnswered = value !== null;
   const optionIndex = value === null ? -1 : options.findIndex((option) => option.value === value);
   const fallbackIndex = Math.max(0, Math.floor((options.length - 1) / 2));
   const normalizedIndex = optionIndex >= 0 ? optionIndex : fallbackIndex;
   const fillPercent = `${(normalizedIndex / Math.max(1, options.length - 1)) * 100}%`;
-  const activeLabel = value === null ? "Elige un nivel" : options[normalizedIndex]?.label ?? "";
+  const activeLabel = value === null ? "Falta elegir" : options[normalizedIndex]?.label ?? "";
 
   return (
-    <section className={styles.checkinQuestionBlock}>
+    <section
+      className={`${styles.checkinQuestionBlock} ${
+        isAnswered ? styles.checkinQuestionAnswered : styles.checkinQuestionPending
+      } ${className ?? ""}`}
+    >
       <div className={styles.checkinSliderHeader}>
         <div>
           <p className={styles.checkinQuestionTitle}>{title}</p>
           {helperText ? <p className={styles.checkinQuestionHelper}>{helperText}</p> : null}
         </div>
-        <span className={styles.checkinSliderValue}>{activeLabel}</span>
+        <span
+          className={`${styles.checkinSliderValue} ${
+            isAnswered ? styles.checkinSliderValueAnswered : styles.checkinSliderValuePending
+          }`}
+        >
+          {activeLabel}
+        </span>
       </div>
       <div
         className={styles.checkinSliderWrap}
@@ -1085,6 +1098,7 @@ export function MvpEntryFlow() {
                 options={DAILY_MOOD_OPTIONS}
                 value={draftMoodLevel}
                 onChange={setDraftMoodLevel}
+                className={styles.checkinQuestionSpanTwo}
               />
 
               <CheckinSliderQuestion
@@ -1092,18 +1106,39 @@ export function MvpEntryFlow() {
                 options={DAILY_CONFIDENCE_OPTIONS}
                 value={draftConfidenceLevel}
                 onChange={setDraftConfidenceLevel}
+                className={styles.checkinQuestionSpanTwo}
               />
               <CheckinSliderQuestion
                 title="Como esta el vinculo con tu expareja actualmente?"
                 options={EX_RELATIONSHIP_OPTIONS}
                 value={draftRelationshipLevel}
                 onChange={setDraftRelationshipLevel}
+                className={styles.checkinQuestionSpanTwo}
               />
 
-              <section className={styles.checkinQuestionBlock}>
+              <section
+                className={`${styles.checkinQuestionBlock} ${
+                  draftRecentContact !== null ? styles.checkinQuestionAnswered : styles.checkinQuestionPending
+                } ${
+                  shouldShowChildrenInteractionQuestion
+                    ? styles.checkinQuestionSpanTwo
+                    : styles.checkinQuestionSpanFull
+                }`}
+              >
                 <p className={styles.checkinQuestionTitle}>
                   ¿Tuviste contacto con tu ex en las últimas 12 horas?
                 </p>
+                <div className={styles.checkinQuestionStatusRow}>
+                  <span
+                    className={`${styles.checkinSliderValue} ${
+                      draftRecentContact !== null
+                        ? styles.checkinSliderValueAnswered
+                        : styles.checkinSliderValuePending
+                    }`}
+                  >
+                    {draftRecentContact === null ? "Falta elegir" : draftRecentContact ? "Si" : "No"}
+                  </span>
+                </div>
                 <div className={styles.binaryOptionRow}>
                   <button
                     type="button"
@@ -1130,6 +1165,7 @@ export function MvpEntryFlow() {
                   options={CHILDREN_INTERACTION_OPTIONS}
                   value={draftChildrenInteractionLevel}
                   onChange={setDraftChildrenInteractionLevel}
+                  className={styles.checkinQuestionSpanFour}
                 />
               ) : null}
             </div>

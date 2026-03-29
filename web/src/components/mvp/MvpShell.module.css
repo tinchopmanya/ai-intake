@@ -1244,6 +1244,14 @@
   padding-right: 4px;
 }
 
+.historyModal {
+  width: min(100%, 920px);
+}
+
+.processHistoryModal {
+  width: min(100%, 760px);
+}
+
 .settingsActionCard {
   display: flex;
   align-items: center;
@@ -1315,9 +1323,19 @@
 
 .historyModalBody {
   display: grid;
-  gap: 12px;
+  gap: 16px;
   overflow-y: auto;
   padding-right: 4px;
+}
+
+.historyModalSection {
+  display: grid;
+  gap: 12px;
+}
+
+.historyModalEntries {
+  display: grid;
+  gap: 12px;
 }
 
 .historyModalEntry {
@@ -1400,6 +1418,18 @@
   color: rgba(226, 238, 251, 0.7);
 }
 
+.processHistoryModalBody {
+  display: grid;
+  gap: 16px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.processHistorySection {
+  display: grid;
+  gap: 10px;
+}
+
 .shellContent {
   display: flex;
   min-width: 0;
@@ -1420,6 +1450,18 @@
   justify-content: flex-end;
   background: rgba(6, 12, 18, 0.62);
   backdrop-filter: blur(4px);
+}
+
+.overlayBackdrop {
+  position: fixed;
+  inset: 56px 0 0 0;
+  z-index: 28;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(6, 12, 18, 0.62);
+  backdrop-filter: blur(6px);
 }
 
 .historyReportPanel {
@@ -3468,6 +3510,12 @@
   .historyReportBackdrop {
     inset: 56px 0 0 0;
     justify-content: stretch;
+  }
+
+  .overlayBackdrop {
+    inset: 56px 0 0 0;
+    padding: 14px;
+    align-items: stretch;
   }
 
   .historyReportPanel {
