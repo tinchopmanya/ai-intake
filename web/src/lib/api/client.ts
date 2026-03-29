@@ -34,6 +34,7 @@ import type { OnboardingProfile } from "@/lib/api/types";
 import type { OnboardingProfileUpdateRequest } from "@/lib/api/types";
 import type { OcrInterpretRequest } from "@/lib/api/types";
 import type { OcrInterpretResponse } from "@/lib/api/types";
+import type { TtsStreamRequest } from "@/lib/api/types";
 import type { WizardEventRequest } from "@/lib/api/types";
 import type { WizardEventResponse } from "@/lib/api/types";
 
@@ -140,6 +141,29 @@ export async function postAdvisorVoice(payload: AdvisorVoiceRequest): Promise<Ad
     method: "POST",
     body: formData,
   });
+}
+
+export async function postTtsStream(payload: TtsStreamRequest, options?: { signal?: AbortSignal }): Promise<Response> {
+  const response = await authFetch(`${API_URL}/v1/tts/stream`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal: options?.signal,
+  });
+
+  if (!response.ok) {
+    const errorPayload = (await response.json().catch(() => null)) as
+      | { error_code?: string; message?: string; detail?: string }
+      | null;
+    throw new Error(
+      errorPayload?.error_code ||
+        errorPayload?.detail ||
+        errorPayload?.message ||
+        `http_${response.status}`,
+    );
+  }
+
+  return response;
 }
 
 /**

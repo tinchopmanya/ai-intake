@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import Image from "next/image";
 
 import { Button, Textarea } from "@/components/mvp/ui";
+import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
 import { postAdvisorVoice } from "@/lib/api/client";
 import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
 import styles from "@/components/mvp/AdvisorPopups.module.css";
@@ -75,18 +76,6 @@ function resolveAvatarVariant(src: string | null | undefined, variant: "128" | "
   return src.replace("_64", "_256").replace("_128", "_256");
 }
 
-function pickSpanishVoice(voices: SpeechSynthesisVoice[]) {
-  const spanish = voices.filter((voice) => voice.lang.toLowerCase().startsWith("es"));
-  return (
-    spanish.find((voice) =>
-      /(female|mujer|sofia|paulina|monica|helena|maria|isabela|camila)/i.test(voice.name),
-    ) ??
-    spanish[0] ??
-    voices[0] ??
-    null
-  );
-}
-
 export function AdvisorChatModal({
   isOpen,
   advisorName,
@@ -118,11 +107,9 @@ export function AdvisorChatModal({
   const [voiceLastSuggestedReply, setVoiceLastSuggestedReply] = useState<string | null>(null);
   const [voiceLastDebug, setVoiceLastDebug] = useState<Record<string, unknown> | null>(null);
   const [voiceChatExpanded, setVoiceChatExpanded] = useState(false);
-  const [voiceSpeaking, setVoiceSpeaking] = useState(false);
   const [finalizeInFlight, setFinalizeInFlight] = useState(false);
   const [readyForNextTurn, setReadyForNextTurn] = useState(false);
   const autoStartGuardRef = useRef(false);
-  const synthVoicesRef = useRef<SpeechSynthesisVoice[]>([]);
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
   const wasSpeakingRef = useRef(false);
 
@@ -136,29 +123,16 @@ export function AdvisorChatModal({
     [],
   );
   const recorder = useVoiceRecorder({ lang: preferredVoiceLang, countdownSeconds: 3 });
+  const speechSynthesis = useSpeechSynthesis({
+    lang: preferredVoiceLang,
+    voice: "es-AR-ElenaNeural",
+  });
+  const voiceSpeaking = speechSynthesis.speaking;
 
   useEffect(() => {
     if (!voiceChatExpanded) return;
     chatScrollRef.current?.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: "smooth" });
   }, [voiceChatExpanded, voiceTurns, recorder.transcript, recorder.status]);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-    const loadVoices = () => {
-      synthVoicesRef.current = window.speechSynthesis.getVoices();
-    };
-    loadVoices();
-    window.speechSynthesis.addEventListener("voiceschanged", loadVoices);
-    return () => window.speechSynthesis.removeEventListener("voiceschanged", loadVoices);
-  }, []);
-
-  useEffect(() => {
-    if (!voiceOpen || typeof window === "undefined" || !("speechSynthesis" in window)) return;
-    const intervalId = window.setInterval(() => {
-      setVoiceSpeaking(window.speechSynthesis.speaking);
-    }, 100);
-    return () => window.clearInterval(intervalId);
-  }, [voiceOpen]);
 
   useEffect(() => {
     if (!voiceOpen) {
@@ -225,29 +199,10 @@ export function AdvisorChatModal({
                 : "Preparando...";
 
   const stopTts = useCallback(() => {
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-    }
-    setVoiceSpeaking(false);
+    speechSynthesis.stop();
     setReadyForNextTurn(true);
     recorder.setStatus("idle");
-  }, [recorder]);
-
-  const speak = useCallback((text: string) => {
-    if (!text.trim() || typeof window === "undefined" || !("speechSynthesis" in window)) return;
-    const synth = window.speechSynthesis;
-    synth.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "es-UY";
-    utterance.rate = 0.94;
-    utterance.pitch = 1.04;
-    const selectedVoice = pickSpanishVoice(synthVoicesRef.current);
-    if (selectedVoice) utterance.voice = selectedVoice;
-    utterance.onstart = () => setVoiceSpeaking(true);
-    utterance.onend = () => setVoiceSpeaking(false);
-    utterance.onerror = () => setVoiceSpeaking(false);
-    synth.speak(utterance);
-  }, []);
+  }, [recorder, speechSynthesis]);
 
   const commitVoiceSession = useCallback(() => {
     if (voiceTurns.length === 0) return;
@@ -337,7 +292,7 @@ export function AdvisorChatModal({
         setVoiceLastSuggestedReply(result.suggested_reply);
         setVoiceLastDebug(result.debug ?? null);
         setReadyForNextTurn(false);
-        speak(advisorReply);
+        void speechSynthesis.speak(advisorReply);
         recorder.resetRecording();
         recorder.setStatus("idle");
 
@@ -370,7 +325,7 @@ export function AdvisorChatModal({
       onVoiceExchangeComplete,
       onVoiceSessionSync,
       recorder,
-      speak,
+      speechSynthesis,
       userName,
       voiceLiveTranscript,
       voiceTurns,

@@ -9,3 +9,4 @@ pillow
 pytesseract
 opencv-python-headless
 numpy
+edge-tts

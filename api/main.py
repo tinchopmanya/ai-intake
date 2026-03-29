@@ -19,6 +19,7 @@ from app.api.routers import memory_items_router
 from app.api.routers import messages_router
 from app.api.routers import onboarding_router
 from app.api.routers import ocr_router
+from app.api.routers import tts_router
 from app.services.i18n_service import i18n_service
 from config import settings
 from config import validate_startup_or_raise
@@ -73,6 +74,7 @@ app.include_router(metrics_router)
 app.include_router(memory_items_router)
 app.include_router(messages_router)
 app.include_router(ocr_router)
+app.include_router(tts_router)
 
 
 @app.exception_handler(HTTPException)

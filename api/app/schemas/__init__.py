@@ -24,6 +24,7 @@ from .ocr import OcrExtractResponse
 from .ocr import OcrConversationBlock
 from .ocr import OcrInterpretRequest
 from .ocr import OcrInterpretResponse
+from .tts import TtsStreamRequest
 
 __all__ = [
     "AdvisorRequest",
@@ -52,5 +53,6 @@ __all__ = [
     "OcrInterpretRequest",
     "OcrInterpretResponse",
     "RefreshSessionRequest",
+    "TtsStreamRequest",
 ]
 

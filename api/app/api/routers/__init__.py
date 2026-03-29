@@ -11,6 +11,7 @@ from .memory_items import router as memory_items_router
 from .messages import router as messages_router
 from .onboarding import router as onboarding_router
 from .ocr import router as ocr_router
+from .tts import router as tts_router
 
 __all__ = [
     "advisor_router",
@@ -26,5 +27,6 @@ __all__ = [
     "messages_router",
     "onboarding_router",
     "ocr_router",
+    "tts_router",
 ]
 

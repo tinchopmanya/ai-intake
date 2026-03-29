@@ -113,6 +113,19 @@ export type AdvisorVoiceRequest = {
   debug?: boolean;
 };
 
+export type SupportedTtsVoice =
+  | "es-AR-ElenaNeural"
+  | "es-MX-DaliaNeural"
+  | "es-ES-AlvaroNeural"
+  | "es-MX-JorgeNeural";
+
+export type TtsVoicePreset = "female" | "male";
+
+export type TtsStreamRequest = {
+  text: string;
+  voice?: SupportedTtsVoice | null;
+};
+
 export type WizardEventRequest = {
   event_name: "reply_copied" | "case_exported";
   session_id?: string | null;
