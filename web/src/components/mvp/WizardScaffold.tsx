@@ -2002,6 +2002,26 @@ export function WizardScaffold({
     setSpeakingResponseIndex(index);
   }
 
+  const advisorChatVoiceBaseReply =
+    advisorChatIndex !== null ? advisorResult?.responses[advisorChatIndex]?.text?.trim() ?? null : null;
+  const advisorChatVoiceContext =
+    advisorChatIndex !== null
+      ? (() => {
+          const advisorVisual = getAdvisorVisualByIndex(advisorChatIndex);
+          return {
+            relationship_type: "otro",
+            extra:
+              buildContextPayload({
+                entry_mode: "advisor_refine_response",
+                selected_advisor_id: advisorVisual.id,
+                selected_advisor_name: advisorVisual.name,
+                selected_advisor_role: advisorVisual.role,
+                refinement_base_text: advisorChatVoiceBaseReply ?? undefined,
+              }) ?? null,
+          };
+        })()
+      : null;
+
   const analysisStatus = analysisResult ? getAnalysisStatus(analysisResult) : null;
   const analysisQuickChips = analysisResult ? getAnalysisQuickChips(analysisResult) : [];
   const hasConversationInput = messageText.trim().length > 0 || conversationBlocks.length > 0;
@@ -2957,6 +2977,8 @@ export function WizardScaffold({
         entryMode="advisor_refine_response"
         helperCopy="Que te parecio mi sugerencia? Puedes darme mas contexto y la ajustamos juntos."
         debugPayload={advisorChatDebugPayload}
+        voiceConversationContext={advisorChatVoiceContext}
+        voiceBaseReply={advisorChatVoiceBaseReply}
         onDraftChange={setAdvisorChatInput}
         onSend={() => void handleSendAdvisorRefinement()}
         onVoiceSessionSync={handleVoiceRefinementSessionSync}
