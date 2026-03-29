@@ -205,7 +205,6 @@ export function AdvisorAvatar3D({
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
-  const zeroGainRef = useRef<GainNode | null>(null);
   const sourceAudioElementRef = useRef<HTMLAudioElement | null>(null);
   const activePlaybackRef = useRef<number>(-1);
   const [loadState, setLoadState] = useState<Exclude<AvatarStatus, "speaking">>("loading");
@@ -296,11 +295,9 @@ export function AdvisorAvatar3D({
 
   useEffect(() => {
     return () => {
-      zeroGainRef.current?.disconnect();
       analyserRef.current?.disconnect();
       sourceNodeRef.current?.disconnect();
       audioContextRef.current?.close().catch(() => undefined);
-      zeroGainRef.current = null;
       analyserRef.current = null;
       sourceNodeRef.current = null;
       audioContextRef.current = null;
@@ -335,19 +332,14 @@ export function AdvisorAvatar3D({
 
         analyserRef.current?.disconnect();
         sourceNodeRef.current?.disconnect();
-        zeroGainRef.current?.disconnect();
 
         const analyser = context.createAnalyser();
         const sourceNode = context.createMediaElementSource(audioElement);
-        const zeroGain = context.createGain();
-        zeroGain.gain.value = 0;
         sourceNode.connect(analyser);
-        analyser.connect(zeroGain);
-        zeroGain.connect(context.destination);
+        sourceNode.connect(context.destination);
 
         analyserRef.current = analyser;
         sourceNodeRef.current = sourceNode;
-        zeroGainRef.current = zeroGain;
         sourceAudioElementRef.current = audioElement;
 
         activeHead.startListening(analyser, {
