@@ -10,7 +10,7 @@ import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
 import { postAdvisorChat } from "@/lib/api/client";
 import { postAdvisorVoice } from "@/lib/api/client";
 import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
-import type { TtsVoicePreset } from "@/lib/api/types";
+import type { AdvisorChatRequest, TtsVoicePreset } from "@/lib/api/types";
 import styles from "@/components/mvp/AdvisorPopups.module.css";
 
 export type AdvisorChatMessage = {
@@ -31,6 +31,8 @@ type VoiceFlowPhase =
   | "ready_for_next_turn"
   | "error";
 
+type AdvisorChatConversationContext = NonNullable<AdvisorChatRequest["conversation_context"]>;
+
 type AdvisorChatModalProps = {
   isOpen: boolean;
   advisorName: string;
@@ -47,6 +49,8 @@ type AdvisorChatModalProps = {
   helperCopy?: string;
   debugPayload?: Record<string, unknown> | null;
   autoSendOnVoiceComplete?: boolean;
+  voiceConversationContext?: AdvisorChatConversationContext | null;
+  voiceBaseReply?: string | null;
   onDraftChange: (value: string) => void;
   onSend: () => void;
   onUseResponse: () => void;
@@ -131,6 +135,8 @@ export function AdvisorChatModal({
   helperCopy,
   debugPayload,
   autoSendOnVoiceComplete = true,
+  voiceConversationContext = null,
+  voiceBaseReply = null,
   onDraftChange,
   onSend,
   onUseResponse,
@@ -319,10 +325,17 @@ export function AdvisorChatModal({
               ...voiceTurns.map((item) => ({ role: item.role, content: item.text })),
             ];
         const conversationContext = {
-          user_name: userName || null,
-          relationship_type: "otro",
-          extra: { voice_flow: true },
+          user_name: (voiceConversationContext?.user_name ?? userName) || null,
+          ex_name: voiceConversationContext?.ex_name ?? null,
+          has_children: voiceConversationContext?.has_children ?? null,
+          relationship_type: voiceConversationContext?.relationship_type ?? "otro",
+          extra: {
+            ...(voiceConversationContext?.extra ?? {}),
+            voice_flow: true,
+          },
         };
+        const baseReply =
+          entryMode === "advisor_refine_response" ? voiceBaseReply?.trim() || null : null;
         const outboundMessages = [...history, { role: "user" as const, content: userVoiceText }];
         const result = payload.audioBlob
           ? await postAdvisorVoice({
@@ -334,6 +347,7 @@ export function AdvisorChatModal({
               messages: outboundMessages,
               case_id: caseId,
               conversation_context: conversationContext,
+              base_reply: baseReply,
               debug: isDevelopment,
             })
           : await postAdvisorChat({
@@ -342,6 +356,7 @@ export function AdvisorChatModal({
               messages: outboundMessages,
               case_id: caseId,
               conversation_context: conversationContext,
+              base_reply: baseReply,
               debug: isDevelopment,
             });
 
@@ -398,6 +413,8 @@ export function AdvisorChatModal({
       speechSynthesis,
       syncVoiceTurnsLive,
       userName,
+      voiceBaseReply,
+      voiceConversationContext,
       voiceLiveTranscript,
       voiceTurns,
     ],

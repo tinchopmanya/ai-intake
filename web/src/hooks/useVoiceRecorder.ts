@@ -85,6 +85,7 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
   });
 
   const transcript = speech.transcript.trim();
+  const transcriptRef = useRef(transcript);
   const speechListening = speech.listening;
   const speechSupported = speech.speechSupported;
   const startListening = speech.startListening;
@@ -92,6 +93,9 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
   const resetTranscript = speech.resetTranscript;
   const speechListeningRef = useRef(speechListening);
   const stopListeningRef = useRef(stopListening);
+  useEffect(() => {
+    transcriptRef.current = speech.transcript.trim();
+  }, [speech.transcript]);
   useEffect(() => {
     speechListeningRef.current = speechListening;
   }, [speechListening]);
@@ -140,9 +144,9 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
   const buildFinalPayload = useCallback(
     (blob: Blob | null) => ({
       audioBlob: blob,
-      transcript: speech.transcript.trim(),
+      transcript: transcriptRef.current,
     }),
-    [speech.transcript],
+    [],
   );
 
   const resolveFinalize = useCallback(
