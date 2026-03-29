@@ -73,6 +73,12 @@
   backdrop-filter: blur(2px);
 }
 
+.vpOverlayHidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .cpPanel,
 .vpCard {
   position: relative;
@@ -594,6 +600,15 @@
   border-radius: 10px !important;
   background: var(--btn-secondary-bg) !important;
   color: var(--btn-secondary-text) !important;
+}
+
+.cpVoiceWarmupStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 @keyframes vpPulseRing {

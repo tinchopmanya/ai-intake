@@ -23,7 +23,10 @@ export type AdvisorChatEntryMode = "advisor_conversation" | "advisor_refine_resp
 type VoiceSessionTurn = { role: "user" | "advisor"; text: string };
 type AvatarRuntimeState = "loading" | "ready" | "error";
 type VoicePerfKey =
+  | "modalOpenedAt"
   | "popupOpenedAt"
+  | "avatarWarmupStartedAt"
+  | "avatarReadyAt"
   | "submitStartedAt"
   | "advisorResponseAt"
   | "ttsStartedAt"
@@ -93,6 +96,7 @@ function resolveAvatarVariant(src: string | null | undefined, variant: "128" | "
 type AdvisorAvatarRuntimeConfig = {
   avatarVariant: "female" | "male";
   avatarModelUrl: string;
+  avatarLightModelUrl?: string | null;
   voicePreset: TtsVoicePreset;
 };
 
@@ -100,19 +104,61 @@ const ADVISOR_AVATAR_RUNTIME_CONFIG: Record<string, AdvisorAvatarRuntimeConfig> 
   laura: {
     avatarVariant: "female",
     avatarModelUrl: "/advisors/laura.glb",
+    avatarLightModelUrl: null,
     voicePreset: "female",
   },
   lidia: {
     avatarVariant: "female",
     avatarModelUrl: "/advisors/lidia.glb",
+    avatarLightModelUrl: null,
     voicePreset: "female",
   },
   robert: {
     avatarVariant: "male",
     avatarModelUrl: "/advisors/robert.glb",
+    avatarLightModelUrl: null,
     voicePreset: "male",
   },
 };
+
+type AdvisorAvatarDeliverySelection = {
+  modelUrl: string;
+  qualityTier: "full" | "light";
+  supportsUpgrade: boolean;
+  performancePreset: "balanced" | "economy";
+};
+
+function resolveAdvisorAvatarDelivery(config: AdvisorAvatarRuntimeConfig): AdvisorAvatarDeliverySelection {
+  const qualityPreference =
+    typeof process !== "undefined" ? process.env.NEXT_PUBLIC_ADVISOR_AVATAR_QUALITY?.trim().toLowerCase() : "";
+  const connection = typeof navigator !== "undefined"
+    ? (navigator as Navigator & {
+        connection?: { effectiveType?: string; saveData?: boolean };
+      }).connection
+    : undefined;
+  const deviceMemory =
+    typeof navigator !== "undefined"
+      ? (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? null
+      : null;
+  const prefersLightweight =
+    qualityPreference === "light" ||
+    (qualityPreference !== "full" &&
+      Boolean(config.avatarLightModelUrl) &&
+      (
+        connection?.saveData === true ||
+        connection?.effectiveType === "slow-2g" ||
+        connection?.effectiveType === "2g" ||
+        connection?.effectiveType === "3g" ||
+        (deviceMemory !== null && deviceMemory <= 4)
+      ));
+  return {
+    modelUrl: prefersLightweight && config.avatarLightModelUrl ? config.avatarLightModelUrl : config.avatarModelUrl,
+    qualityTier: prefersLightweight && config.avatarLightModelUrl ? "light" : "full",
+    supportsUpgrade: Boolean(config.avatarLightModelUrl),
+    performancePreset:
+      deviceMemory !== null && deviceMemory <= 4 ? "economy" : "balanced",
+  };
+}
 
 function getAdvisorAvatarRuntimeConfig(advisorId?: string): AdvisorAvatarRuntimeConfig {
   if (!advisorId) {
@@ -168,13 +214,18 @@ export function AdvisorChatModal({
   const [avatarSpeechText, setAvatarSpeechText] = useState<string>("");
   const [avatarRuntimeState, setAvatarRuntimeState] = useState<AvatarRuntimeState>("loading");
   const perfMarksRef = useRef<Record<VoicePerfKey, number | null>>({
+    modalOpenedAt: null,
     popupOpenedAt: null,
+    avatarWarmupStartedAt: null,
+    avatarReadyAt: null,
     submitStartedAt: null,
     advisorResponseAt: null,
     ttsStartedAt: null,
     ttsEndedAt: null,
   });
   const previousAvatarRuntimeStateRef = useRef<AvatarRuntimeState>("loading");
+  const avatarColdStartMsRef = useRef<number | null>(null);
+  const lastPopupOpenReadyMsRef = useRef<number | null>(null);
 
   const pushMetric = useCallback(
     (event: string, details?: Record<string, unknown>) => {
@@ -200,7 +251,14 @@ export function AdvisorChatModal({
 
   const headerAvatar = useMemo(() => resolveAvatarVariant(advisorAvatarSrc, "128"), [advisorAvatarSrc]);
   const heroAvatar = useMemo(() => resolveAvatarVariant(advisorAvatarSrc, "256"), [advisorAvatarSrc]);
-  const advisorAvatarRuntime = useMemo(() => getAdvisorAvatarRuntimeConfig(advisorId), [advisorId]);
+  const advisorAvatarRuntimeBase = useMemo(() => getAdvisorAvatarRuntimeConfig(advisorId), [advisorId]);
+  const advisorAvatarRuntime = useMemo(
+    () => ({
+      ...advisorAvatarRuntimeBase,
+      ...resolveAdvisorAvatarDelivery(advisorAvatarRuntimeBase),
+    }),
+    [advisorAvatarRuntimeBase],
+  );
   const syncVoiceTurnsLive = Boolean(onVoiceSessionSync);
   const preferredVoiceLang = useMemo(
     () =>
@@ -212,7 +270,7 @@ export function AdvisorChatModal({
   const recorder = useVoiceRecorder({ lang: preferredVoiceLang, countdownSeconds: 3 });
   const speechSynthesis = useSpeechSynthesis({
     lang: preferredVoiceLang,
-    voicePreset: advisorAvatarRuntime.voicePreset,
+    voicePreset: advisorAvatarRuntimeBase.voicePreset,
     preferBuffered: true,
     onPlaybackFallback: () => {
       setVoicePlaybackNotice("La voz natural no estuvo disponible. Seguimos con la voz del navegador.");
@@ -250,22 +308,70 @@ export function AdvisorChatModal({
   const voiceSpeaking = speechSynthesis.speaking;
 
   useEffect(() => {
-    if (!voiceOpen) return;
+    if (!isOpen) return;
+    markPerf("modalOpenedAt");
+    perfMarksRef.current.avatarWarmupStartedAt = performance.now();
+    perfMarksRef.current.avatarReadyAt = null;
+    avatarColdStartMsRef.current = null;
+    lastPopupOpenReadyMsRef.current = null;
+    previousAvatarRuntimeStateRef.current = "loading";
+    pushMetric("modal_warmup_started", {
+      advisorId: advisorId ?? "unknown",
+      qualityTier: advisorAvatarRuntime.qualityTier,
+      performancePreset: advisorAvatarRuntime.performancePreset,
+      supportsUpgrade: advisorAvatarRuntime.supportsUpgrade,
+    });
+  }, [advisorAvatarRuntime.performancePreset, advisorAvatarRuntime.qualityTier, advisorAvatarRuntime.supportsUpgrade, advisorId, isOpen, markPerf, pushMetric]);
+
+  useEffect(() => {
+    if (!isOpen) return;
     const previous = previousAvatarRuntimeStateRef.current;
     if (previous === avatarRuntimeState) return;
     previousAvatarRuntimeStateRef.current = avatarRuntimeState;
-    pushMetric("avatar_runtime_state", {
-      state: avatarRuntimeState,
-      popupElapsedMs: getElapsed("popupOpenedAt"),
-    });
-  }, [avatarRuntimeState, getElapsed, pushMetric, voiceOpen]);
+    if (avatarRuntimeState === "ready") {
+      markPerf("avatarReadyAt");
+      avatarColdStartMsRef.current =
+        perfMarksRef.current.avatarWarmupStartedAt !== null
+          ? Math.round((perfMarksRef.current.avatarReadyAt ?? performance.now()) - perfMarksRef.current.avatarWarmupStartedAt)
+          : null;
+      const popupReadyMs =
+        perfMarksRef.current.popupOpenedAt !== null
+          ? Math.round((perfMarksRef.current.avatarReadyAt ?? performance.now()) - perfMarksRef.current.popupOpenedAt)
+          : 0;
+      lastPopupOpenReadyMsRef.current = Math.max(0, popupReadyMs);
+      pushMetric("avatar_runtime_ready", {
+        warmupMs: avatarColdStartMsRef.current,
+        popupToReadyMs: perfMarksRef.current.popupOpenedAt !== null ? lastPopupOpenReadyMsRef.current : null,
+        qualityTier: advisorAvatarRuntime.qualityTier,
+      });
+      if (perfMarksRef.current.popupOpenedAt !== null) {
+        pushMetric("before_after_avatar_ready", {
+          beforeMs: avatarColdStartMsRef.current,
+          afterMs: lastPopupOpenReadyMsRef.current,
+          deltaMs:
+            avatarColdStartMsRef.current !== null && lastPopupOpenReadyMsRef.current !== null
+              ? avatarColdStartMsRef.current - lastPopupOpenReadyMsRef.current
+              : null,
+          deltaPct:
+            avatarColdStartMsRef.current && lastPopupOpenReadyMsRef.current !== null
+              ? Math.round(((avatarColdStartMsRef.current - lastPopupOpenReadyMsRef.current) / avatarColdStartMsRef.current) * 100)
+              : null,
+        });
+      }
+    } else {
+      pushMetric("avatar_runtime_state", {
+        state: avatarRuntimeState,
+        popupElapsedMs: getElapsed("popupOpenedAt"),
+      });
+    }
+  }, [advisorAvatarRuntime.qualityTier, avatarRuntimeState, getElapsed, isOpen, markPerf, pushMetric]);
 
   useEffect(() => {
     if (!isOpen) return;
     void import("@/components/mvp/AdvisorAvatar3D").then((mod) => {
-      mod.preloadAdvisorAvatarAssets?.(advisorAvatarRuntime.avatarModelUrl);
+      mod.preloadAdvisorAvatarAssets?.(advisorAvatarRuntime.modelUrl);
     });
-  }, [advisorAvatarRuntime.avatarModelUrl, isOpen]);
+  }, [advisorAvatarRuntime.modelUrl, isOpen]);
 
   useEffect(() => {
     if (!voiceChatExpanded) return;
@@ -275,7 +381,6 @@ export function AdvisorChatModal({
   useEffect(() => {
     if (!voiceOpen) {
       autoStartGuardRef.current = false;
-      setAvatarRuntimeState("loading");
       return;
     }
     if (autoStartGuardRef.current) return;
@@ -379,7 +484,6 @@ export function AdvisorChatModal({
       setVoiceChatExpanded(false);
       setAvatarAudioElement(null);
       setAvatarSpeechText("");
-      setAvatarRuntimeState("loading");
     },
     [commitVoiceSession, recorder, stopTts],
   );
@@ -582,29 +686,45 @@ export function AdvisorChatModal({
     perfMarksRef.current.advisorResponseAt = null;
     perfMarksRef.current.ttsStartedAt = null;
     perfMarksRef.current.ttsEndedAt = null;
-    previousAvatarRuntimeStateRef.current = "loading";
     pushMetric("popup_opened", {
       advisorId: advisorId ?? "unknown",
+      avatarRuntimeState,
+      coldAvatarWarmupMs: avatarColdStartMsRef.current,
       expandedDefault:
         typeof window !== "undefined" ? window.matchMedia("(min-width: 1024px)").matches : false,
     });
+    if (avatarRuntimeState === "ready") {
+      lastPopupOpenReadyMsRef.current = 0;
+      pushMetric("before_after_avatar_ready", {
+        beforeMs: avatarColdStartMsRef.current,
+        afterMs: 0,
+        deltaMs: avatarColdStartMsRef.current,
+        deltaPct: avatarColdStartMsRef.current ? 100 : null,
+      });
+    }
     setVoiceTranscriptOpen(false);
     setVoiceSendError(null);
     setVoicePlaybackNotice(null);
     setVoiceTurns([]);
     setFinalizeInFlight(false);
     setReadyForNextTurn(false);
-    setAvatarRuntimeState("loading");
     const desktopDefault =
       typeof window !== "undefined" ? window.matchMedia("(min-width: 1024px)").matches : false;
     setVoiceChatExpanded(desktopDefault);
     setVoiceOpen(true);
   };
 
+  const voiceWarmupCopy =
+    avatarRuntimeState === "ready"
+      ? "Voz del advisor lista"
+      : avatarRuntimeState === "error"
+        ? "Avatar no disponible, puedes usar voz igualmente"
+        : "Preparando avatar de voz...";
+
   const voiceOverlay =
-    typeof document !== "undefined" && voiceOpen
+    typeof document !== "undefined" && isOpen
       ? createPortal(
-          <div className={styles.vpOverlay}>
+          <div className={`${styles.vpOverlay} ${voiceOpen ? "" : styles.vpOverlayHidden}`} aria-hidden={!voiceOpen}>
             <div className={`relative ${styles.vpModalFrame} ${voiceChatExpanded ? styles.vpModalFrameExpanded : ""}`}>
               <button type="button" onClick={() => closeVoice()} className={styles.vpClose} aria-label="Cerrar">
                 <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2">
@@ -656,7 +776,7 @@ export function AdvisorChatModal({
                             speechText={avatarSpeechText}
                             isSpeaking={voiceSpeaking}
                             avatarVariant={advisorAvatarRuntime.avatarVariant}
-                            modelUrl={advisorAvatarRuntime.avatarModelUrl}
+                            modelUrl={advisorAvatarRuntime.modelUrl}
                             fallbackImageSrc={heroAvatar}
                             label={advisorName}
                             playbackId={avatarPlaybackId}
@@ -831,7 +951,10 @@ export function AdvisorChatModal({
                 {canUseSuggestedReply ? (
                   <Button type="button" variant="secondary" onClick={onUseResponse} className={`${styles.cpUseBtn} px-[14px] py-[7px] text-[13px]`}>Usar respuesta sugerida</Button>
                 ) : <span />}
-                {isDevelopment && debugPayload ? <details className="text-right"><summary className="cursor-pointer text-[11px]">Debug prompt (solo desarrollo)</summary><pre className="mt-2 max-h-40 overflow-auto rounded-lg p-2 text-left text-[11px]">{JSON.stringify(debugPayload, null, 2)}</pre></details> : null}
+                <div className="flex items-center gap-3">
+                  <span className={styles.cpVoiceWarmupStatus}>{voiceWarmupCopy}</span>
+                  {isDevelopment && debugPayload ? <details className="text-right"><summary className="cursor-pointer text-[11px]">Debug prompt (solo desarrollo)</summary><pre className="mt-2 max-h-40 overflow-auto rounded-lg p-2 text-left text-[11px]">{JSON.stringify(debugPayload, null, 2)}</pre></details> : null}
+                </div>
               </div>
             </footer>
             </div>
