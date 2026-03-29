@@ -78,9 +78,20 @@
   position: relative;
   overflow: hidden;
   border: 1px solid var(--bubble-advisor-border);
-  border-radius: 20px;
+  border-radius: 24px;
   background: var(--popup-bg);
-  box-shadow: 0 24px 60px var(--popup-shadow);
+  box-shadow: 0 28px 72px var(--popup-shadow);
+}
+
+.vpModalFrame {
+  width: 100%;
+  max-width: 480px;
+  height: min(92vh, 820px);
+  transition: max-width 0.3s ease, transform 0.3s ease;
+}
+
+.vpModalFrameExpanded {
+  max-width: 920px;
 }
 
 .vpHeader,
@@ -92,6 +103,8 @@
   display: flex;
   align-items: center;
   gap: 14px;
+  min-height: 82px;
+  flex-shrink: 0;
 }
 
 .vpAvatar,
@@ -175,6 +188,22 @@
   background: var(--popup-bg);
 }
 
+.vpShellSection {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.vpShellContent {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  padding: 18px 24px 20px;
+}
+
 .vpBodySplit {
   border-right: 1px solid var(--bubble-advisor-border);
 }
@@ -187,12 +216,55 @@
   box-shadow: 0 8px 18px var(--popup-shadow);
 }
 
-.vpAvatarHero {
-  width: 168px;
-  height: 168px;
-  border-radius: 9999px;
-  border: 3px solid var(--avatar-border);
-  object-fit: cover;
+.vpAvatarStage {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-height: 388px;
+  align-items: center;
+  justify-content: center;
+  padding-top: 10px;
+}
+
+.vpAvatarButton {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 42px;
+  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.3);
+}
+
+.vpMeta {
+  width: 100%;
+  max-width: 340px;
+  text-align: center;
+}
+
+.vpAvatarNotice {
+  margin-top: 10px;
+  width: 100%;
+  max-width: 340px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 10px 14px;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.74);
+}
+
+.vpPlaybackNotice {
+  margin-top: 10px;
+  width: 100%;
+  max-width: 340px;
+  padding-inline: 4px;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.72);
 }
 
 .vpAvatarHeroFallback {
@@ -229,13 +301,15 @@
 
 .vpNameSmall {
   color: var(--popup-header-text);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
+  line-height: 1.2;
 }
 
 .vpStatus {
-  margin-top: 4px;
+  margin-top: 8px;
   font-size: 13px;
+  line-height: 1.45;
   color: var(--popup-header-sub);
 }
 
@@ -403,6 +477,9 @@
   background: var(--popup-header-bg);
   border-bottom: 2px solid var(--popup-header-accent);
   padding: 14px 20px;
+  min-height: 82px;
+  display: flex;
+  align-items: center;
 }
 
 .vpChatHeadText {
@@ -564,5 +641,20 @@
   }
   50% {
     box-shadow: 0 0 0 8px var(--mic-pulse-fade);
+  }
+}
+
+@media (max-width: 1023px) {
+  .vpModalFrame {
+    max-width: 100%;
+    height: min(94vh, 860px);
+  }
+
+  .vpShellContent {
+    padding: 16px 20px 18px;
+  }
+
+  .vpAvatarStage {
+    min-height: 352px;
   }
 }

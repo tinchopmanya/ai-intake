@@ -21,6 +21,7 @@ export type AdvisorChatMessage = {
 
 export type AdvisorChatEntryMode = "advisor_conversation" | "advisor_refine_response";
 type VoiceSessionTurn = { role: "user" | "advisor"; text: string };
+type AvatarRuntimeState = "loading" | "ready" | "error";
 type VoiceFlowPhase =
   | "countdown"
   | "initializing_media"
@@ -159,6 +160,7 @@ export function AdvisorChatModal({
   const [avatarPlaybackId, setAvatarPlaybackId] = useState(0);
   const [avatarAudioElement, setAvatarAudioElement] = useState<HTMLAudioElement | null>(null);
   const [avatarSpeechText, setAvatarSpeechText] = useState<string>("");
+  const [avatarRuntimeState, setAvatarRuntimeState] = useState<AvatarRuntimeState>("loading");
 
   const headerAvatar = useMemo(() => resolveAvatarVariant(advisorAvatarSrc, "128"), [advisorAvatarSrc]);
   const heroAvatar = useMemo(() => resolveAvatarVariant(advisorAvatarSrc, "256"), [advisorAvatarSrc]);
@@ -211,12 +213,14 @@ export function AdvisorChatModal({
   useEffect(() => {
     if (!voiceOpen) {
       autoStartGuardRef.current = false;
+      setAvatarRuntimeState("loading");
       return;
     }
     if (autoStartGuardRef.current) return;
+    if (avatarRuntimeState === "loading") return;
     autoStartGuardRef.current = true;
     recorder.startFlow();
-  }, [recorder, voiceOpen]);
+  }, [avatarRuntimeState, recorder, voiceOpen]);
 
   useEffect(() => {
     if (!voiceOpen) return;
@@ -233,6 +237,7 @@ export function AdvisorChatModal({
   }, [recorder, voiceOpen, voiceSpeaking]);
 
   const voiceLiveTranscript = recorder.transcript.trim();
+  const avatarBooting = voiceOpen && avatarRuntimeState === "loading";
   const canUseSuggestedReply = entryMode === "advisor_refine_response";
   const flowPhase: VoiceFlowPhase =
     voiceSpeaking
@@ -254,7 +259,9 @@ export function AdvisorChatModal({
                     : "ready_for_next_turn";
 
   const statusText =
-    flowPhase === "countdown"
+    avatarBooting
+      ? "Preparando el avatar..."
+      : flowPhase === "countdown"
       ? `Iniciando en ${recorder.countdown} segundo${recorder.countdown === 1 ? "" : "s"}...`
       : flowPhase === "initializing_media"
         ? "Preparando dictado..."
@@ -310,6 +317,7 @@ export function AdvisorChatModal({
       setVoiceChatExpanded(false);
       setAvatarAudioElement(null);
       setAvatarSpeechText("");
+      setAvatarRuntimeState("loading");
     },
     [commitVoiceSession, recorder, stopTts],
   );
@@ -498,6 +506,7 @@ export function AdvisorChatModal({
     setVoiceTurns([]);
     setFinalizeInFlight(false);
     setReadyForNextTurn(false);
+    setAvatarRuntimeState("loading");
     const desktopDefault =
       typeof window !== "undefined" ? window.matchMedia("(min-width: 1024px)").matches : false;
     setVoiceChatExpanded(desktopDefault);
@@ -508,9 +517,7 @@ export function AdvisorChatModal({
     typeof document !== "undefined" && voiceOpen
       ? createPortal(
           <div className={styles.vpOverlay}>
-            <div
-              className={`relative h-[min(88vh,760px)] w-full transition-all duration-300 ${voiceChatExpanded ? "max-w-[780px]" : "max-w-[420px]"}`}
-            >
+            <div className={`relative ${styles.vpModalFrame} ${voiceChatExpanded ? styles.vpModalFrameExpanded : ""}`}>
               <button type="button" onClick={() => closeVoice()} className={styles.vpClose} aria-label="Cerrar">
                 <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M2 2 12 12M12 2 2 12" />
@@ -518,8 +525,8 @@ export function AdvisorChatModal({
               </button>
               <div className={styles.vpCard}>
                 <div className="relative flex h-full flex-col lg:flex-row">
-                  <section className={`${styles.vpBody} ${voiceChatExpanded ? styles.vpBodySplit : ""} relative flex h-full min-h-0 flex-col items-center px-6 pb-5 pt-4 ${voiceChatExpanded ? "lg:w-[380px] lg:shrink-0" : "lg:w-full"}`}>
-                    <header className={`${styles.vpHeader} absolute inset-x-0 top-0`}>
+                  <section className={`${styles.vpBody} ${styles.vpShellSection} ${voiceChatExpanded ? styles.vpBodySplit : ""} ${voiceChatExpanded ? "lg:w-[440px] lg:shrink-0" : "lg:w-full"}`}>
+                    <header className={styles.vpHeader}>
                       {headerAvatar ? (
                         <Image src={headerAvatar} alt={advisorName} width={48} height={48} priority className={styles.vpAvatar} />
                       ) : (
@@ -531,91 +538,106 @@ export function AdvisorChatModal({
                       </div>
                     </header>
 
-                    <button
-                      type="button"
-                      onClick={() => setVoiceChatExpanded((prev) => !prev)}
-                      className={`${styles.vpToggle} absolute -right-3 top-1/2 z-10 hidden -translate-y-1/2 px-2 py-6 lg:inline-flex`}
-                      aria-label={voiceChatExpanded ? "Contraer chat" : "Expandir chat"}
-                    >
-                      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" className={`h-4 w-4 transition-transform ${voiceChatExpanded ? "rotate-180" : ""}`}>
-                        <path d="m7 4 6 6-6 6" />
-                      </svg>
-                    </button>
-
-                    <div className="relative mt-12 flex h-[256px] w-[256px] items-center justify-center">
-                      <span className={`${styles.vpRing} ${styles.vpRing1} ${voiceSpeaking ? styles.vpRingSpeaking : ""} ${(flowPhase === "user_recording" || flowPhase === "user_paused") ? styles.vpRingListening : ""}`} />
-                      <span className={`${styles.vpRing} ${styles.vpRing2} ${voiceSpeaking ? styles.vpRingSpeaking : ""} ${(flowPhase === "user_recording" || flowPhase === "user_paused") ? styles.vpRingListening : ""}`} />
-                      <span className={`${styles.vpRing} ${styles.vpRing3} ${voiceSpeaking ? styles.vpRingSpeaking : ""} ${(flowPhase === "user_recording" || flowPhase === "user_paused") ? styles.vpRingListening : ""}`} />
+                    <div className={styles.vpShellContent}>
                       <button
                         type="button"
-                        onClick={() => {
-                          if (voiceSpeaking) stopTts();
-                        }}
-                        disabled={!voiceSpeaking}
-                        className={`relative z-[2] rounded-full ${voiceSpeaking ? "cursor-pointer" : "cursor-default"}`}
-                        aria-label={voiceSpeaking ? "Detener voz del advisor" : "Avatar del advisor"}
+                        onClick={() => setVoiceChatExpanded((prev) => !prev)}
+                        className={`${styles.vpToggle} absolute -right-3 top-1/2 z-10 hidden -translate-y-1/2 px-2 py-6 lg:inline-flex`}
+                        aria-label={voiceChatExpanded ? "Contraer chat" : "Expandir chat"}
                       >
-                        <AdvisorAvatar3D
-                          audioElement={avatarAudioElement}
-                          speechText={avatarSpeechText}
-                          isSpeaking={voiceSpeaking}
-                          avatarVariant={advisorAvatarRuntime.avatarVariant}
-                          modelUrl={advisorAvatarRuntime.avatarModelUrl}
-                          fallbackImageSrc={heroAvatar}
-                          label={advisorName}
-                          playbackId={avatarPlaybackId}
-                          size={168}
-                        />
+                        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" className={`h-4 w-4 transition-transform ${voiceChatExpanded ? "rotate-180" : ""}`}>
+                          <path d="m7 4 6 6-6 6" />
+                        </svg>
                       </button>
-                      {recorder.status === "countdown" ? <span className={styles.vpCountdown}>{recorder.countdown}</span> : null}
-                    </div>
 
-                    <div className="mb-3 mt-2 text-center">
-                      <p className={styles.vpNameSmall}>{advisorName}</p>
-                      {advisorRole ? <p className={styles.vpSub}>{advisorRole}</p> : null}
-                      {advisorDescription ? <p className={styles.vpDesc}>{advisorDescription}</p> : null}
-                      <p className={`${styles.vpStatus} ${flowPhase === "user_recording" ? styles.vpStatusRecording : ""} ${flowPhase === "user_paused" ? styles.vpStatusPaused : ""} ${flowPhase === "advisor_speaking" ? styles.vpStatusSpeaking : ""} ${flowPhase === "sending" ? styles.vpStatusSending : ""}`}>{statusText}</p>
-                    </div>
+                      <div className={styles.vpAvatarStage}>
+                        <span className={`${styles.vpRing} ${styles.vpRing1} ${voiceSpeaking ? styles.vpRingSpeaking : ""} ${(flowPhase === "user_recording" || flowPhase === "user_paused") ? styles.vpRingListening : ""}`} />
+                        <span className={`${styles.vpRing} ${styles.vpRing2} ${voiceSpeaking ? styles.vpRingSpeaking : ""} ${(flowPhase === "user_recording" || flowPhase === "user_paused") ? styles.vpRingListening : ""}`} />
+                        <span className={`${styles.vpRing} ${styles.vpRing3} ${voiceSpeaking ? styles.vpRingSpeaking : ""} ${(flowPhase === "user_recording" || flowPhase === "user_paused") ? styles.vpRingListening : ""}`} />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (voiceSpeaking) stopTts();
+                          }}
+                          disabled={!voiceSpeaking}
+                          className={`${styles.vpAvatarButton} ${voiceSpeaking ? "cursor-pointer" : "cursor-default"}`}
+                          aria-label={voiceSpeaking ? "Detener voz del advisor" : "Avatar del advisor"}
+                        >
+                          <AdvisorAvatar3D
+                            audioElement={avatarAudioElement}
+                            speechText={avatarSpeechText}
+                            isSpeaking={voiceSpeaking}
+                            avatarVariant={advisorAvatarRuntime.avatarVariant}
+                            modelUrl={advisorAvatarRuntime.avatarModelUrl}
+                            fallbackImageSrc={heroAvatar}
+                            label={advisorName}
+                            playbackId={avatarPlaybackId}
+                            width={236}
+                            height={320}
+                            onRuntimeStateChange={setAvatarRuntimeState}
+                          />
+                        </button>
+                        {recorder.status === "countdown" ? <span className={styles.vpCountdown}>{recorder.countdown}</span> : null}
+                      </div>
 
-                    <div className="mb-3 flex h-9 items-center gap-[3px]">
-                      {Array.from({ length: 12 }).map((_, index) => (
-                        <span
-                          key={`wave-${index}`}
-                          className={`${styles.vpWaveBar} ${flowPhase === "user_recording" || flowPhase === "advisor_speaking" ? styles.vpWaveActive : styles.vpWavePaused}`}
-                          style={{ animationDelay: `${index * 0.1}s` }}
-                        />
-                      ))}
-                    </div>
-                    <button type="button" onClick={() => setVoiceTranscriptOpen((prev) => !prev)} className={styles.vpHintBtn}>
-                      <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" className={`h-3 w-3 transition-transform ${voiceTranscriptOpen ? "rotate-90" : ""}`}>
-                        <path d="M4 2l4 4-4 4" />
-                      </svg>
-                      ver dictado
-                    </button>
-                    <div className={`${styles.vpHintBox} ${voiceTranscriptOpen ? styles.vpHintOpen : styles.vpHintClosed}`}>
-                      Esta experiencia usa el dictado del navegador. El advisor responde a partir de la transcripcion.
-                    </div>
-                    {voiceSendError || recorder.errorMessage ? <p className={styles.vpError}>{voiceSendError ?? recorder.errorMessage}</p> : null}
-                    {voicePlaybackNotice ? (
-                      <p className="px-1 text-center text-xs text-white/70">{voicePlaybackNotice}</p>
-                    ) : null}
-                    <div className="mt-auto flex w-full gap-2.5">
-                      <button
-                        type="button"
-                        onClick={() => void handlePrimaryVoiceAction()}
-                        disabled={finalizeInFlight || flowPhase === "countdown" || flowPhase === "initializing_media" || flowPhase === "sending"}
-                        className={styles.vpPrimaryBtn}
-                      >
-                        {flowPhase === "advisor_speaking" ? "Detener" : flowPhase === "ready_for_next_turn" || flowPhase === "error" ? "Volver a dictar" : "Enviar dictado"}
+                      <div className={styles.vpMeta}>
+                        <p className={styles.vpNameSmall}>{advisorName}</p>
+                        {advisorRole ? <p className={styles.vpSub}>{advisorRole}</p> : null}
+                        {advisorDescription ? <p className={styles.vpDesc}>{advisorDescription}</p> : null}
+                        <p className={`${styles.vpStatus} ${flowPhase === "user_recording" ? styles.vpStatusRecording : ""} ${flowPhase === "user_paused" ? styles.vpStatusPaused : ""} ${flowPhase === "advisor_speaking" ? styles.vpStatusSpeaking : ""} ${flowPhase === "sending" ? styles.vpStatusSending : ""}`}>{statusText}</p>
+                      </div>
+
+                      <div className="mb-3 mt-4 flex h-9 items-center gap-[3px]">
+                        {Array.from({ length: 12 }).map((_, index) => (
+                          <span
+                            key={`wave-${index}`}
+                            className={`${styles.vpWaveBar} ${flowPhase === "user_recording" || flowPhase === "advisor_speaking" ? styles.vpWaveActive : styles.vpWavePaused}`}
+                            style={{ animationDelay: `${index * 0.1}s` }}
+                          />
+                        ))}
+                      </div>
+                      <button type="button" onClick={() => setVoiceTranscriptOpen((prev) => !prev)} className={styles.vpHintBtn}>
+                        <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" className={`h-3 w-3 transition-transform ${voiceTranscriptOpen ? "rotate-90" : ""}`}>
+                          <path d="M4 2l4 4-4 4" />
+                        </svg>
+                        ver dictado
                       </button>
-                      <button type="button" onClick={() => closeVoice()} className={styles.vpSecondaryBtn}>
-                        Cancelar
-                      </button>
+                      <div className={`${styles.vpHintBox} ${voiceTranscriptOpen ? styles.vpHintOpen : styles.vpHintClosed}`}>
+                        Esta experiencia usa el dictado del navegador. El advisor responde a partir de la transcripcion.
+                      </div>
+                      {avatarRuntimeState === "error" ? (
+                        <p className={styles.vpAvatarNotice}>
+                          No pudimos cargar el avatar ahora mismo. Puedes seguir usando el advisor igualmente.
+                        </p>
+                      ) : null}
+                      {voiceSendError || recorder.errorMessage ? <p className={styles.vpError}>{voiceSendError ?? recorder.errorMessage}</p> : null}
+                      {voicePlaybackNotice ? (
+                        <p className={styles.vpPlaybackNotice}>{voicePlaybackNotice}</p>
+                      ) : null}
+                      <div className="mt-auto flex w-full gap-2.5">
+                        <button
+                          type="button"
+                          onClick={() => void handlePrimaryVoiceAction()}
+                          disabled={avatarBooting || finalizeInFlight || flowPhase === "countdown" || flowPhase === "initializing_media" || flowPhase === "sending"}
+                          className={styles.vpPrimaryBtn}
+                        >
+                          {avatarBooting
+                            ? "Preparando avatar"
+                            : flowPhase === "advisor_speaking"
+                              ? "Detener"
+                              : flowPhase === "ready_for_next_turn" || flowPhase === "error"
+                                ? "Volver a dictar"
+                                : "Enviar dictado"}
+                        </button>
+                        <button type="button" onClick={() => closeVoice()} className={styles.vpSecondaryBtn}>
+                          Cancelar
+                        </button>
+                      </div>
                     </div>
                   </section>
 
                   {voiceChatExpanded ? (
-                    <aside className={`${styles.vpChatAside} hidden h-full min-h-0 w-[360px] shrink-0 lg:flex lg:flex-col`}>
+                    <aside className={`${styles.vpChatAside} hidden h-full min-h-0 w-[420px] shrink-0 lg:flex lg:flex-col`}>
                       <div className={styles.vpChatHead}>
                         <p className={styles.vpChatHeadText}>Conversacion</p>
                       </div>

@@ -7,6 +7,7 @@ import styles from "@/components/mvp/AdvisorAvatar3D.module.css";
 
 type AvatarVariant = "female" | "male";
 type AvatarStatus = "loading" | "ready" | "speaking" | "error";
+type AvatarRuntimeState = Exclude<AvatarStatus, "speaking">;
 
 type AdvisorAvatar3DProps = {
   audioElement?: HTMLAudioElement | null;
@@ -14,10 +15,13 @@ type AdvisorAvatar3DProps = {
   isSpeaking: boolean;
   avatarVariant?: AvatarVariant;
   size?: number;
+  width?: number;
+  height?: number;
   modelUrl?: string | null;
   fallbackImageSrc?: string | null;
   label: string;
   playbackId?: number;
+  onRuntimeStateChange?: (state: AvatarRuntimeState) => void;
 };
 
 type TalkingHeadInstance = {
@@ -195,10 +199,13 @@ export function AdvisorAvatar3D({
   isSpeaking,
   avatarVariant = "female",
   size = 168,
+  width,
+  height,
   modelUrl,
   fallbackImageSrc = null,
   label,
   playbackId = 0,
+  onRuntimeStateChange,
 }: AdvisorAvatar3DProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const headRef = useRef<TalkingHeadInstance | null>(null);
@@ -208,7 +215,6 @@ export function AdvisorAvatar3D({
   const sourceAudioElementRef = useRef<HTMLAudioElement | null>(null);
   const activePlaybackRef = useRef<number>(-1);
   const [loadState, setLoadState] = useState<Exclude<AvatarStatus, "speaking">>("loading");
-  const [runtimeErrorMessage, setRuntimeErrorMessage] = useState<string | null>(null);
 
   const resolvedModelUrl = useMemo(
     () => resolveReadyPlayerMeUrl(avatarVariant, modelUrl),
@@ -222,7 +228,15 @@ export function AdvisorAvatar3D({
       : isSpeaking
         ? "speaking"
         : loadState;
-  const errorMessage = modelUnavailable ? "Avatar 3D no disponible" : runtimeErrorMessage;
+  const runtimeState: AvatarRuntimeState = modelUnavailable
+    ? "error"
+    : loadState === "error"
+      ? "error"
+      : loadState;
+
+  useEffect(() => {
+    onRuntimeStateChange?.(runtimeState);
+  }, [onRuntimeStateChange, runtimeState]);
 
   useEffect(() => {
     if (!containerRef.current || !resolvedModelUrl) {
@@ -234,7 +248,6 @@ export function AdvisorAvatar3D({
     async function loadAvatar() {
       try {
         setLoadState("loading");
-        setRuntimeErrorMessage(null);
         const { TalkingHead } = await loadTalkingHeadModule();
         if (cancelled || !containerRef.current) return;
 
@@ -277,7 +290,6 @@ export function AdvisorAvatar3D({
       } catch (error) {
         console.error("avatar_3d_load_failed", error);
         setLoadState("error");
-        setRuntimeErrorMessage("No pudimos cargar el avatar 3D");
       }
     }
 
@@ -391,21 +403,29 @@ export function AdvisorAvatar3D({
       } catch (error) {
         console.error("avatar_3d_speaking_failed", error);
         setLoadState("error");
-        setRuntimeErrorMessage("No pudimos sincronizar el avatar");
       }
     }
 
     void animateSpeech();
   }, [isSpeaking, playbackId, speechText]);
 
+  const resolvedWidth = width ?? size;
+  const resolvedHeight = height ?? size;
   const avatarSizeStyle = {
-    width: `${size}px`,
-    height: `${size}px`,
+    width: `${resolvedWidth}px`,
+    height: `${resolvedHeight}px`,
   };
   const initials = (label || "A").trim()[0]?.toUpperCase() || "A";
+  const shellClassName = [
+    styles.avatarShell,
+    runtimeState === "ready" ? styles.avatarShellReady : "",
+    status === "speaking" ? styles.avatarShellSpeaking : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
-    <div className={styles.avatarShell} style={avatarSizeStyle}>
+    <div className={shellClassName} style={avatarSizeStyle}>
       {status === "error" || !resolvedModelUrl ? (
         fallbackImageSrc ? (
           <Image
@@ -414,7 +434,7 @@ export function AdvisorAvatar3D({
             fill
             priority
             className={styles.avatarFallbackImage}
-            sizes={`${size}px`}
+            sizes={`${resolvedWidth}px`}
           />
         ) : (
           <span className={styles.avatarFallbackInitial}>{initials}</span>
@@ -423,17 +443,36 @@ export function AdvisorAvatar3D({
         <div ref={containerRef} className={styles.avatarCanvas} />
       )}
 
-      {status === "loading" ? <div className={styles.avatarLoading}>Cargando avatar</div> : null}
+      <div
+        className={`${styles.avatarLoadingOverlay} ${runtimeState === "loading" ? "" : styles.avatarLoadingOverlayHidden}`}
+      >
+          <div className={styles.avatarLoadingCard}>
+            <div className={styles.avatarLoaderClock} aria-hidden="true">
+              <span className={styles.avatarLoaderRing} />
+              <span className={styles.avatarLoaderHandLong} />
+              <span className={styles.avatarLoaderHandShort} />
+              <span className={styles.avatarLoaderPivot} />
+            </div>
+            <div className={styles.avatarLoaderCopy}>
+              <p className={styles.avatarLoadingTitle}>Cargando avatar</p>
+              <p className={styles.avatarLoadingBody}>
+                Por favor espera unos segundos mientras preparamos la animacion del advisor.
+              </p>
+            </div>
+            <div className={styles.avatarLoaderBar} aria-hidden="true">
+              <span className={styles.avatarLoaderBarFill} />
+            </div>
+          </div>
+      </div>
       <div className={styles.avatarStatus}>
         {status === "speaking"
           ? "Hablando"
           : status === "ready"
             ? "Listo"
             : status === "loading"
-              ? "Cargando"
-              : "Fallback"}
+              ? "Preparando"
+              : "Visual"}
       </div>
-      {errorMessage ? <div className={styles.avatarError}>{errorMessage}</div> : null}
     </div>
   );
 }

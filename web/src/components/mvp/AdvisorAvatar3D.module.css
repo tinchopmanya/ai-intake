@@ -1,15 +1,38 @@
 .avatarShell {
   position: relative;
   z-index: 2;
+  isolation: isolate;
   overflow: hidden;
-  border-radius: 999px;
-  border: 3px solid rgba(255, 255, 255, 0.15);
+  border-radius: 42px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
   background:
-    radial-gradient(circle at top, rgba(94, 156, 255, 0.16) 0%, transparent 42%),
-    linear-gradient(180deg, rgba(12, 21, 33, 0.98) 0%, rgba(8, 16, 27, 0.98) 100%);
+    radial-gradient(circle at 50% 0%, rgba(133, 184, 255, 0.2) 0%, transparent 36%),
+    linear-gradient(180deg, rgba(14, 25, 40, 0.98) 0%, rgba(7, 15, 26, 1) 100%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 18px 34px rgba(0, 0, 0, 0.24);
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 28px 54px rgba(3, 8, 20, 0.38);
+  transform-origin: center bottom;
+}
+
+.avatarShell::after {
+  content: "";
+  position: absolute;
+  inset: auto 14px 12px;
+  height: 32%;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(102, 160, 255, 0.18) 0%, rgba(102, 160, 255, 0) 72%);
+  pointer-events: none;
+}
+
+.avatarShellReady {
+  animation: avatarEnter 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.avatarShellSpeaking {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 28px 54px rgba(3, 8, 20, 0.42),
+    0 0 0 1px rgba(255, 228, 164, 0.14);
 }
 
 .avatarCanvas {
@@ -17,8 +40,14 @@
   height: 100%;
 }
 
+.avatarCanvas :global(canvas) {
+  width: 100% !important;
+  height: 100% !important;
+}
+
 .avatarFallbackImage {
   object-fit: cover;
+  object-position: center 18%;
 }
 
 .avatarFallbackInitial {
@@ -27,60 +56,223 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 52px;
+  font-size: 60px;
   font-weight: 700;
   color: rgba(255, 255, 255, 0.95);
-  background: linear-gradient(180deg, rgba(45, 107, 228, 0.92) 0%, rgba(23, 62, 124, 0.96) 100%);
+  background:
+    radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.18) 0%, transparent 30%),
+    linear-gradient(180deg, rgba(45, 107, 228, 0.92) 0%, rgba(18, 45, 94, 0.96) 100%);
 }
 
-.avatarLoading {
+.avatarLoadingOverlay {
   position: absolute;
-  left: 50%;
-  bottom: 16px;
-  transform: translateX(-50%);
-  min-height: 28px;
-  display: inline-flex;
+  inset: 16px;
+  z-index: 4;
+  display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 10px;
+  border-radius: 30px;
+  padding: 18px;
+  background: rgba(249, 251, 255, 0.94);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow:
+    0 22px 40px rgba(15, 23, 42, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(14px);
+  transition: opacity 0.26s ease, transform 0.26s ease;
+}
+
+.avatarLoadingOverlayHidden {
+  opacity: 0;
+  transform: translateY(10px) scale(0.985);
+  pointer-events: none;
+}
+
+.avatarLoadingCard {
+  width: 100%;
+  max-width: 228px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+}
+
+.avatarLoaderClock {
+  position: relative;
+  width: 58px;
+  height: 58px;
   border-radius: 999px;
-  background: rgba(8, 16, 27, 0.72);
-  color: rgba(239, 246, 255, 0.88);
-  font-size: 11px;
-  letter-spacing: 0.02em;
-  backdrop-filter: blur(8px);
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.92) 0%, rgba(241, 245, 249, 0.96) 74%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(226, 232, 240, 0.92) 100%);
+  box-shadow:
+    0 12px 24px rgba(45, 107, 228, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.avatarLoaderRing {
+  position: absolute;
+  inset: 4px;
+  border-radius: inherit;
+  border: 2px solid rgba(45, 107, 228, 0.16);
+  border-top-color: rgba(45, 107, 228, 0.94);
+  border-right-color: rgba(45, 107, 228, 0.54);
+  animation: avatarSpin 1.25s linear infinite;
+}
+
+.avatarLoaderHandLong,
+.avatarLoaderHandShort {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(45, 107, 228, 0.98) 0%, rgba(94, 156, 255, 0.72) 100%);
+  transform-origin: center calc(100% - 2px);
+}
+
+.avatarLoaderHandLong {
+  height: 18px;
+  margin-left: -1px;
+  margin-top: -16px;
+  animation: avatarClockHand 1.45s linear infinite;
+}
+
+.avatarLoaderHandShort {
+  height: 12px;
+  margin-left: -1px;
+  margin-top: -10px;
+  opacity: 0.78;
+  animation: avatarClockHand 4.2s linear infinite reverse;
+}
+
+.avatarLoaderPivot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  margin-top: -4px;
+  border-radius: 999px;
+  background: rgba(45, 107, 228, 0.94);
+  box-shadow: 0 0 0 4px rgba(45, 107, 228, 0.12);
+}
+
+.avatarLoaderCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.avatarLoadingTitle {
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.avatarLoadingBody {
+  color: rgba(15, 23, 42, 0.72);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.avatarLoaderBar {
+  width: 100%;
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.2);
+}
+
+.avatarLoaderBarFill {
+  display: block;
+  height: 100%;
+  width: 38%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(45, 107, 228, 0.28) 0%, rgba(45, 107, 228, 0.92) 54%, rgba(125, 180, 255, 0.54) 100%);
+  animation: avatarLoaderBar 1.75s ease-in-out infinite;
 }
 
 .avatarStatus {
   position: absolute;
   left: 50%;
-  top: 12px;
+  top: 14px;
   transform: translateX(-50%);
-  min-height: 26px;
+  min-height: 28px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0 10px;
+  padding: 0 12px;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(8, 16, 27, 0.58);
+  background: rgba(8, 16, 27, 0.56);
   color: rgba(239, 246, 255, 0.84);
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   backdrop-filter: blur(8px);
+  z-index: 3;
 }
 
 .avatarError {
   position: absolute;
   left: 50%;
-  bottom: 46px;
+  bottom: 16px;
+  z-index: 3;
   transform: translateX(-50%);
-  max-width: calc(100% - 24px);
+  width: calc(100% - 28px);
+  padding: 10px 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(203, 213, 225, 0.45);
+  background: rgba(248, 250, 252, 0.94);
+  color: rgba(127, 29, 29, 0.88);
   text-align: center;
   font-size: 11px;
-  line-height: 1.4;
-  color: rgba(255, 214, 214, 0.92);
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.26);
+  line-height: 1.45;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+}
+
+@keyframes avatarEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.965);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes avatarSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes avatarClockHand {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes avatarLoaderBar {
+  0% {
+    transform: translateX(-82%);
+  }
+  50% {
+    transform: translateX(112%);
+  }
+  100% {
+    transform: translateX(-82%);
+  }
 }
