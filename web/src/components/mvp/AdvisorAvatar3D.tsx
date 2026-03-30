@@ -14,6 +14,7 @@ type AdvisorAvatar3DProps = {
   speechText?: string | null;
   isSpeaking: boolean;
   isListening?: boolean;
+  framingKey?: string | null;
   avatarVariant?: AvatarVariant;
   size?: number;
   width?: number;
@@ -23,6 +24,15 @@ type AdvisorAvatar3DProps = {
   label: string;
   playbackId?: number;
   onRuntimeStateChange?: (state: AvatarRuntimeState) => void;
+};
+
+type AvatarFramingPreset = {
+  view: "full" | "mid" | "upper" | "head";
+  cameraDistance: number;
+  cameraX?: number;
+  cameraY: number;
+  cameraRotateX?: number;
+  cameraRotateY?: number;
 };
 
 type TalkingHeadInstance = {
@@ -221,11 +231,50 @@ function buildApproximateVisemeTrack(text: string) {
   return { visemes, vtimes, vdurations };
 }
 
+function resolveAvatarFramingPreset(framingKey: string | null | undefined, avatarVariant: AvatarVariant): AvatarFramingPreset {
+  const normalizedKey = (framingKey ?? "").toLowerCase();
+  if (normalizedKey.includes("robert")) {
+    return {
+      view: "upper",
+      cameraDistance: -1.65,
+      cameraX: 0.01,
+      cameraY: -0.58,
+      cameraRotateX: 0.015,
+    };
+  }
+  if (normalizedKey.includes("lidia")) {
+    return {
+      view: "upper",
+      cameraDistance: -1.82,
+      cameraX: 0.01,
+      cameraY: -0.62,
+      cameraRotateX: 0.02,
+    };
+  }
+  if (normalizedKey.includes("laura")) {
+    return {
+      view: "upper",
+      cameraDistance: -1.92,
+      cameraX: 0.015,
+      cameraY: -0.64,
+      cameraRotateX: 0.02,
+    };
+  }
+  return {
+    view: "upper",
+    cameraDistance: avatarVariant === "male" ? -1.68 : -1.86,
+    cameraX: 0.01,
+    cameraY: avatarVariant === "male" ? -0.58 : -0.63,
+    cameraRotateX: 0.018,
+  };
+}
+
 export function AdvisorAvatar3D({
   audioElement = null,
   speechText = null,
   isSpeaking,
   isListening = false,
+  framingKey = null,
   avatarVariant = "female",
   size = 168,
   width,
@@ -250,6 +299,10 @@ export function AdvisorAvatar3D({
   const resolvedModelUrl = useMemo(
     () => resolveReadyPlayerMeUrl(avatarVariant, modelUrl),
     [avatarVariant, modelUrl],
+  );
+  const framingPreset = useMemo(
+    () => resolveAvatarFramingPreset(framingKey ?? resolvedModelUrl, avatarVariant),
+    [avatarVariant, framingKey, resolvedModelUrl],
   );
   const modelUnavailable = !resolvedModelUrl;
   const status: AvatarStatus = modelUnavailable
@@ -306,7 +359,7 @@ export function AdvisorAvatar3D({
         if (cancelled || !containerRef.current) return;
 
         const head = new TalkingHead(containerRef.current, {
-          cameraView: "upper",
+          cameraView: framingPreset.view,
           cameraRotateEnable: false,
           cameraPanEnable: false,
           cameraZoomEnable: false,
@@ -315,8 +368,8 @@ export function AdvisorAvatar3D({
           lipsyncModules: [],
           modelFPS: 24,
           modelPixelRatio: 0.85,
-          lightAmbientIntensity: 2.1,
-          lightDirectIntensity: 20,
+          lightAmbientIntensity: 2.2,
+          lightDirectIntensity: 22,
           lightDirectPhi: 0.18,
           lightDirectTheta: 2.2,
           avatarMood: "neutral",
@@ -351,14 +404,17 @@ export function AdvisorAvatar3D({
         }
 
         headRef.current = head;
-        head.setView?.("upper", {
-          cameraDistance: -1.45,
-          cameraY: -0.55,
-          cameraRotateX: 0.02,
+        head.setView?.(framingPreset.view, {
+          cameraDistance: framingPreset.cameraDistance,
+          cameraX: framingPreset.cameraX,
+          cameraY: framingPreset.cameraY,
+          cameraRotateX: framingPreset.cameraRotateX,
+          cameraRotateY: framingPreset.cameraRotateY,
         });
-        head.lookAtCamera(1600);
+        head.lookAtCamera(1300);
         pushDebug("show_avatar_ready", {
           modelUrl: resolvedModelUrl,
+          framingPreset,
           elapsedMs: Math.round(performance.now() - runtimeStartedAt),
         });
         setLoadState("ready");
@@ -382,7 +438,7 @@ export function AdvisorAvatar3D({
       headRef.current?.stop?.();
       headRef.current = null;
     };
-  }, [avatarVariant, pushDebug, resolvedModelUrl]);
+  }, [avatarVariant, framingPreset, pushDebug, resolvedModelUrl]);
 
   useEffect(() => {
     return () => {

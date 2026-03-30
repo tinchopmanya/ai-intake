@@ -822,13 +822,14 @@ export function AdvisorChatModal({
                               speechText={avatarSpeechText}
                               isSpeaking={voiceSpeaking}
                               isListening={voiceListening}
+                              framingKey={advisorId ?? advisorAvatarRuntime.modelUrl}
                               avatarVariant={advisorAvatarRuntime.avatarVariant}
                               modelUrl={advisorAvatarRuntime.modelUrl}
                               fallbackImageSrc={heroAvatar}
                               label={advisorName}
                               playbackId={avatarPlaybackId}
-                              width={332}
-                              height={430}
+                              width={340}
+                              height={446}
                               onRuntimeStateChange={setAvatarRuntimeState}
                             />
                           </button>
