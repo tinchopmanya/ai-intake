@@ -1012,6 +1012,7 @@ export function WizardScaffold({
   const [incidentSaving, setIncidentSaving] = useState(false);
   const [, setIncidentNotice] = useState<string | null>(null);
   const [advisorChatOpen, setAdvisorChatOpen] = useState(false);
+  const [advisorChatAutoLaunchVoice, setAdvisorChatAutoLaunchVoice] = useState(false);
   const [advisorChatIndex, setAdvisorChatIndex] = useState<number | null>(null);
   const [advisorChatInput, setAdvisorChatInput] = useState("");
   const [advisorChatSending, setAdvisorChatSending] = useState(false);
@@ -1838,6 +1839,7 @@ export function WizardScaffold({
       },
     ]);
     setAdvisorChatInput("");
+    setAdvisorChatAutoLaunchVoice(true);
     setAdvisorChatOpen(true);
   }
 
@@ -2959,6 +2961,7 @@ export function WizardScaffold({
 
       <AdvisorChatModal
         isOpen={advisorChatOpen}
+        autoLaunchVoice={advisorChatAutoLaunchVoice}
         advisorId={advisorChatIndex !== null ? getAdvisorVisualByIndex(advisorChatIndex).id : undefined}
         advisorName={advisorChatIndex !== null ? getAdvisorVisualByIndex(advisorChatIndex).name : "Adviser"}
         advisorRole={advisorChatIndex !== null ? getAdvisorVisualByIndex(advisorChatIndex).role : ""}
@@ -2982,8 +2985,14 @@ export function WizardScaffold({
         onDraftChange={setAdvisorChatInput}
         onSend={() => void handleSendAdvisorRefinement()}
         onVoiceSessionSync={handleVoiceRefinementSessionSync}
-        onUseResponse={() => setAdvisorChatOpen(false)}
-        onClose={() => setAdvisorChatOpen(false)}
+        onUseResponse={() => {
+          setAdvisorChatAutoLaunchVoice(false);
+          setAdvisorChatOpen(false);
+        }}
+        onClose={() => {
+          setAdvisorChatAutoLaunchVoice(false);
+          setAdvisorChatOpen(false);
+        }}
       />
       <AdvisorProfileModal profile={selectedProfile} onClose={() => setSelectedProfile(null)} />
     </Panel>

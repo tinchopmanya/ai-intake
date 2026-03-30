@@ -1,5 +1,6 @@
 .vpOverlay,
 .cpOverlay {
+  --vp-header-height: 78px;
   --popup-bg: #0d1825;
   --popup-header-bg: #1c2b3a;
   --popup-header-accent: #2d6be4;
@@ -26,15 +27,15 @@
   --close-btn-border: rgba(255, 255, 255, 0.2);
   --close-btn-color: #ffffff;
   --backdrop: rgba(10, 18, 35, 0.75);
-  --vp-ring-idle-1: rgba(74, 158, 255, 0.35);
-  --vp-ring-idle-2: rgba(74, 158, 255, 0.25);
-  --vp-ring-idle-3: rgba(74, 158, 255, 0.15);
+  --vp-ring-idle-1: rgba(255, 255, 255, 0.42);
+  --vp-ring-idle-2: rgba(225, 236, 255, 0.28);
+  --vp-ring-idle-3: rgba(200, 220, 245, 0.16);
   --vp-ring-rec-1: rgba(239, 68, 68, 0.7);
   --vp-ring-rec-2: rgba(248, 113, 113, 0.45);
   --vp-ring-rec-3: rgba(252, 165, 165, 0.25);
-  --vp-ring-speak-1: rgba(234, 179, 8, 0.7);
-  --vp-ring-speak-2: rgba(250, 204, 21, 0.45);
-  --vp-ring-speak-3: rgba(253, 224, 71, 0.25);
+  --vp-ring-speak-1: rgba(45, 107, 228, 0.78);
+  --vp-ring-speak-2: rgba(95, 161, 255, 0.48);
+  --vp-ring-speak-3: rgba(168, 214, 255, 0.28);
   --popup-shadow: rgba(0, 0, 0, 0.34);
   --popup-shadow-soft: rgba(0, 0, 0, 0.3);
   --avatar-border: rgba(255, 255, 255, 0.15);
@@ -91,16 +92,29 @@
 
 .vpModalFrame {
   width: 100%;
-  max-width: 480px;
+  max-width: 520px;
   height: min(92vh, 820px);
   transition: max-width 0.3s ease, transform 0.3s ease;
 }
 
 .vpModalFrameExpanded {
-  max-width: 920px;
+  max-width: 968px;
 }
 
-.vpHeader,
+.vpHeader {
+  background:
+    linear-gradient(180deg, rgba(30, 45, 61, 0.98) 0%, rgba(23, 37, 51, 0.98) 100%);
+  border-bottom: 1px solid rgba(112, 156, 230, 0.22);
+  color: var(--popup-header-text);
+  padding: 12px 18px 11px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: var(--vp-header-height);
+  flex-shrink: 0;
+}
+
 .cpHeader {
   background: var(--popup-header-bg);
   border-bottom: 2px solid var(--popup-header-accent);
@@ -111,6 +125,14 @@
   gap: 14px;
   min-height: 82px;
   flex-shrink: 0;
+}
+
+.vpHeaderIdentity {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 0 1 auto;
 }
 
 .vpAvatar,
@@ -161,6 +183,18 @@
   font-size: 12px;
 }
 
+.vpHeaderDescription {
+  max-width: 320px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgba(236, 244, 255, 0.82);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-align: left;
+}
+
 .vpDesc,
 .cpDesc {
   margin-top: 4px;
@@ -206,8 +240,8 @@
   min-height: 0;
   flex: 1;
   flex-direction: column;
-  align-items: center;
-  padding: 18px 24px 20px;
+  align-items: stretch;
+  padding: 14px 18px 18px;
 }
 
 .vpBodySplit {
@@ -226,10 +260,10 @@
   position: relative;
   display: flex;
   width: 100%;
-  min-height: 388px;
-  align-items: center;
+  min-height: 446px;
+  align-items: flex-start;
   justify-content: center;
-  padding-top: 10px;
+  padding-top: 2px;
 }
 
 .vpAvatarButton {
@@ -239,38 +273,185 @@
   align-items: center;
   justify-content: center;
   border-radius: 42px;
-  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.3);
+  margin-inline: auto;
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.38);
+}
+
+.vpHeroStack {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 14px;
 }
 
 .vpMeta {
   width: 100%;
-  max-width: 340px;
-  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px 16px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.02) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.vpStatusHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.vpStateBadge {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.vpStateBadgeReady {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(249, 252, 255, 0.92);
+}
+
+.vpStateBadgeListening {
+  border-color: rgba(248, 113, 113, 0.3);
+  background: rgba(127, 29, 29, 0.22);
+  color: rgba(254, 226, 226, 0.96);
+}
+
+.vpStateBadgeSpeaking {
+  border-color: rgba(125, 190, 255, 0.3);
+  background: rgba(29, 78, 216, 0.18);
+  color: rgba(224, 242, 254, 0.96);
+}
+
+.vpStateBadgeError {
+  border-color: rgba(248, 113, 113, 0.28);
+  background: rgba(127, 29, 29, 0.18);
+  color: rgba(254, 202, 202, 0.96);
+}
+
+.vpStatusHeadline {
+  color: var(--popup-header-text);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.vpNameSmall {
+  color: var(--popup-header-text);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.vpStatus {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--popup-header-sub);
+}
+
+.vpStatusRecording {
+  color: var(--status-recording);
+}
+
+.vpStatusPaused {
+  color: var(--status-paused);
+}
+
+.vpStatusSending {
+  color: var(--conv-label);
+}
+
+.vpStatusSpeaking {
+  color: var(--status-speaking);
+}
+
+.vpStatusError {
+  color: var(--error-text);
+}
+
+.vpAudioMeter {
+  display: flex;
+  height: 40px;
+  align-items: center;
+  gap: 4px;
+  padding: 0 2px;
+}
+
+.vpAudioMeterIdle {
+  opacity: 0.86;
+}
+
+.vpAudioMeterListening {
+  opacity: 1;
+}
+
+.vpAudioMeterSpeaking {
+  opacity: 1;
+}
+
+.vpWaveBar {
+  width: 4px;
+  height: 24px;
+  border-radius: 999px;
+  transform-origin: center bottom;
+  background: color-mix(in srgb, white 80%, var(--conv-label));
+  animation: vpWaveBar 1.2s ease-in-out infinite;
+}
+
+.vpAudioMeterListening .vpWaveBar {
+  background: linear-gradient(180deg, rgba(254, 202, 202, 0.96) 0%, rgba(239, 68, 68, 0.94) 100%);
+}
+
+.vpAudioMeterSpeaking .vpWaveBar {
+  background: linear-gradient(180deg, rgba(191, 219, 254, 0.98) 0%, rgba(45, 107, 228, 0.94) 100%);
+}
+
+.vpUtilityRow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.vpNoticeStack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .vpAvatarNotice {
-  margin-top: 10px;
   width: 100%;
-  max-width: 340px;
-  border-radius: 16px;
+  border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.09);
-  background: rgba(255, 255, 255, 0.06);
-  padding: 10px 14px;
-  text-align: center;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 11px 14px;
   font-size: 12px;
   line-height: 1.5;
   color: rgba(255, 255, 255, 0.74);
 }
 
 .vpPlaybackNotice {
-  margin-top: 10px;
   width: 100%;
-  max-width: 340px;
-  padding-inline: 4px;
-  text-align: center;
+  border-radius: 16px;
+  border: 1px solid rgba(126, 160, 209, 0.14);
+  background: rgba(13, 24, 37, 0.62);
+  padding: 10px 12px;
   font-size: 12px;
   line-height: 1.5;
-  color: rgba(255, 255, 255, 0.72);
+  color: rgba(200, 217, 240, 0.72);
 }
 
 .vpAvatarHeroFallback {
@@ -303,36 +484,6 @@
   justify-content: center;
   font-size: 22px;
   font-weight: 700;
-}
-
-.vpNameSmall {
-  color: var(--popup-header-text);
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 1.2;
-}
-
-.vpStatus {
-  margin-top: 8px;
-  font-size: 13px;
-  line-height: 1.45;
-  color: var(--popup-header-sub);
-}
-
-.vpStatusRecording {
-  color: var(--status-recording);
-}
-
-.vpStatusPaused {
-  color: var(--status-paused);
-}
-
-.vpStatusSending {
-  color: var(--conv-label);
-}
-
-.vpStatusSpeaking {
-  color: var(--status-speaking);
 }
 
 .vpRing {
@@ -392,15 +543,6 @@
   border-color: var(--vp-ring-speak-3);
 }
 
-.vpWaveBar {
-  width: 4px;
-  height: 24px;
-  border-radius: 2px;
-  transform-origin: center bottom;
-  background: color-mix(in srgb, var(--conv-label) 55%, transparent);
-  animation: vpWaveBar 1.2s ease-in-out infinite;
-}
-
 .vpWavePaused {
   animation-play-state: paused;
   height: 8px;
@@ -412,32 +554,34 @@
 }
 
 .vpHintBtn {
-  margin-bottom: 4px;
   display: flex;
   align-items: center;
   gap: 8px;
+  min-height: 28px;
+  padding: 0;
   background: transparent;
   font-size: 12px;
-  color: var(--popup-header-desc);
+  font-weight: 600;
+  color: rgba(209, 226, 250, 0.82);
 }
 
 .vpHintBox {
   width: 100%;
   overflow: hidden;
-  border-radius: 10px;
-  background: var(--btn-secondary-bg);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.04);
   padding-inline: 14px;
   font-size: 12px;
-  line-height: 1.4;
+  line-height: 1.5;
   color: var(--popup-header-sub);
   transition: max-height 0.3s ease, padding 0.3s ease, margin 0.3s ease;
 }
 
 .vpHintOpen {
-  margin-bottom: 12px;
-  max-height: 44px;
-  padding-top: 8px;
-  padding-bottom: 8px;
+  max-height: 68px;
+  padding-top: 10px;
+  padding-bottom: 10px;
 }
 
 .vpHintClosed {
@@ -448,31 +592,44 @@
 }
 
 .vpError {
-  margin-bottom: 8px;
   width: 100%;
-  text-align: center;
+  border-radius: 16px;
+  border: 1px solid rgba(248, 113, 113, 0.14);
+  background: rgba(69, 10, 10, 0.22);
+  padding: 10px 12px;
   font-size: 12px;
+  line-height: 1.5;
   color: var(--error-text);
 }
 
+.vpActions {
+  margin-top: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
 .vpPrimaryBtn {
-  flex: 1;
   border: 0;
-  border-radius: 12px;
+  border-radius: 16px;
   background: var(--btn-primary-bg);
   color: var(--btn-primary-text);
-  font-size: 14px;
+  min-height: 50px;
+  font-size: 15px;
   font-weight: 600;
-  padding: 11px 16px;
+  padding: 13px 18px;
+  box-shadow: 0 16px 32px rgba(45, 107, 228, 0.28);
 }
 
 .vpSecondaryBtn {
-  border-radius: 12px;
+  min-height: 42px;
+  border-radius: 14px;
   border: 1px solid var(--btn-secondary-border);
   background: var(--btn-secondary-bg);
   color: var(--btn-secondary-text);
   font-size: 13px;
-  padding: 11px 16px;
+  padding: 10px 14px;
 }
 
 .vpChatAside {
@@ -481,11 +638,11 @@
 
 .vpChatHead {
   background: var(--popup-header-bg);
-  border-bottom: 2px solid var(--popup-header-accent);
-  padding: 14px 20px;
-  min-height: 82px;
+  border-bottom: 1px solid rgba(112, 156, 230, 0.22);
+  padding: 12px 20px 11px;
+  min-height: var(--vp-header-height);
   display: flex;
-  align-items: center;
+  align-items: flex-end;
 }
 
 .vpChatHeadText {
@@ -666,10 +823,59 @@
   }
 
   .vpShellContent {
-    padding: 16px 20px 18px;
+    padding: 12px 16px 16px;
   }
 
   .vpAvatarStage {
-    min-height: 352px;
+    min-height: 414px;
+  }
+
+  .vpHeader {
+    align-items: stretch;
+    flex-wrap: wrap;
+    gap: 10px 14px;
+    padding: 12px 16px;
+  }
+
+  .vpHeaderDescription {
+    max-width: none;
+    width: 100%;
+  }
+
+  .vpStatusHeader {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+@media (max-width: 640px) {
+  .vpOverlay,
+  .cpOverlay {
+    padding: 0.5rem;
+  }
+
+  .vpModalFrame {
+    height: min(96vh, 900px);
+  }
+
+  .vpAvatarStage {
+    min-height: 452px;
+  }
+
+  .vpMeta {
+    padding: 13px 14px 14px;
+  }
+
+  .vpStatusHeadline {
+    font-size: 16px;
+  }
+
+  .vpActions {
+    grid-template-columns: 1fr;
+  }
+
+  .vpSecondaryBtn {
+    width: 100%;
   }
 }

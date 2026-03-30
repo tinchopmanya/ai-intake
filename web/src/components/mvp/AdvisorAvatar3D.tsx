@@ -13,6 +13,7 @@ type AdvisorAvatar3DProps = {
   audioElement?: HTMLAudioElement | null;
   speechText?: string | null;
   isSpeaking: boolean;
+  isListening?: boolean;
   avatarVariant?: AvatarVariant;
   size?: number;
   width?: number;
@@ -42,6 +43,7 @@ type TalkingHeadInstance = {
   lookAtCamera: (durationMs: number) => void;
   lookAhead: (durationMs: number) => void;
   setMood: (mood: string) => void;
+  setView?: (view: "full" | "mid" | "upper" | "head", options?: Record<string, unknown>) => void;
   stop?: () => void;
 };
 
@@ -223,6 +225,7 @@ export function AdvisorAvatar3D({
   audioElement = null,
   speechText = null,
   isSpeaking,
+  isListening = false,
   avatarVariant = "female",
   size = 168,
   width,
@@ -256,6 +259,13 @@ export function AdvisorAvatar3D({
       : isSpeaking
         ? "speaking"
         : loadState;
+  const visualTone = status === "error"
+    ? "idle"
+    : isSpeaking
+      ? "speaking"
+      : isListening
+        ? "listening"
+        : "idle";
   const runtimeState: AvatarRuntimeState = modelUnavailable
     ? "error"
     : loadState === "error"
@@ -341,6 +351,11 @@ export function AdvisorAvatar3D({
         }
 
         headRef.current = head;
+        head.setView?.("upper", {
+          cameraDistance: -1.45,
+          cameraY: -0.55,
+          cameraRotateX: 0.02,
+        });
         head.lookAtCamera(1600);
         pushDebug("show_avatar_ready", {
           modelUrl: resolvedModelUrl,
@@ -495,12 +510,32 @@ export function AdvisorAvatar3D({
     styles.avatarShell,
     runtimeState === "ready" ? styles.avatarShellReady : "",
     status === "speaking" ? styles.avatarShellSpeaking : "",
+    visualTone === "listening" ? styles.avatarToneListening : "",
+    visualTone === "speaking" ? styles.avatarToneSpeaking : styles.avatarToneIdle,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const statusClassName = [
+    styles.avatarStatus,
+    visualTone === "listening"
+      ? styles.avatarStatusListening
+      : visualTone === "speaking"
+        ? styles.avatarStatusSpeaking
+        : styles.avatarStatusIdle,
   ]
     .filter(Boolean)
     .join(" ");
 
   return (
     <div className={shellClassName} style={avatarSizeStyle}>
+      <span className={styles.avatarAura} aria-hidden="true" />
+      <span className={styles.avatarGradientBorder} aria-hidden="true" />
+      <span className={`${styles.avatarSideRail} ${styles.avatarSideRailLeft}`} aria-hidden="true" />
+      <span className={`${styles.avatarSideRail} ${styles.avatarSideRailRight}`} aria-hidden="true" />
+      <span className={`${styles.avatarArc} ${styles.avatarArcTop}`} aria-hidden="true" />
+      <span className={`${styles.avatarArc} ${styles.avatarArcBottom}`} aria-hidden="true" />
+      <span className={styles.avatarSweep} aria-hidden="true" />
+
       {status === "error" || !resolvedModelUrl ? (
         fallbackImageSrc ? (
           <Image
@@ -539,14 +574,16 @@ export function AdvisorAvatar3D({
             </div>
           </div>
       </div>
-      <div className={styles.avatarStatus}>
+      <div className={statusClassName}>
         {status === "speaking"
           ? "Hablando"
-          : status === "ready"
-            ? "Listo"
-            : status === "loading"
-              ? "Preparando"
-              : "Visual"}
+          : isListening
+            ? "Escuchando"
+            : status === "ready"
+              ? "Listo"
+              : status === "loading"
+                ? "Preparando"
+                : "Visual"}
       </div>
     </div>
   );

@@ -971,6 +971,7 @@ export function AppShell({ children }: AppShellProps) {
   const [isDesktop, setIsDesktop] = useState(false);
   const [displayName, setDisplayName] = useState("Usuario");
   const [advisorChatOpen, setAdvisorChatOpen] = useState(false);
+  const [advisorChatAutoLaunchVoice, setAdvisorChatAutoLaunchVoice] = useState(false);
   const [advisorChatIndex, setAdvisorChatIndex] = useState<number | null>(null);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
@@ -1488,6 +1489,7 @@ export function AppShell({ children }: AppShellProps) {
     setAdvisorChatInput("");
     setAdvisorChatDebugPayload(null);
     setAdvisorChatMessages([]);
+    setAdvisorChatAutoLaunchVoice(true);
     setAdvisorChatOpen(true);
   }
 
@@ -2521,6 +2523,7 @@ export function AppShell({ children }: AppShellProps) {
 
       <AdvisorChatModal
         isOpen={advisorChatOpen}
+        autoLaunchVoice={advisorChatAutoLaunchVoice}
         advisorId={advisorChatIndex !== null ? ADVISOR_PROFILES[advisorChatIndex]?.id : undefined}
         advisorName={advisorChatIndex !== null ? ADVISOR_PROFILES[advisorChatIndex]?.name ?? "Adviser" : "Adviser"}
         advisorRole={advisorChatIndex !== null ? ADVISOR_PROFILES[advisorChatIndex]?.role ?? "" : ""}
@@ -2537,8 +2540,14 @@ export function AppShell({ children }: AppShellProps) {
         entryMode="advisor_conversation"
         onDraftChange={setAdvisorChatInput}
         onSend={() => void handleSendAdvisorMessage()}
-        onUseResponse={() => setAdvisorChatOpen(false)}
-        onClose={() => setAdvisorChatOpen(false)}
+        onUseResponse={() => {
+          setAdvisorChatAutoLaunchVoice(false);
+          setAdvisorChatOpen(false);
+        }}
+        onClose={() => {
+          setAdvisorChatAutoLaunchVoice(false);
+          setAdvisorChatOpen(false);
+        }}
         helperCopy={`Como estas hoy, ${displayName}? En que te puedo ayudar?`}
         debugPayload={advisorChatDebugPayload}
         autoSendOnVoiceComplete
