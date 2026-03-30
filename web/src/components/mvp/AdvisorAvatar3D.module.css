@@ -1,27 +1,76 @@
 .avatarShell {
+  --avatar-accent-rgb: 230, 238, 255;
+  --avatar-accent-soft-rgb: 186, 211, 255;
+  --avatar-accent-strong-rgb: 255, 255, 255;
   position: relative;
   z-index: 2;
   isolation: isolate;
   overflow: hidden;
   border-radius: 42px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
   background:
-    radial-gradient(circle at 50% 0%, rgba(133, 184, 255, 0.2) 0%, transparent 36%),
-    linear-gradient(180deg, rgba(14, 25, 40, 0.98) 0%, rgba(7, 15, 26, 1) 100%);
+    radial-gradient(circle at 50% 12%, rgba(var(--avatar-accent-rgb), 0.16) 0%, transparent 34%),
+    radial-gradient(circle at 50% 84%, rgba(117, 154, 214, 0.16) 0%, transparent 38%),
+    linear-gradient(180deg, rgba(10, 18, 31, 0.98) 0%, rgba(6, 12, 22, 1) 100%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 28px 54px rgba(3, 8, 20, 0.38);
+    0 34px 64px rgba(2, 7, 19, 0.48);
   transform-origin: center bottom;
+}
+
+.avatarShell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 1.5px;
+  border-radius: inherit;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(var(--avatar-accent-strong-rgb), 0.55) 0%,
+      rgba(var(--avatar-accent-rgb), 0.2) 18%,
+      rgba(var(--avatar-accent-rgb), 0.08) 52%,
+      rgba(var(--avatar-accent-soft-rgb), 0.4) 100%
+    );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: 0.92;
+  pointer-events: none;
 }
 
 .avatarShell::after {
   content: "";
   position: absolute;
-  inset: auto 14px 12px;
-  height: 32%;
+  inset: auto 24px 18px;
+  height: 21%;
   border-radius: 999px;
-  background: radial-gradient(circle, rgba(102, 160, 255, 0.18) 0%, rgba(102, 160, 255, 0) 72%);
+  background: radial-gradient(circle, rgba(var(--avatar-accent-rgb), 0.22) 0%, rgba(var(--avatar-accent-rgb), 0) 76%);
+  filter: blur(18px);
+  opacity: 0.9;
   pointer-events: none;
+}
+
+.avatarToneIdle {
+  --avatar-accent-rgb: 240, 246, 255;
+  --avatar-accent-soft-rgb: 181, 203, 228;
+  --avatar-accent-strong-rgb: 255, 255, 255;
+}
+
+.avatarToneListening {
+  --avatar-accent-rgb: 255, 92, 92;
+  --avatar-accent-soft-rgb: 255, 156, 156;
+  --avatar-accent-strong-rgb: 255, 233, 233;
+}
+
+.avatarToneSpeaking {
+  --avatar-accent-rgb: 77, 166, 255;
+  --avatar-accent-soft-rgb: 154, 214, 255;
+  --avatar-accent-strong-rgb: 230, 246, 255;
 }
 
 .avatarShellReady {
@@ -31,11 +80,131 @@
 .avatarShellSpeaking {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 28px 54px rgba(3, 8, 20, 0.42),
-    0 0 0 1px rgba(255, 228, 164, 0.14);
+    0 38px 74px rgba(2, 7, 19, 0.56),
+    0 0 0 1px rgba(var(--avatar-accent-rgb), 0.2);
+}
+
+.avatarAura,
+.avatarGradientBorder,
+.avatarSideRail,
+.avatarArc,
+.avatarSweep {
+  position: absolute;
+  pointer-events: none;
+}
+
+.avatarAura {
+  inset: -14%;
+  z-index: 0;
+  background:
+    radial-gradient(circle at 50% 18%, rgba(var(--avatar-accent-rgb), 0.24) 0%, rgba(var(--avatar-accent-rgb), 0.08) 24%, transparent 58%),
+    radial-gradient(circle at 50% 84%, rgba(var(--avatar-accent-soft-rgb), 0.18) 0%, transparent 42%);
+  filter: blur(18px);
+  animation: avatarAuraPulse 3.2s ease-in-out infinite;
+}
+
+.avatarGradientBorder {
+  inset: 9px;
+  z-index: 1;
+  border-radius: 34px;
+  background:
+    linear-gradient(180deg, rgba(var(--avatar-accent-rgb), 0.18) 0%, rgba(var(--avatar-accent-rgb), 0.02) 32%, rgba(var(--avatar-accent-rgb), 0.14) 100%);
+  opacity: 0.9;
+  filter: blur(0.4px);
+}
+
+.avatarSideRail {
+  top: 14%;
+  bottom: 17%;
+  width: 34px;
+  z-index: 2;
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(var(--avatar-accent-rgb), 0) 0%, rgba(var(--avatar-accent-rgb), 0.3) 22%, rgba(var(--avatar-accent-rgb), 0.48) 50%, rgba(var(--avatar-accent-rgb), 0.18) 78%, rgba(var(--avatar-accent-rgb), 0) 100%);
+  opacity: 0.88;
+  filter: blur(0.5px);
+}
+
+.avatarSideRail::before,
+.avatarSideRail::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 999px;
+}
+
+.avatarSideRail::before {
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: linear-gradient(180deg, rgba(var(--avatar-accent-rgb), 0) 0%, rgba(var(--avatar-accent-rgb), 0.88) 50%, rgba(var(--avatar-accent-rgb), 0) 100%);
+}
+
+.avatarSideRail::after {
+  top: 18%;
+  bottom: 18%;
+  width: 12px;
+  border: 1px solid rgba(var(--avatar-accent-rgb), 0.2);
+}
+
+.avatarSideRailLeft {
+  left: 12px;
+}
+
+.avatarSideRailRight {
+  right: 12px;
+}
+
+.avatarArc {
+  left: 50%;
+  z-index: 2;
+  transform: translateX(-50%);
+  border-radius: 999px;
+}
+
+.avatarArcTop {
+  top: 16px;
+  width: calc(100% - 112px);
+  height: 82px;
+  border-top: 1.5px solid rgba(var(--avatar-accent-rgb), 0.6);
+  border-left: 1px solid rgba(var(--avatar-accent-rgb), 0.14);
+  border-right: 1px solid rgba(var(--avatar-accent-rgb), 0.14);
+  opacity: 0.9;
+}
+
+.avatarArcBottom {
+  bottom: 18px;
+  width: calc(100% - 88px);
+  height: 118px;
+  border-bottom: 1.5px solid rgba(var(--avatar-accent-rgb), 0.38);
+  border-left: 1px solid rgba(var(--avatar-accent-rgb), 0.12);
+  border-right: 1px solid rgba(var(--avatar-accent-rgb), 0.12);
+  opacity: 0.82;
+}
+
+.avatarSweep {
+  inset: 18px;
+  z-index: 1;
+  border-radius: 30px;
+  background:
+    conic-gradient(
+      from 210deg at 50% 52%,
+      rgba(var(--avatar-accent-rgb), 0) 0deg,
+      rgba(var(--avatar-accent-rgb), 0.2) 34deg,
+      rgba(var(--avatar-accent-rgb), 0) 118deg,
+      rgba(var(--avatar-accent-rgb), 0.14) 202deg,
+      rgba(var(--avatar-accent-rgb), 0) 300deg,
+      rgba(var(--avatar-accent-rgb), 0.18) 360deg
+    );
+  opacity: 0.56;
+  filter: blur(16px);
+  animation: avatarSweepRotate 8s linear infinite;
 }
 
 .avatarCanvas {
+  position: relative;
+  z-index: 3;
   width: 100%;
   height: 100%;
 }
@@ -43,14 +212,19 @@
 .avatarCanvas :global(canvas) {
   width: 100% !important;
   height: 100% !important;
+  transform: translateY(-5.5%) scale(1.12);
+  transform-origin: center 28%;
 }
 
 .avatarFallbackImage {
   object-fit: cover;
-  object-position: center 18%;
+  object-position: center 12%;
+  z-index: 3;
 }
 
 .avatarFallbackInitial {
+  position: relative;
+  z-index: 3;
   width: 100%;
   height: 100%;
   display: flex;
@@ -60,14 +234,14 @@
   font-weight: 700;
   color: rgba(255, 255, 255, 0.95);
   background:
-    radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.18) 0%, transparent 30%),
-    linear-gradient(180deg, rgba(45, 107, 228, 0.92) 0%, rgba(18, 45, 94, 0.96) 100%);
+    radial-gradient(circle at 50% 18%, rgba(var(--avatar-accent-strong-rgb), 0.18) 0%, transparent 30%),
+    linear-gradient(180deg, rgba(34, 70, 122, 0.94) 0%, rgba(9, 21, 40, 0.98) 100%);
 }
 
 .avatarLoadingOverlay {
   position: absolute;
   inset: 16px;
-  z-index: 4;
+  z-index: 8;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -199,41 +373,36 @@
 .avatarStatus {
   position: absolute;
   left: 50%;
-  top: 14px;
+  top: 16px;
   transform: translateX(-50%);
-  min-height: 28px;
+  min-height: 30px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0 12px;
+  padding: 0 14px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(var(--avatar-accent-rgb), 0.22);
   background: rgba(8, 16, 27, 0.56);
-  color: rgba(239, 246, 255, 0.84);
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  backdrop-filter: blur(8px);
-  z-index: 3;
+  backdrop-filter: blur(10px);
+  z-index: 7;
 }
 
-.avatarError {
-  position: absolute;
-  left: 50%;
-  bottom: 16px;
-  z-index: 3;
-  transform: translateX(-50%);
-  width: calc(100% - 28px);
-  padding: 10px 12px;
-  border-radius: 18px;
-  border: 1px solid rgba(203, 213, 225, 0.45);
-  background: rgba(248, 250, 252, 0.94);
-  color: rgba(127, 29, 29, 0.88);
-  text-align: center;
-  font-size: 11px;
-  line-height: 1.45;
-  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+.avatarStatusIdle {
+  color: rgba(246, 249, 255, 0.88);
+}
+
+.avatarStatusListening {
+  color: rgba(255, 216, 216, 0.96);
+  background: rgba(44, 10, 10, 0.46);
+}
+
+.avatarStatusSpeaking {
+  color: rgba(222, 244, 255, 0.98);
+  background: rgba(5, 27, 46, 0.46);
 }
 
 @keyframes avatarEnter {
@@ -274,5 +443,51 @@
   }
   100% {
     transform: translateX(-82%);
+  }
+}
+
+@keyframes avatarAuraPulse {
+  0%,
+  100% {
+    transform: scale(0.97);
+    opacity: 0.76;
+  }
+  50% {
+    transform: scale(1.02);
+    opacity: 1;
+  }
+}
+
+@keyframes avatarSweepRotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 640px) {
+  .avatarShell {
+    border-radius: 38px;
+  }
+
+  .avatarCanvas :global(canvas) {
+    transform: translateY(-6.8%) scale(1.15);
+    transform-origin: center 26%;
+  }
+
+  .avatarSideRail {
+    top: 13%;
+    bottom: 15%;
+  }
+
+  .avatarArcTop {
+    width: calc(100% - 92px);
+  }
+
+  .avatarArcBottom {
+    width: calc(100% - 68px);
+    height: 106px;
   }
 }
