@@ -979,47 +979,65 @@ export function AdvisorChatModal({
               </div>
             </header>
 
-            <div className={`${styles.cpBody} flex min-h-0 flex-1 flex-col`}>
-              <div className={`${styles.cpConversation} min-h-0 flex-1 overflow-y-auto px-5 pb-3 pt-5`}>
-                {messages.length === 0 ? (
-                  <div className="max-w-[80%]">
-                    <p className={styles.cpLabelAdvisor}>{advisorName.toUpperCase()}</p>
-                    <div className={`${styles.cpBubbleAdvisor} px-4 py-3 text-[14px] leading-[1.55]`}>{helperText}</div>
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-3">
-                    {messages.map((message) => (
-                      <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-                        <div className={message.role === "user" ? "max-w-[70%]" : "max-w-[80%]"}>
-                          <p className={message.role === "user" ? styles.cpLabelUser : styles.cpLabelAdvisor}>
-                            {message.role === "user" ? "TU" : advisorName.toUpperCase()}
-                          </p>
-                          <div className={`whitespace-pre-wrap break-words px-[14px] py-[10px] text-[14px] leading-[1.55] ${message.role === "user" ? styles.cpBubbleUser : styles.cpBubbleAdvisor}`}>
-                            {message.text}
+            <div className={styles.cpShell}>
+              <div className={`${styles.cpBody} flex min-h-0 flex-1 flex-col`}>
+                <div className={`${styles.cpConversation} min-h-0 flex-1 overflow-y-auto px-5 pb-3 pt-5`}>
+                  {messages.length === 0 ? (
+                    <div className="max-w-[80%]">
+                      <p className={styles.cpLabelAdvisor}>{advisorName.toUpperCase()}</p>
+                      <div className={`${styles.cpBubbleAdvisor} px-4 py-3 text-[14px] leading-[1.55]`}>{helperText}</div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-3">
+                      {messages.map((message) => (
+                        <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
+                          <div className={message.role === "user" ? "max-w-[70%]" : "max-w-[80%]"}>
+                            <p className={message.role === "user" ? styles.cpLabelUser : styles.cpLabelAdvisor}>
+                              {message.role === "user" ? "TU" : advisorName.toUpperCase()}
+                            </p>
+                            <div className={`whitespace-pre-wrap break-words px-[14px] py-[10px] text-[14px] leading-[1.55] ${message.role === "user" ? styles.cpBubbleUser : styles.cpBubbleAdvisor}`}>
+                              {message.text}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <footer className={`${styles.cpFooter} px-4 py-3`}>
+                  <div className="mb-2 flex items-end gap-2">
+                    <Textarea id="advisor-chat-draft" value={draft} onChange={(event) => onDraftChange(event.target.value)} rows={1} spellCheck={false} placeholder={inputPlaceholder} onKeyDown={(event: KeyboardEvent<HTMLTextAreaElement>) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); if (!sending && draft.trim()) onSend(); } }} className={`${styles.cpTextarea} min-h-[42px] max-h-[120px] flex-1 px-[14px] py-[10px] text-[14px] focus:ring-0`} />
+                    <button type="button" onClick={() => openVoice()} className={styles.cpMicBtn} aria-label="Dictar para el advisor"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10a7 7 0 0 0 14 0" /><path d="M12 19v3" /><path d="M8 22h8" /></svg></button>
+                    <Button type="button" variant="primary" disabled={sending || !draft.trim()} onClick={onSend} className={`${styles.cpSendBtn} h-[42px] px-[18px] text-[14px] font-semibold`}>{sending ? "Enviando..." : "Enviar"}</Button>
                   </div>
-                )}
+                  <div className="flex items-center justify-between gap-2">
+                    {canUseSuggestedReply ? (
+                      <Button type="button" variant="secondary" onClick={onUseResponse} className={`${styles.cpUseBtn} px-[14px] py-[7px] text-[13px]`}>Usar respuesta sugerida</Button>
+                    ) : <span />}
+                    <div className="flex items-center gap-3">
+                      <span className={styles.cpVoiceWarmupStatus}>{voiceWarmupCopy}</span>
+                      {isDevelopment && debugPayload ? <details className="text-right"><summary className="cursor-pointer text-[11px]">Debug prompt (solo desarrollo)</summary><pre className="mt-2 max-h-40 overflow-auto rounded-lg p-2 text-left text-[11px]">{JSON.stringify(debugPayload, null, 2)}</pre></details> : null}
+                    </div>
+                  </div>
+                </footer>
               </div>
 
-              <footer className={`${styles.cpFooter} px-4 py-3`}>
-              <div className="mb-2 flex items-end gap-2">
-                <Textarea id="advisor-chat-draft" value={draft} onChange={(event) => onDraftChange(event.target.value)} rows={1} spellCheck={false} placeholder={inputPlaceholder} onKeyDown={(event: KeyboardEvent<HTMLTextAreaElement>) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); if (!sending && draft.trim()) onSend(); } }} className={`${styles.cpTextarea} min-h-[42px] max-h-[120px] flex-1 px-[14px] py-[10px] text-[14px] focus:ring-0`} />
-                <button type="button" onClick={() => openVoice()} className={styles.cpMicBtn} aria-label="Dictar para el advisor"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10a7 7 0 0 0 14 0" /><path d="M12 19v3" /><path d="M8 22h8" /></svg></button>
-                <Button type="button" variant="primary" disabled={sending || !draft.trim()} onClick={onSend} className={`${styles.cpSendBtn} h-[42px] px-[18px] text-[14px] font-semibold`}>{sending ? "Enviando..." : "Enviar"}</Button>
-              </div>
-              <div className="flex items-center justify-between gap-2">
-                {canUseSuggestedReply ? (
-                  <Button type="button" variant="secondary" onClick={onUseResponse} className={`${styles.cpUseBtn} px-[14px] py-[7px] text-[13px]`}>Usar respuesta sugerida</Button>
-                ) : <span />}
-                <div className="flex items-center gap-3">
-                  <span className={styles.cpVoiceWarmupStatus}>{voiceWarmupCopy}</span>
-                  {isDevelopment && debugPayload ? <details className="text-right"><summary className="cursor-pointer text-[11px]">Debug prompt (solo desarrollo)</summary><pre className="mt-2 max-h-40 overflow-auto rounded-lg p-2 text-left text-[11px]">{JSON.stringify(debugPayload, null, 2)}</pre></details> : null}
+              <aside className={styles.cpAside}>
+                <div className={styles.cpAsideVisual}>
+                  {heroAvatar ? (
+                    <Image src={heroAvatar} alt={advisorName} width={240} height={240} className={styles.cpVisualAvatar} />
+                  ) : (
+                    <span className={styles.cpVisualFallback}>{getInitials(advisorName) || "A"}</span>
+                  )}
                 </div>
-              </div>
-            </footer>
+                <span className={styles.cpStatusBadge}>
+                  {sending ? "Respondiendo" : "Disponible"}
+                </span>
+                <p className={styles.cpAsideCopy}>
+                  {advisorDescription || `${advisorName} te ayuda a bajar ruido emocional y encontrar una respuesta mas clara.`}
+                </p>
+              </aside>
             </div>
           </div>
         </div>

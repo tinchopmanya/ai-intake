@@ -33,9 +33,10 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 18px 0 20px;
-  background: #0f1117;
+  background: rgba(9, 15, 22, 0.92);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: none;
+  backdrop-filter: blur(10px);
 }
 
 .shellBrand {
@@ -69,8 +70,8 @@
   height: 38px;
   border-radius: 14px;
   border: 1px solid rgba(45, 107, 228, 0.32);
-  background: rgba(29, 34, 48, 0.96);
-  color: #78b3ff;
+  background: rgba(17, 32, 51, 0.72);
+  color: rgba(220, 231, 245, 0.82);
   padding: 0 15px;
   font-size: 13px;
   font-weight: 500;
@@ -225,7 +226,7 @@
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
-  width: 48px;
+  width: 64px;
   background: linear-gradient(180deg, rgba(13, 24, 37, 0.98) 0%, rgba(8, 17, 26, 0.98) 100%);
   border-right: 1px solid var(--separator);
   height: calc(100vh - 56px);
@@ -235,7 +236,7 @@
 }
 
 .shellSidebarExpanded {
-  width: 320px;
+  width: 260px;
 }
 
 .shellSidebarHeader {
@@ -260,10 +261,7 @@
 }
 
 .shellSidebarSubtitle {
-  max-width: 220px;
-  font-size: 12px;
-  line-height: 1.45;
-  color: rgba(220, 231, 245, 0.58);
+  display: none;
 }
 
 .shellSidebarToggle {
@@ -480,10 +478,7 @@
 }
 
 .processSectionCopy {
-  margin-top: 4px;
-  font-size: 11.5px;
-  line-height: 1.55;
-  color: rgba(223, 235, 248, 0.62);
+  display: none;
 }
 
 .processSectionBody {
@@ -3013,10 +3008,87 @@
   align-items: start;
 }
 
+.wizardUnifiedLayout {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1.18fr) minmax(320px, 0.82fr);
+  align-items: start;
+}
+
 .wizardAnalysisColumn {
   display: grid;
   gap: 10px;
   min-width: 0;
+}
+
+.wizardUnifiedSection {
+  display: grid;
+  gap: 12px;
+}
+
+.wizardUnifiedSectionHeader {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.wizardUnifiedSectionCopy {
+  margin-top: 5px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: rgba(229, 239, 248, 0.7);
+}
+
+.wizardResultAside {
+  display: grid;
+  gap: 12px;
+}
+
+.wizardResultAsideCard {
+  gap: 10px;
+  padding: 16px;
+  border-color: rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(circle at top left, rgba(45, 107, 228, 0.08) 0%, transparent 26%),
+    linear-gradient(180deg, rgba(15, 27, 39, 0.98) 0%, rgba(10, 21, 32, 0.98) 100%);
+}
+
+.wizardResultPanelTitle {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(186, 213, 244, 0.74);
+}
+
+.wizardResultOriginalMessage {
+  white-space: pre-wrap;
+  font-size: 12px;
+  line-height: 1.65;
+  color: rgba(226, 240, 255, 0.78);
+}
+
+.wizardResultDraftTextarea {
+  min-height: 180px;
+  border-radius: 18px !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background: rgba(8, 17, 26, 0.58) !important;
+  color: rgba(248, 251, 255, 0.92) !important;
+  padding: 14px 15px !important;
+  font-size: 13px !important;
+  line-height: 1.65 !important;
+}
+
+.wizardResultObjectiveCopy {
+  font-size: 13px;
+  line-height: 1.6;
+  color: rgba(248, 251, 255, 0.88);
+}
+
+.wizardResultAsideActions {
+  display: grid;
+  gap: 10px;
 }
 
 .wizardAnalysisCompactCard {
@@ -3748,6 +3820,7 @@
   }
 
   .wizardAnalysisLayout,
+  .wizardUnifiedLayout,
   .wizardAnalysisMetaGrid {
     grid-template-columns: minmax(0, 1fr);
   }

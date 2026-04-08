@@ -16,6 +16,8 @@ import type { EmotionalCheckinSummary } from "@/lib/api/types";
 type FlowView = "entry" | "wizard";
 type SelectorIntent = "vent" | "write_to_ex";
 type SelectorCardVariant = "calm" | "structured" | "direct";
+type HomeInputMode = "write" | "capture" | "voice";
+type CheckinFlow = "edit" | "post_session";
 type ResumeCta = ConversationResumeState & {
   ctaLabel: string;
   helperText: string;
@@ -64,6 +66,14 @@ const CHILDREN_INTERACTION_OPTIONS: CheckinOption[] = [
   { value: 3, label: "Normal" },
   { value: 4, label: "Tranquila" },
   { value: 5, label: "Muy bien" },
+];
+
+const SESSION_OUTCOME_OPTIONS: CheckinOption[] = [
+  { value: 1, label: "Mas tenso/a" },
+  { value: 2, label: "Algo cargado/a" },
+  { value: 3, label: "Igual que antes" },
+  { value: 4, label: "Mas claro/a" },
+  { value: 5, label: "Mas tranquilo/a" },
 ];
 
 const ADVISOR_MICROCOPY: Record<string, string> = {
@@ -445,8 +455,14 @@ export function MvpEntryFlow() {
   const [preferredAdvisorId, setPreferredAdvisorId] = useState<string | null>(null);
   const [wizardKey, setWizardKey] = useState(0);
   const [resumeState, setResumeState] = useState<ConversationResumeState | null>(null);
+  const [entryInputMode, setEntryInputMode] = useState<HomeInputMode>("write");
+  const [entryMessageText, setEntryMessageText] = useState("");
+  const [wizardInitialInput, setWizardInitialInput] = useState<string | null>(null);
+  const [wizardInitialMode, setWizardInitialMode] = useState<HomeInputMode>("write");
+  const [wizardAutoSubmit, setWizardAutoSubmit] = useState(false);
   const [historyPanelOpen, setHistoryPanelOpen] = useState(false);
   const [checkinModalOpen, setCheckinModalOpen] = useState(false);
+  const [checkinFlow, setCheckinFlow] = useState<CheckinFlow>("post_session");
   const [, setCheckinDismissedForVisit] = useState(false);
   const [checkinSubmitting, setCheckinSubmitting] = useState(false);
   const [checkinError, setCheckinError] = useState<string | null>(null);
@@ -456,6 +472,7 @@ export function MvpEntryFlow() {
   const [draftRecentContact, setDraftRecentContact] = useState<boolean | null>(null);
   const [draftRelationshipLevel, setDraftRelationshipLevel] = useState<number | null>(null);
   const [draftChildrenInteractionLevel, setDraftChildrenInteractionLevel] = useState<number | null>(null);
+  const [draftSessionOutcomeLevel, setDraftSessionOutcomeLevel] = useState<number | null>(4);
 
   function syncCheckinDrafts(checkin: EmotionalCheckinSummary | null) {
     setDraftMoodLevel(checkin?.mood_level ?? null);
@@ -463,6 +480,7 @@ export function MvpEntryFlow() {
     setDraftRecentContact(checkin?.recent_contact ?? null);
     setDraftRelationshipLevel(checkin?.vinculo_expareja ?? null);
     setDraftChildrenInteractionLevel(checkin?.interaccion_hijos ?? null);
+    setDraftSessionOutcomeLevel(4);
   }
 
   useEffect(() => {
@@ -482,11 +500,9 @@ export function MvpEntryFlow() {
         const existingCheckin = response.today_checkin ?? null;
         setTodayCheckin(existingCheckin);
         syncCheckinDrafts(existingCheckin);
-        setCheckinModalOpen(true);
       } catch {
         if (!mounted) return;
         syncCheckinDrafts(null);
-        setCheckinModalOpen(true);
       }
     }
     void loadTodayCheckin();
@@ -638,10 +654,18 @@ export function MvpEntryFlow() {
 
   function enterWizard(
     nextPreferredAdvisorId: string | null,
-    options?: { resumeState?: ConversationResumeState | null },
+    options?: {
+      resumeState?: ConversationResumeState | null;
+      initialInput?: string | null;
+      initialStepInputMode?: HomeInputMode;
+      autoSubmit?: boolean;
+    },
   ) {
     setPreferredAdvisorId(nextPreferredAdvisorId);
     setResumeState(options?.resumeState ?? null);
+    setWizardInitialInput(options?.initialInput ?? null);
+    setWizardInitialMode(options?.initialStepInputMode ?? "write");
+    setWizardAutoSubmit(options?.autoSubmit ?? false);
     setWizardKey((current) => current + 1);
     setView("wizard");
   }
@@ -659,17 +683,30 @@ export function MvpEntryFlow() {
   function handleConfirmAdvisor() {
     persistAdvisorPreference();
     setSelectorIntent(null);
-    enterWizard(selectedAdvisor.id);
+    enterWizard(selectedAdvisor.id, {
+      initialInput: entryMessageText.trim() || null,
+      initialStepInputMode: "write",
+      autoSubmit: Boolean(entryMessageText.trim()),
+    });
   }
 
   function handleAnalyzeConversation() {
-    enterWizard(null);
+    const normalizedMessage = entryMessageText.trim();
+    if (!normalizedMessage) return;
+    enterWizard(null, {
+      initialInput: normalizedMessage,
+      initialStepInputMode: "write",
+      autoSubmit: true,
+    });
   }
 
   function handleReturnToEntry() {
     setResumeState(null);
     setPreferredAdvisorId(null);
     setSelectorIntent(null);
+    setWizardInitialInput(null);
+    setWizardAutoSubmit(false);
+    setWizardInitialMode("write");
     setView("entry");
   }
 
@@ -684,6 +721,15 @@ export function MvpEntryFlow() {
     syncCheckinDrafts(todayCheckin);
     setCheckinError(null);
     setCheckinDismissedForVisit(false);
+    setCheckinFlow("edit");
+    setCheckinModalOpen(true);
+  }
+
+  function handleOpenPostSessionCheckin() {
+    syncCheckinDrafts(todayCheckin);
+    setCheckinError(null);
+    setCheckinDismissedForVisit(false);
+    setCheckinFlow("post_session");
     setCheckinModalOpen(true);
   }
 
@@ -710,6 +756,9 @@ export function MvpEntryFlow() {
         window.dispatchEvent(new Event("mvp:memory-updated"));
       }
       setCheckinModalOpen(false);
+      if (checkinFlow === "post_session") {
+        handleReturnToEntry();
+      }
     } catch (error) {
       setCheckinError(toUiErrorMessage(error, "No pudimos guardar tu check-in por ahora."));
     } finally {
@@ -721,6 +770,9 @@ export function MvpEntryFlow() {
     setCheckinDismissedForVisit(true);
     setCheckinModalOpen(false);
     setCheckinError(null);
+    if (checkinFlow === "post_session") {
+      handleReturnToEntry();
+    }
   }
 
   return (
@@ -728,6 +780,125 @@ export function MvpEntryFlow() {
       {view === "entry" ? (
         <div className={`${styles.viewport} ${styles.entryViewport}`}>
           <div className={styles.entryShell}>
+            <section className={styles.homePanel}>
+              <div className={styles.homeHero}>
+                <p className={styles.homeEyebrow}>ExReply â€” tu espacio para pensar antes de responder</p>
+                <h1 className={styles.homeTitle}>Â¿QuÃ© pasÃ³ con tu ex hoy?</h1>
+                <p className={styles.homeSubcopy}>
+                  PegÃ¡ el mensaje, contanos la situaciÃ³n o subÃ­ una captura. Tres consejeros te ayudan a responder con claridad.
+                </p>
+              </div>
+
+              <section className={styles.homeInputCard}>
+                <div className={styles.homeInputTabs}>
+                  <button
+                    type="button"
+                    className={`${styles.homeInputTab} ${entryInputMode === "write" ? styles.homeInputTabActive : ""}`}
+                    onClick={() => setEntryInputMode("write")}
+                  >
+                    Escribir
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.homeInputTab} ${entryInputMode === "capture" ? styles.homeInputTabActive : ""}`}
+                    onClick={() => setEntryInputMode("capture")}
+                  >
+                    Captura
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.homeInputTab} ${entryInputMode === "voice" ? styles.homeInputTabActive : ""}`}
+                    onClick={() => setEntryInputMode("voice")}
+                  >
+                    Voz
+                  </button>
+                </div>
+
+                <div className={styles.homeInputBody}>
+                  {entryInputMode === "write" ? (
+                    <textarea
+                      value={entryMessageText}
+                      onChange={(event) => setEntryMessageText(event.target.value)}
+                      className={styles.homeTextarea}
+                      placeholder='PegÃ¡ el mensaje o contanos con tus palabras quÃ© pasÃ³. Ej: "Me mandÃ³ un audio diciendo que quiere cambiar el rÃ©gimen de visitas..."'
+                    />
+                  ) : (
+                    <div className={styles.homeAssistCard}>
+                      <p className={styles.homeAssistTitle}>
+                        {entryInputMode === "capture"
+                          ? "La carga por captura sigue usando el flujo real de OCR."
+                          : "El dictado sigue usando el flujo real de voz."}
+                      </p>
+                      <p className={styles.homeAssistCopy}>
+                        {entryInputMode === "capture"
+                          ? "Abrimos el paso real de captura para que subas la imagen y revises el texto antes del anÃ¡lisis."
+                          : "Abrimos el paso real de voz para que dictes y revises el texto antes del anÃ¡lisis."}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className={styles.homeInputFooter}>
+                    <span className={styles.homeInputHint}>Tu conversaciÃ³n no se comparte con nadie.</span>
+                    <button
+                      type="button"
+                      className={styles.homePrimaryButton}
+                      onClick={() => {
+                        if (entryInputMode === "write") {
+                          handleAnalyzeConversation();
+                          return;
+                        }
+                        enterWizard(null, {
+                          initialInput: entryMessageText.trim() || null,
+                          initialStepInputMode: entryInputMode,
+                          autoSubmit: false,
+                        });
+                      }}
+                      disabled={entryInputMode === "write" && !entryMessageText.trim()}
+                    >
+                      {entryInputMode === "write" ? "Ver quÃ© dicen los consejeros" : "Continuar con este modo"}
+                    </button>
+                  </div>
+                </div>
+              </section>
+
+              <div className={styles.quickActions}>
+                <button type="button" className={styles.quickActionCard} onClick={() => openSelector("vent")}>
+                  <span className={styles.quickActionTitle}>Solo quiero desahogarme</span>
+                  <span className={styles.quickActionCopy}>EntrÃ¡ directo a hablar con un advisor sin analizar nada concreto.</span>
+                </button>
+                <button type="button" className={styles.quickActionCard} onClick={() => openSelector("write_to_ex")}>
+                  <span className={styles.quickActionTitle}>Quiero escribirle a mi ex</span>
+                  <span className={styles.quickActionCopy}>ElegÃ­ un advisor y seguÃ­ con el flujo real de redacciÃ³n.</span>
+                </button>
+              </div>
+
+              {(activeConversationSummary || sidebarConversation || todayCheckin) ? (
+                <section className={styles.homeContextStrip}>
+                  {todayCheckin ? (
+                    <button type="button" className={styles.homeContextCard} onClick={handleOpenCheckinEditor}>
+                      <span className={styles.homeContextLabel}>Estado de hoy</span>
+                      <span className={styles.homeContextValue}>{checkinSummaryLine ?? "Check-in disponible"}</span>
+                    </button>
+                  ) : null}
+                  {sidebarConversation && lastSessionMeta ? (
+                    <div className={styles.homeContextCard}>
+                      <span className={styles.homeContextLabel}>Ãšltima sesiÃ³n</span>
+                      <span className={styles.homeContextValue}>{sessionTitleLabel} Â· {lastSessionMeta}</span>
+                    </div>
+                  ) : null}
+                  {activeConversationSummary ? (
+                    <button type="button" className={styles.homeContextCard} onClick={handleResumeConversation}>
+                      <span className={styles.homeContextLabel}>Retomar</span>
+                      <span className={styles.homeContextValue}>
+                        {activeConversationResume?.ctaLabel ?? `${getSavedItemsLabel(activeConversationSummary!.count)} guardados`}
+                      </span>
+                    </button>
+                  ) : null}
+                </section>
+              ) : null}
+            </section>
+
+            {false ? (
             <section className={styles.entryPanel}>
               <div className={styles.entryBody}>
                 <div>
@@ -799,15 +970,15 @@ export function MvpEntryFlow() {
                           ) : activeConversationSummary ? (
                             <>
                               <p className={styles.historySummaryText}>
-                                {getSavedItemsLabel(activeConversationSummary.count)} · {activeConversationSummary.lastTypeLabel}
+                                {getSavedItemsLabel(activeConversationSummary!.count)} · {activeConversationSummary!.lastTypeLabel}
                               </p>
-                              <p className={styles.historySummaryPreview}>{activeConversationSummary.preview}</p>
+                              <p className={styles.historySummaryPreview}>{activeConversationSummary!.preview}</p>
                               {activeConversationResume ? (
                                 <div className={styles.historySummaryActions}>
-                                  <p className={styles.historySummaryHint}>{activeConversationResume.helperText}</p>
-                                  {activeConversationResume.previewText ? (
+                                  <p className={styles.historySummaryHint}>{activeConversationResume!.helperText}</p>
+                                  {activeConversationResume!.previewText ? (
                                     <p className={styles.historySummaryResumePreview}>
-                                      {activeConversationResume.previewText}
+                                      {activeConversationResume!.previewText}
                                     </p>
                                   ) : null}
                                   <div className={styles.historySummaryButtonRow}>
@@ -816,7 +987,7 @@ export function MvpEntryFlow() {
                                       className={styles.historySummaryButton}
                                       onClick={handleResumeConversation}
                                     >
-                                      {activeConversationResume.ctaLabel}
+                                      {activeConversationResume!.ctaLabel}
                                     </button>
                                     <button
                                       type="button"
@@ -940,9 +1111,9 @@ export function MvpEntryFlow() {
                           <div className={styles.todayStateMetrics}>
                             <TodayStateMetric
                               label="Animo"
-                              value={getMoodSummaryLabel(todayCheckin.mood_level) ?? "Sin registrar"}
-                              percent={getCheckinPercent(todayCheckin.mood_level)}
-                              tone={getCheckinTone(todayCheckin.mood_level)}
+                              value={getMoodSummaryLabel(todayCheckin!.mood_level) ?? "Sin registrar"}
+                              percent={getCheckinPercent(todayCheckin!.mood_level)}
+                              tone={getCheckinTone(todayCheckin!.mood_level)}
                               icon={
                                 <svg viewBox="0 0 20 20" className={styles.todayStateMetricSvg} fill="none">
                                   <path
@@ -957,9 +1128,9 @@ export function MvpEntryFlow() {
                             />
                             <TodayStateMetric
                               label="Confianza"
-                              value={getConfidenceSummaryLabel(todayCheckin.confidence_level) ?? "Sin registrar"}
-                              percent={getCheckinPercent(todayCheckin.confidence_level)}
-                              tone={getCheckinTone(todayCheckin.confidence_level)}
+                              value={getConfidenceSummaryLabel(todayCheckin!.confidence_level) ?? "Sin registrar"}
+                              percent={getCheckinPercent(todayCheckin!.confidence_level)}
+                              tone={getCheckinTone(todayCheckin!.confidence_level)}
                               icon={
                                 <svg viewBox="0 0 20 20" className={styles.todayStateMetricSvg} fill="none">
                                   <path
@@ -977,10 +1148,10 @@ export function MvpEntryFlow() {
                             <span className={styles.todayStateFooterLabel}>Contacto reciente</span>
                             <span
                               className={`${styles.todayStateContactChip} ${
-                                todayCheckin.recent_contact ? styles.todayStateContactChipAlert : styles.todayStateContactChipCalm
+                                todayCheckin!.recent_contact ? styles.todayStateContactChipAlert : styles.todayStateContactChipCalm
                               }`}
                             >
-                              {getRecentContactSummary(todayCheckin.recent_contact)}
+                              {getRecentContactSummary(todayCheckin!.recent_contact)}
                             </span>
                           </div>
                         </section>
@@ -1009,15 +1180,15 @@ export function MvpEntryFlow() {
                               ) : activeConversationSummary ? (
                                 <>
                                   <p className={styles.historySummaryText}>
-                                    {getSavedItemsLabel(activeConversationSummary.count)} · {activeConversationSummary.lastTypeLabel}
+                                    {getSavedItemsLabel(activeConversationSummary!.count)} · {activeConversationSummary!.lastTypeLabel}
                                   </p>
-                                  <p className={styles.historySummaryPreview}>{activeConversationSummary.preview}</p>
+                                  <p className={styles.historySummaryPreview}>{activeConversationSummary!.preview}</p>
                                   {activeConversationResume ? (
                                     <div className={styles.historySummaryActions}>
-                                      <p className={styles.historySummaryHint}>{activeConversationResume.helperText}</p>
-                                      {activeConversationResume.previewText ? (
+                                      <p className={styles.historySummaryHint}>{activeConversationResume!.helperText}</p>
+                                      {activeConversationResume!.previewText ? (
                                         <p className={styles.historySummaryResumePreview}>
-                                          {activeConversationResume.previewText}
+                                          {activeConversationResume!.previewText}
                                         </p>
                                       ) : null}
                                       <div className={styles.historySummaryButtonRow}>
@@ -1026,7 +1197,7 @@ export function MvpEntryFlow() {
                                           className={styles.historySummaryButton}
                                           onClick={handleResumeConversation}
                                         >
-                                          {activeConversationResume.ctaLabel}
+                                          {activeConversationResume!.ctaLabel}
                                         </button>
                                         <button
                                           type="button"
@@ -1057,6 +1228,7 @@ export function MvpEntryFlow() {
                 </p>
               </div>
             </section>
+            ) : null}
           </div>
         </div>
       ) : (
@@ -1081,12 +1253,16 @@ export function MvpEntryFlow() {
               preferredAdvisorId={preferredAdvisorId}
               resumeState={resumeState}
               onExitToEntry={handleReturnToEntry}
+              onSaveSession={handleOpenPostSessionCheckin}
+              initialInput={wizardInitialInput}
+              initialStepInputMode={wizardInitialMode}
+              autoSubmitFromEntry={wizardAutoSubmit}
             />
           </div>
         </div>
       )}
 
-      {checkinModalOpen && view === "entry" ? (
+      {checkinModalOpen ? (
         <div className={styles.checkinBackdrop} role="presentation">
           <section
             className={styles.checkinModal}
@@ -1112,7 +1288,9 @@ export function MvpEntryFlow() {
             </button>
 
             <div className={styles.checkinHeader}>
-              <p className={styles.checkinEyebrow}>Check-in diario</p>
+              <p className={styles.checkinEyebrow}>
+                {checkinFlow === "post_session" ? "Cierre de sesión" : "Check-in diario"}
+              </p>
               <h2 id="daily-checkin-title" className={styles.checkinTitle}>
                 Antes de empezar, ¿cómo estás hoy?
               </h2>
@@ -1144,6 +1322,15 @@ export function MvpEntryFlow() {
                 onChange={setDraftRelationshipLevel}
                 className={styles.checkinQuestionSpanTwo}
               />
+              {checkinFlow === "post_session" ? (
+                <CheckinSliderQuestion
+                  title="?C?mo te fuiste de esta sesi?n?"
+                  options={SESSION_OUTCOME_OPTIONS}
+                  value={draftSessionOutcomeLevel}
+                  onChange={setDraftSessionOutcomeLevel}
+                  className={styles.checkinQuestionSpanTwo}
+                />
+              ) : null}
 
               <section
                 className={`${styles.checkinQuestionBlock} ${
@@ -1203,7 +1390,7 @@ export function MvpEntryFlow() {
 
             <div className={styles.checkinActions}>
               <button type="button" className={styles.checkinSecondary} onClick={handleSkipCheckinForVisit}>
-                Omitir por hoy
+                {checkinFlow === "post_session" ? "Omitir" : "Omitir por hoy"}
               </button>
               <button
                 type="button"
@@ -1211,7 +1398,11 @@ export function MvpEntryFlow() {
                 onClick={() => void handleSaveDailyCheckin()}
                 disabled={!canSubmitCheckin}
               >
-                {checkinSubmitting ? "Guardando..." : "Guardar y continuar"}
+                {checkinSubmitting
+                  ? "Guardando..."
+                  : checkinFlow === "post_session"
+                    ? "Guardar y terminar"
+                    : "Guardar y continuar"}
               </button>
             </div>
           </section>

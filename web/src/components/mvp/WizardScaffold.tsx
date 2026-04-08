@@ -876,6 +876,7 @@ function StepSection({
   );
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function ShellStepper({
   currentStep,
   labels,
@@ -967,17 +968,27 @@ export function WizardScaffold({
   preferredAdvisorId = null,
   resumeState = null,
   onExitToEntry,
+  onSaveSession,
+  initialInput = null,
+  initialStepInputMode = "write",
+  autoSubmitFromEntry = false,
 }: {
   preferredAdvisorId?: string | null;
   resumeState?: ConversationResumeState | null;
   onExitToEntry?: () => void;
+  onSaveSession?: () => void;
+  initialInput?: string | null;
+  initialStepInputMode?: StepOneInputMode;
+  autoSubmitFromEntry?: boolean;
 }) {
   const { activeConversation, ensureActiveConversation, updateSidebarConversation, upsertActiveConversationMessage } =
     useMvpShell();
   const locale = resolveRuntimeLocale();
   const t = (key: string) => tRuntime(key, locale);
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(resumeState?.targetStep ?? 1);
-  const [stepOneInputMode, setStepOneInputMode] = useState<StepOneInputMode>("write");
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(
+    resumeState?.targetStep === 4 ? 3 : (resumeState?.targetStep ?? 1),
+  );
+  const [stepOneInputMode, setStepOneInputMode] = useState<StepOneInputMode>(initialStepInputMode);
   const [selectedDecision, setSelectedDecision] = useState<DecisionActionId>("no_reply");
   const [messageText, setMessageText] = useState("");
   const [mode, setMode] = useState<UsageMode>("reactive");
@@ -1024,6 +1035,8 @@ export function WizardScaffold({
   const [analysisActionSaveState, setAnalysisActionSaveState] = useState<"idle" | "saving" | "saved" | "error">(
     "idle",
   );
+  const [draftedReply, setDraftedReply] = useState("");
+  const [entryAutostartPending, setEntryAutostartPending] = useState(false);
   const selectedCaseId = activeCase?.id ?? null;
   const manualInterpretTimerRef = useRef<number | null>(null);
   const conversationListRef = useRef<HTMLDivElement | null>(null);
@@ -1033,6 +1046,7 @@ export function WizardScaffold({
   const analysisActionRequestedTitleRef = useRef<string | null>(null);
   const analysisActionPersistingRef = useRef(false);
   const analysisActionStatusTimerRef = useRef<number | null>(null);
+  const bootstrappedEntryRef = useRef(false);
   const contextVoice = useSpeechToText({
     lang: "es-ES",
     continuous: false,
@@ -1608,6 +1622,13 @@ export function WizardScaffold({
         sourceText: text,
         analysisSummary: result.summary,
       });
+      await requestAdvisorForText(text, {
+        quickMode: false,
+        analysisId: result.analysis_id,
+        sourceType,
+        advanceToStep: false,
+        persistSourceMessage: false,
+      });
     } catch (exc) {
       setAnalysisError(toUiErrorMessage(exc, "No se pudo ejecutar el análisis."));
     } finally {
@@ -1627,6 +1648,8 @@ export function WizardScaffold({
       quickMode: boolean;
       analysisId?: string | null;
       sourceType: "ocr" | "text";
+      advanceToStep?: boolean;
+      persistSourceMessage?: boolean;
     },
   ) {
     if (!text || loadingAdvisor) return;
@@ -1637,11 +1660,13 @@ export function WizardScaffold({
     setCopiedIndex(null);
 
     try {
-      await persistConversationMessage({
-        role: "user",
-        messageType: "source_text",
-        content: text,
-      });
+      if (params.persistSourceMessage !== false) {
+        await persistConversationMessage({
+          role: "user",
+          messageType: "source_text",
+          content: text,
+        });
+      }
       const result = await postAdvisor({
         message_text: text,
         mode,
@@ -1654,7 +1679,9 @@ export function WizardScaffold({
         context: buildContextPayload(),
       });
       setAdvisorResult(result);
-      setCurrentStep(4);
+      if (params.advanceToStep !== false) {
+        setCurrentStep(4);
+      }
     } catch (exc) {
       setAdvisorError(toUiErrorMessage(exc, "No se pudo generar respuestas de advisor."));
     } finally {
@@ -1724,10 +1751,11 @@ export function WizardScaffold({
     setOcrError(null);
     setOcrStatusMessage(null);
     setAutoParseError(null);
-    setCurrentStep(4);
+    setCurrentStep(3);
     await requestAdvisorForText(sourceText, {
       quickMode: false,
       sourceType: "text",
+      advanceToStep: false,
     });
   }
 
@@ -2035,9 +2063,7 @@ export function WizardScaffold({
   const resumeActionPreview = getResumePreviewText(resumeState?.analysisAction ?? null, 120);
   const resumeReplyPreview = getResumePreviewText(resumeState?.selectedReply ?? null);
   const showAnalysisResumePanel = Boolean(currentStep === 3 && resumeState?.sourceText && !analysisResult);
-  const showAdvisorResumePanel = Boolean(
-    currentStep === 4 && resumeState?.targetStep === 4 && !advisorResult,
-  );
+  const showAdvisorResumePanel = Boolean(resumeState?.targetStep === 4 && !advisorResult);
   const toneChipValue =
     analysisResult?.emotional_context.tone || analysisResult?.tone_detected || "No disponible";
   const urgencyChipValue =
@@ -2048,14 +2074,45 @@ export function WizardScaffold({
     (left, right) => DECISION_DISPLAY_ORDER[left.id] - DECISION_DISPLAY_ORDER[right.id],
   );
   const primaryDecisionId = orderedDecisionActions.find((action) => action.id !== "advisor_help")?.id ?? null;
+  const recommendedAdvisorIndex = advisorResult?.responses.length
+    ? Math.max(
+        0,
+        preferredAdvisorId
+          ? ADVISOR_PROFILES.findIndex((advisor) => advisor.id === preferredAdvisorId)
+          : 0,
+      )
+    : 0;
+  const recommendedAdvisor = getAdvisorVisualByIndex(recommendedAdvisorIndex);
+  const recommendedResponseText = advisorResult?.responses[recommendedAdvisorIndex]?.text ?? "";
+  const originalConversationPreview =
+    getLatestExPartnerMessage(conversationBlocks) ??
+    getConversationSubmissionText(conversationBlocks, messageText) ??
+    "";
+  const isUnifiedResultStep = currentStep === 3 || currentStep === 4;
+
+  useEffect(() => {
+    if (bootstrappedEntryRef.current) return;
+    const normalizedInitialInput = initialInput?.trim() ?? "";
+    if (!normalizedInitialInput) return;
+    bootstrappedEntryRef.current = true;
+    setMessageText(normalizedInitialInput);
+    setStepOneInputMode(initialStepInputMode);
+    setEntryAutostartPending(autoSubmitFromEntry);
+  }, [autoSubmitFromEntry, initialInput, initialStepInputMode]);
+
+  useEffect(() => {
+    if (!entryAutostartPending || currentStep !== 1 || !messageText.trim()) return;
+    setEntryAutostartPending(false);
+    void handleContinueFromStep1();
+  }, [currentStep, entryAutostartPending, messageText]);
+
+  useEffect(() => {
+    if (!recommendedResponseText) return;
+    setDraftedReply(recommendedResponseText);
+  }, [recommendedResponseText]);
 
   return (
     <Panel className={styles.wizardPanel}>
-      <ShellStepper
-        currentStep={currentStep}
-        labels={["Entrada", "Revisión", "Análisis", "Consejeros"]}
-      />
-
       {currentStep === 1 ? (
         <div className={`${styles.wizardStepBody} ${styles.wizardStepBodyScroll}`}>
           <div className={styles.wizardStepHeader}>
@@ -2504,31 +2561,41 @@ export function WizardScaffold({
         </div>
       ) : null}
 
-      {currentStep === 3 ? (
+      {isUnifiedResultStep ? (
         <div className={`${styles.wizardStepBody} ${styles.wizardStepBodyScroll}`}>
           <div className={styles.wizardStepHeader}>
-            <p className={styles.wizardStepKicker}>Paso 3</p>
-            <h3 className={styles.wizardStepIntroTitle}>Análisis</h3>
+            <p className={styles.wizardStepKicker}>Resultado</p>
+            <h3 className={styles.wizardStepIntroTitle}>Análisis y consejeros</h3>
             <p className={styles.wizardStepIntroCopy}>
-              Lo esencial para decidir si conviene responder, esperar o pedir ayuda.
+              Lo esencial para decidir con claridad y ver qué te propone cada advisor en la misma pantalla.
             </p>
           </div>
 
-          {showAnalysisResumePanel ? (
+          {showAnalysisResumePanel || showAdvisorResumePanel ? (
             <section className={`${styles.wizardMobileCard} ${styles.wizardResumeCard}`}>
               <div className={styles.wizardResumeHeader}>
                 <div>
-                  <p className={styles.wizardAnalysisBlockLabel}>ConversaciÃ³n guardada</p>
-                  <p className={styles.wizardResumeTitle}>Retoma el anÃ¡lisis desde lo persistido</p>
+                  <p className={styles.wizardAnalysisBlockLabel}>Conversación guardada</p>
+                  <p className={styles.wizardResumeTitle}>
+                    {showAdvisorResumePanel
+                      ? "Vuelve al resultado con consejeros desde lo guardado"
+                      : "Retoma el resultado desde lo persistido"}
+                  </p>
                 </div>
-                <span className={styles.wizardResumeBadge}>Paso 3</span>
+                <span className={styles.wizardResumeBadge}>Resultado</span>
               </div>
               <p className={styles.wizardResumeCopy}>
-                Entraste en el punto de anÃ¡lisis usando solo lo guardado. No rehidratamos todo el wizard.
+                Abrimos el resultado usando lo guardado sin reconstruir todo el wizard.
               </p>
+              {resumeReplyPreview ? (
+                <div className={styles.wizardResumeBlock}>
+                  <p className={styles.wizardResumeLabel}>Respuesta guardada</p>
+                  <p className={styles.wizardResumeValue}>{resumeReplyPreview}</p>
+                </div>
+              ) : null}
               {resumeActionPreview ? (
                 <div className={styles.wizardResumeBlock}>
-                  <p className={styles.wizardResumeLabel}>Ãšltima acciÃ³n guardada</p>
+                  <p className={styles.wizardResumeLabel}>Última acción guardada</p>
                   <p className={styles.wizardResumeValue}>{resumeActionPreview}</p>
                 </div>
               ) : null}
@@ -2541,12 +2608,18 @@ export function WizardScaffold({
               <div className={styles.wizardResumeActions}>
                 <Button
                   type="button"
-                  onClick={() => void handleResumeAnalysisFromSavedText()}
-                  disabled={!resumeState?.sourceText || loadingAnalysis}
+                  onClick={() =>
+                    void (showAdvisorResumePanel ? handleResumeAdvisorsFromSavedText() : handleResumeAnalysisFromSavedText())
+                  }
+                  disabled={!resumeState?.sourceText || loadingAdvisor || loadingAnalysis}
                   variant="primary"
-                  className={`${styles.wizardPrimaryButton} h-10 min-w-[170px] text-[13px] hover:bg-[#265cc7]`}
+                  className={`${styles.wizardPrimaryButton} h-10 min-w-[192px] text-[13px] hover:bg-[#265cc7]`}
                 >
-                  {loadingAnalysis ? "Analizando..." : "Analizar texto guardado"}
+                  {loadingAdvisor || loadingAnalysis
+                    ? "Preparando..."
+                    : showAdvisorResumePanel
+                      ? "Cargar resultado completo"
+                      : "Analizar texto guardado"}
                 </Button>
                 <Button
                   type="button"
@@ -2561,8 +2634,9 @@ export function WizardScaffold({
           ) : null}
 
           <div className="min-h-6">
-            {loadingAnalysis ? (
-              <p className={styles.wizardStepStatus}>Interpretando contexto...</p>
+            {loadingAnalysis ? <p className={styles.wizardStepStatus}>Interpretando contexto...</p> : null}
+            {!loadingAnalysis && loadingAdvisor ? (
+              <p className={styles.wizardStepStatus}>Generando respuestas de advisors...</p>
             ) : null}
             {analysisActionSaveState === "saving" ? (
               <p className={styles.wizardStepStatus}>Guardando accion elegida...</p>
@@ -2579,7 +2653,7 @@ export function WizardScaffold({
 
           {analysisResult ? (
             <>
-              <div className={styles.wizardAnalysisLayout}>
+              <div className={styles.wizardUnifiedLayout}>
                 <div className={styles.wizardAnalysisColumn}>
                   <section className={`${styles.wizardMobileCard} ${styles.wizardAnalysisCompactCard}`}>
                     <div className={styles.wizardAnalysisCardHeader}>
@@ -2608,8 +2682,8 @@ export function WizardScaffold({
 
                   <section className={`${styles.wizardMobileCard} ${styles.wizardAnalysisCompactCard}`}>
                     <div className={styles.wizardAnalysisBlockLabel}>Qué está pasando</div>
-                    <p className={styles.wizardAnalysisLongform}>{analysisResult.summary}</p>
-                    {analysisResult.emotional_context.intent_guess ? (
+                    <p className={styles.wizardAnalysisLongform}>{analysisResult!.summary}</p>
+                    {analysisResult!.emotional_context.intent_guess ? (
                       <div className={styles.wizardInsightRow}>
                         <span className={styles.wizardInsightIcon}>
                           <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
@@ -2623,7 +2697,7 @@ export function WizardScaffold({
                           </svg>
                         </span>
                         <p>
-                          Objetivo sugerido: <strong>{analysisResult.emotional_context.intent_guess}</strong>
+                          Objetivo sugerido: <strong>{analysisResult!.emotional_context.intent_guess}</strong>
                         </p>
                       </div>
                     ) : null}
@@ -2646,44 +2720,192 @@ export function WizardScaffold({
                       </span>
                     </div>
                   </section>
+
+                  <section className={styles.wizardUnifiedSection}>
+                    <div className={styles.wizardUnifiedSectionHeader}>
+                      <div>
+                        <p className={styles.wizardAnalysisBlockLabel}>Qué dicen los consejeros</p>
+                        <p className={styles.wizardUnifiedSectionCopy}>
+                          La recomendación aparece inline para que elijas sin salir del resultado.
+                        </p>
+                      </div>
+                    </div>
+                    <div className={`${styles.wizardCardsGrid} ${styles.wizardAdvisorCards}`}>
+                      {Array.from({ length: 3 }).map((_, index) => {
+                        const advisorVisual = getAdvisorVisualByIndex(index);
+                        const advisorAvatar64 = getAdvisorAvatar(advisorVisual, "64");
+                        const response = advisorResult?.responses[index];
+                        const responseText = response?.text ?? "";
+                        const advisorPreview = getResumePreviewText(responseText, 220) ?? "Sin respuesta disponible.";
+                        const isRecommended = preferredAdvisorId ? advisorVisual.id === preferredAdvisorId : index === 0;
+                        const advisorInitials = advisorVisual.name
+                          .split(" ")
+                          .filter((part) => part.trim().length > 0)
+                          .slice(0, 2)
+                          .map((part) => part[0]?.toUpperCase() ?? "")
+                          .join("");
+
+                        return (
+                          <article
+                            key={`${advisorVisual.id}-${index}`}
+                            onClick={() => openAdvisorChat(index)}
+                            className={`${styles.wizardAdvisorCard} ${isRecommended ? styles.wizardAdvisorCardRecommended : ""}`}
+                          >
+                            <header
+                              className={`${styles.wizardAdvisorHeader} ${isRecommended ? styles.wizardAdvisorHeaderRecommended : ""}`}
+                            >
+                              {isRecommended ? (
+                                <span className={styles.wizardAdvisorRecommendedTag}>
+                                  <svg aria-hidden="true" viewBox="0 0 16 16" className="h-3 w-3" fill="none">
+                                    <path
+                                      d="m8 2 1.55 3.49L13 6l-2.6 2.28.73 3.22L8 9.9l-3.13 1.6.73-3.22L3 6l3.45-.51L8 2Z"
+                                      stroke="currentColor"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth="1.3"
+                                    />
+                                  </svg>
+                                  {preferredAdvisorId ? "Tu consejero" : "Recomendada"}
+                                </span>
+                              ) : null}
+                              <span className={styles.wizardAdvisorBadge}>
+                                {getResponseBadgeLabel(response?.emotion_label)}
+                              </span>
+                              <div className={styles.wizardAdvisorHeaderRow}>
+                                <div className="flex min-w-0 items-center gap-3">
+                                  <button
+                                    type="button"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      openAdvisorProfileById(advisorVisual.id);
+                                    }}
+                                    className={styles.wizardAdvisorAvatarButton}
+                                    aria-label={`Abrir perfil de ${advisorVisual.name}`}
+                                  >
+                                    {advisorAvatar64 ? (
+                                      <Image
+                                        src={advisorAvatar64}
+                                        alt={advisorVisual.name}
+                                        width={46}
+                                        height={46}
+                                        className={styles.wizardAdvisorAvatar}
+                                      />
+                                    ) : (
+                                      <span className={styles.wizardAdvisorAvatarFallback}>
+                                        {advisorInitials || "AD"}
+                                      </span>
+                                    )}
+                                  </button>
+                                  <div className="min-w-0">
+                                    <p className={`${styles.wizardAdvisorName} truncate`}>{advisorVisual.name}</p>
+                                    <p className={`${styles.wizardAdvisorRole} truncate`}>{advisorVisual.role}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            </header>
+
+                            <p className={styles.wizardAdvisorResponse}>{advisorPreview}</p>
+
+                            <div className={styles.wizardAdvisorActions}>
+                              {speechSynthesis.supported ? (
+                                <Button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    handleToggleSpeakResponse(index, responseText);
+                                  }}
+                                  disabled={!responseText}
+                                  variant="secondary"
+                                  className={`${styles.wizardTertiaryButton} h-9 text-[13px] hover:bg-[rgba(255,255,255,0.1)]`}
+                                >
+                                  {speechSynthesis.speaking && speakingResponseIndex === index ? "Detener" : "Escuchar"}
+                                </Button>
+                              ) : null}
+                              <Button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  openAdvisorChat(index);
+                                }}
+                                disabled={!responseText}
+                                variant="secondary"
+                                className={`${styles.wizardSecondaryButton} h-9 text-[13px] hover:bg-[rgba(255,255,255,0.12)]`}
+                              >
+                                Conversar
+                              </Button>
+                              <Button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setDraftedReply(responseText);
+                                  void handleCopy(responseText, index);
+                                }}
+                                disabled={!responseText}
+                                variant="primary"
+                                className={`h-9 rounded-[12px] px-4 text-[13px] ${
+                                  copiedIndex === index
+                                    ? "bg-[#16A34A] text-white hover:bg-[#15803d]"
+                                    : `${styles.wizardPrimaryButton} hover:bg-[#265cc7]`
+                                }`}
+                              >
+                                {copiedIndex === index ? "Respuesta copiada" : "Usar esta respuesta"}
+                              </Button>
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  </section>
                 </div>
 
-                <section className={`${styles.wizardMobileCard} ${styles.wizardAnalysisActionsCard}`}>
-                  <div className={styles.wizardAnalysisBlockLabel}>Qué quieres hacer</div>
-                  <div className={styles.wizardDecisionListCompact}>
-                    {orderedDecisionActions.map((action) => {
-                      const isAdvisorAction = action.id === "advisor_help";
-                      const isActive = !isAdvisorAction && selectedDecision === action.id;
-                      const isPrimaryAction = !isAdvisorAction && action.id === primaryDecisionId;
+                <aside className={styles.wizardResultAside}>
+                  <section className={`${styles.wizardMobileCard} ${styles.wizardResultAsideCard}`}>
+                    <div className={styles.wizardResultPanelTitle}>Conversación analizada</div>
+                    <div className={styles.wizardResultOriginalMessage}>
+                      {originalConversationPreview || "Todavía no tenemos un mensaje para mostrar."}
+                    </div>
+                  </section>
 
-                      return (
-                        <button
-                          key={action.id}
-                          type="button"
-                          onClick={() => {
-                            if (isAdvisorAction) {
-                              void handleContinueToStep4();
-                              return;
-                            }
-                            setSelectedDecision(action.id);
-                            queueAnalysisActionPersistence(action.title);
-                          }}
-                          className={`${styles.wizardDecisionOption} ${
-                            isActive ? styles.wizardDecisionOptionActive : ""
-                          } ${isAdvisorAction ? styles.wizardDecisionOptionAdvisor : ""} ${
-                            isPrimaryAction ? styles.wizardDecisionOptionSuggested : ""
-                          }`}
-                          disabled={isAdvisorAction && (!analysisId || loadingAdvisor)}
-                        >
-                          <span className={styles.wizardDecisionTitle}>
-                            {isAdvisorAction && loadingAdvisor ? "Cargando consejeros..." : action.title}
-                          </span>
-                          <span className={styles.wizardDecisionCopy}>{action.subtitle}</span>
-                        </button>
-                      );
-                    })}
+                  <section className={`${styles.wizardMobileCard} ${styles.wizardResultAsideCard}`}>
+                    <div className={styles.wizardResultPanelTitle}>Borrador sugerido · {recommendedAdvisor.name}</div>
+                    <Textarea
+                      value={draftedReply}
+                      onChange={(event) => setDraftedReply(event.target.value)}
+                      rows={8}
+                      spellCheck={false}
+                      className={styles.wizardResultDraftTextarea}
+                    />
+                    <div className={styles.wizardResultAsideActions}>
+                      <Button
+                        type="button"
+                        onClick={() => void handleCopy(draftedReply, recommendedAdvisorIndex)}
+                        disabled={!draftedReply.trim()}
+                        variant="secondary"
+                        className={`${styles.wizardSecondaryButton} h-10 text-[13px] hover:bg-[rgba(255,255,255,0.12)]`}
+                      >
+                        Copiar borrador
+                      </Button>
+                    </div>
+                  </section>
+
+                  {analysisResult.emotional_context.intent_guess ? (
+                    <section className={`${styles.wizardMobileCard} ${styles.wizardResultAsideCard}`}>
+                      <div className={styles.wizardResultPanelTitle}>Objetivo sugerido</div>
+                      <p className={styles.wizardResultObjectiveCopy}>{analysisResult.emotional_context.intent_guess}</p>
+                    </section>
+                  ) : null}
+
+                  <div className={styles.wizardResultAsideActions}>
+                    <Button
+                      type="button"
+                      onClick={() => onSaveSession?.()}
+                      variant="primary"
+                      className={`${styles.wizardPrimaryButton} h-11 w-full text-[14px] hover:bg-[#265cc7]`}
+                    >
+                      Guardar sesión
+                    </Button>
                   </div>
-                </section>
+                </aside>
               </div>
 
               <div className={styles.wizardFooterRow}>
@@ -2700,262 +2922,13 @@ export function WizardScaffold({
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth="1.8"
-                  />
-                </svg>
-                Volver
-              </Button>
+                    />
+                  </svg>
+                  Volver
+                </Button>
               </div>
             </>
           ) : null}
-        </div>
-      ) : null}
-
-      {currentStep === 4 ? (
-        <div className={`${styles.wizardStepBody} ${styles.wizardStepBodyScroll}`}>
-          <div className={styles.wizardStepHeader}>
-            <p className={styles.wizardStepKicker}>Paso 4</p>
-            <h3 className={styles.wizardStepIntroTitle}>Consejeros</h3>
-            <p className={styles.wizardStepIntroCopy}>
-              Elige con quien quieres profundizar. Esta pantalla reutiliza exactamente las cards actuales.
-            </p>
-          </div>
-
-          {showAdvisorResumePanel ? (
-            <section className={`${styles.wizardMobileCard} ${styles.wizardResumeCard}`}>
-              <div className={styles.wizardResumeHeader}>
-                <div>
-                  <p className={styles.wizardAnalysisBlockLabel}>ConversaciÃ³n guardada</p>
-                  <p className={styles.wizardResumeTitle}>Vuelve a consejeros desde lo guardado</p>
-                </div>
-                <span className={styles.wizardResumeBadge}>Paso 4</span>
-              </div>
-              <p className={styles.wizardResumeCopy}>
-                Abrimos el punto de consejeros sin reconstruir el wizard completo. Si quieres, puedes generar
-                de nuevo las respuestas desde el texto guardado.
-              </p>
-              {resumeReplyPreview ? (
-                <div className={styles.wizardResumeBlock}>
-                  <p className={styles.wizardResumeLabel}>Respuesta guardada</p>
-                  <p className={styles.wizardResumeValue}>{resumeReplyPreview}</p>
-                </div>
-              ) : null}
-              {resumeActionPreview ? (
-                <div className={styles.wizardResumeBlock}>
-                  <p className={styles.wizardResumeLabel}>Ãšltima acciÃ³n guardada</p>
-                  <p className={styles.wizardResumeValue}>{resumeActionPreview}</p>
-                </div>
-              ) : null}
-              {resumeSourcePreview ? (
-                <div className={styles.wizardResumeBlock}>
-                  <p className={styles.wizardResumeLabel}>Texto base guardado</p>
-                  <p className={styles.wizardResumeValue}>{resumeSourcePreview}</p>
-                </div>
-              ) : null}
-              <div className={styles.wizardResumeActions}>
-                <Button
-                  type="button"
-                  onClick={() => void handleResumeAdvisorsFromSavedText()}
-                  disabled={!resumeState?.sourceText || loadingAdvisor}
-                  variant="primary"
-                  className={`${styles.wizardPrimaryButton} h-10 min-w-[192px] text-[13px] hover:bg-[#265cc7]`}
-                >
-                  {loadingAdvisor ? "Generando..." : "Generar consejeros otra vez"}
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() => setCurrentStep(3)}
-                  variant="secondary"
-                  className={`${styles.wizardSecondaryButton} h-10 text-[13px] hover:bg-[rgba(255,255,255,0.12)]`}
-                >
-                  Ir al anÃ¡lisis
-                </Button>
-              </div>
-            </section>
-          ) : null}
-
-          <div className="min-h-6">
-            {advisorError ? <p className="text-sm text-red-700">{advisorError}</p> : null}
-            {loadingAdvisor ? (
-              <p className={styles.wizardStepStatus}>Generando respuestas...</p>
-            ) : null}
-          </div>
-
-          <div className={`${styles.wizardCardsGrid} ${styles.wizardAdvisorCards}`}>
-                {Array.from({ length: 3 }).map((_, index) => {
-                  const advisorVisual = getAdvisorVisualByIndex(index);
-                  const advisorAvatar64 = getAdvisorAvatar(advisorVisual, "64");
-                  const response = advisorResult?.responses[index];
-                  const responseText = response?.text ?? "";
-                  const isRecommended = preferredAdvisorId ? advisorVisual.id === preferredAdvisorId : index === 0;
-                  const advisorInitials = advisorVisual.name
-                    .split(" ")
-                    .filter((part) => part.trim().length > 0)
-                    .slice(0, 2)
-                    .map((part) => part[0]?.toUpperCase() ?? "")
-                    .join("");
-
-                  return (
-                    <article
-                      key={`${advisorVisual.id}-${index}`}
-                      onClick={() => openAdvisorChat(index)}
-                      className={`${styles.wizardAdvisorCard} ${isRecommended ? styles.wizardAdvisorCardRecommended : ""}`}
-                    >
-                      <header
-                        className={`${styles.wizardAdvisorHeader} ${isRecommended ? styles.wizardAdvisorHeaderRecommended : ""}`}
-                      >
-                        {isRecommended ? (
-                          <span className={styles.wizardAdvisorRecommendedTag}>
-                            <svg aria-hidden="true" viewBox="0 0 16 16" className="h-3 w-3" fill="none">
-                              <path
-                                d="m8 2 1.55 3.49L13 6l-2.6 2.28.73 3.22L8 9.9l-3.13 1.6.73-3.22L3 6l3.45-.51L8 2Z"
-                                stroke="currentColor"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth="1.3"
-                              />
-                            </svg>
-                            {preferredAdvisorId ? "Tu consejero" : "Recomendada"}
-                          </span>
-                        ) : null}
-                        <span className={styles.wizardAdvisorBadge}>
-                          {getResponseBadgeLabel(response?.emotion_label)}
-                        </span>
-                        <div className={styles.wizardAdvisorHeaderRow}>
-                          <div className="flex min-w-0 items-center gap-3">
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                openAdvisorProfileById(advisorVisual.id);
-                              }}
-                              className={styles.wizardAdvisorAvatarButton}
-                              aria-label={`Abrir perfil de ${advisorVisual.name}`}
-                            >
-                              {advisorAvatar64 ? (
-                                <Image
-                                  src={advisorAvatar64}
-                                  alt={advisorVisual.name}
-                                  width={46}
-                                  height={46}
-                                  className={styles.wizardAdvisorAvatar}
-                                />
-                              ) : (
-                                <span className={styles.wizardAdvisorAvatarFallback}>
-                                  {advisorInitials || "AD"}
-                                </span>
-                              )}
-                            </button>
-                            <div className="min-w-0">
-                              <p className={`${styles.wizardAdvisorName} truncate`}>{advisorVisual.name}</p>
-                              <p className={`${styles.wizardAdvisorRole} truncate`}>{advisorVisual.role}</p>
-                            </div>
-                          </div>
-                        </div>
-                      </header>
-
-                      <p className={styles.wizardAdvisorResponse}>
-                        {responseText || "Sin respuesta disponible."}
-                      </p>
-
-                      <div className={styles.wizardAdvisorActions}>
-                        {speechSynthesis.supported ? (
-                          <Button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              handleToggleSpeakResponse(index, responseText);
-                            }}
-                            disabled={!responseText}
-                            variant="secondary"
-                            className={`${styles.wizardTertiaryButton} h-9 text-[13px] hover:bg-[rgba(255,255,255,0.1)]`}
-                          >
-                            <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
-                              <path
-                                d="M4.5 11.5h2.75L11 14.5v-9L7.25 8.5H4.5v3Zm9.75-3.75a4.25 4.25 0 0 1 0 4.5m1.75-6.5a6.75 6.75 0 0 1 0 8.5"
-                                stroke="currentColor"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth="1.6"
-                              />
-                            </svg>
-                            {speechSynthesis.speaking && speakingResponseIndex === index ? "Detener" : "Escuchar"}
-                          </Button>
-                        ) : null}
-                        <Button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            openAdvisorChat(index);
-                          }}
-                          disabled={!responseText}
-                          variant="secondary"
-                          className={`${styles.wizardSecondaryButton} h-9 text-[13px] hover:bg-[rgba(255,255,255,0.12)]`}
-                        >
-                          <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4 text-[#ef4444]" fill="none">
-                            <path
-                              d="M10 3.75a2.5 2.5 0 0 0-2.5 2.5v4.25a2.5 2.5 0 1 0 5 0V6.25A2.5 2.5 0 0 0 10 3.75Zm-4.25 6.5a4.25 4.25 0 1 0 8.5 0M10 14.5v2.25m-2 0h4"
-                              stroke="currentColor"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth="1.6"
-                            />
-                          </svg>
-                          Conversar
-                        </Button>
-                        <Button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            void handleCopy(responseText, index);
-                          }}
-                          disabled={!responseText}
-                          variant="primary"
-                          className={`h-9 rounded-[12px] px-4 text-[13px] ${
-                            copiedIndex === index
-                              ? "bg-[#16A34A] text-white hover:bg-[#15803d]"
-                              : `${styles.wizardPrimaryButton} hover:bg-[#265cc7]`
-                          }`}
-                        >
-                          {copiedIndex !== index ? (
-                            <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
-                              <path
-                                d="M7.5 6.5h6a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-6a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1Zm-2 3h-1a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1"
-                                stroke="currentColor"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth="1.8"
-                              />
-                            </svg>
-                          ) : null}
-                          {copiedIndex === index ? "Respuesta copiada" : "Usar esta respuesta"}
-                        </Button>
-                      </div>
-                    </article>
-                  );
-                })}
-          </div>
-
-          <div className={styles.wizardFooterRow}>
-            <div className={styles.wizardActionGroup}>
-              <Button
-                type="button"
-                onClick={() => setCurrentStep(3)}
-                variant="secondary"
-                className={`${styles.wizardSecondaryButton} h-10 text-[13px] hover:bg-[rgba(255,255,255,0.12)]`}
-              >
-                <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
-                  <path
-                    d="M16 10H4m6 6-6-6 6-6"
-                    stroke="currentColor"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="1.8"
-                  />
-                </svg>
-                Volver
-              </Button>
-            </div>
-          </div>
         </div>
       ) : null}
 

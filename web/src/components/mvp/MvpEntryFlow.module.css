@@ -1594,6 +1594,217 @@
   justify-content: center;
 }
 
+.homePanel {
+  display: grid;
+  gap: 18px;
+  width: 100%;
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(circle at top left, rgba(245, 197, 84, 0.14) 0%, transparent 26%),
+    radial-gradient(circle at 85% 16%, rgba(34, 197, 139, 0.1) 0%, transparent 24%),
+    linear-gradient(180deg, rgba(13, 24, 37, 0.98) 0%, rgba(10, 21, 32, 0.99) 100%);
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.28);
+  padding: 32px;
+}
+
+.homeHero {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  text-align: center;
+}
+
+.homeEyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(245, 213, 132, 0.84);
+}
+
+.homeTitle {
+  max-width: 620px;
+  font-size: clamp(34px, 5vw, 48px);
+  line-height: 1.06;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  color: rgba(248, 251, 255, 0.98);
+}
+
+.homeSubcopy {
+  max-width: 520px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: rgba(227, 237, 248, 0.68);
+}
+
+.homeInputCard {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  border-radius: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(17, 32, 51, 0.92);
+  box-shadow: 0 26px 54px rgba(0, 0, 0, 0.24);
+}
+
+.homeInputTabs {
+  display: flex;
+  gap: 6px;
+  padding: 10px 10px 0;
+}
+
+.homeInputTab {
+  min-height: 42px;
+  border-radius: 16px 16px 0 0;
+  border: 0;
+  background: transparent;
+  color: rgba(220, 231, 245, 0.58);
+  padding: 0 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.homeInputTabActive {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.homeInputBody {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.homeTextarea {
+  width: 100%;
+  min-height: 180px;
+  resize: none;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(10, 21, 32, 0.92);
+  color: rgba(248, 251, 255, 0.94);
+  padding: 16px 18px;
+  font-size: 14px;
+  line-height: 1.7;
+  outline: none;
+}
+
+.homeTextarea::placeholder {
+  color: rgba(185, 211, 242, 0.38);
+}
+
+.homeAssistCard {
+  display: grid;
+  gap: 8px;
+  border-radius: 18px;
+  border: 1px dashed rgba(126, 184, 247, 0.28);
+  background: rgba(10, 21, 32, 0.72);
+  padding: 18px;
+}
+
+.homeAssistTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(248, 251, 255, 0.94);
+}
+
+.homeAssistCopy {
+  font-size: 13px;
+  line-height: 1.6;
+  color: rgba(220, 231, 245, 0.68);
+}
+
+.homeInputFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.homeInputHint {
+  font-size: 12px;
+  color: rgba(185, 211, 242, 0.48);
+}
+
+.homePrimaryButton {
+  min-height: 44px;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #f4c95d 0%, #e9b83d 100%);
+  color: #1d1400;
+  padding: 0 22px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.homePrimaryButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.quickActions {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.quickActionCard {
+  display: grid;
+  gap: 6px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.035);
+  padding: 18px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.quickActionTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(248, 251, 255, 0.94);
+}
+
+.quickActionCopy {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: rgba(220, 231, 245, 0.64);
+}
+
+.homeContextStrip {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.homeContextCard {
+  display: grid;
+  gap: 4px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 14px 16px;
+  text-align: left;
+}
+
+.homeContextLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(185, 211, 242, 0.58);
+}
+
+.homeContextValue {
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(248, 251, 255, 0.88);
+}
+
 @media (max-width: 1023px) {
   .entryShell {
     max-width: none;
@@ -1612,6 +1823,14 @@
   }
 
   .contextSummaryGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .homePanel {
+    padding: 22px 18px;
+  }
+
+  .quickActions {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -1670,6 +1889,20 @@
   .entryBody {
     gap: 16px;
     padding: 18px 16px 20px;
+  }
+
+  .homePanel {
+    border-radius: 22px;
+    padding: 18px 14px;
+  }
+
+  .homeInputFooter {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .homePrimaryButton {
+    width: 100%;
   }
 
   .headline {
