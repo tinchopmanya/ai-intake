@@ -8,7 +8,6 @@ import { AdvisorProfileModal } from "@/components/mvp/AdvisorProfileModal";
 import { useMvpShell } from "@/components/mvp/MvpShellContext";
 import type { SidebarConversationSummary } from "@/components/mvp/MvpShellContext";
 import styles from "@/components/mvp/MvpShell.module.css";
-import { VoicePlaybackButton } from "@/components/mvp/VoiceControls";
 import { Button, Panel, Textarea } from "@/components/mvp/ui";
 import { ADVISOR_PROFILES } from "@/data/advisors";
 import { authFetch } from "@/lib/auth/client";
@@ -125,14 +124,6 @@ const SPEAKER_LABELS: Record<ConversationBlock["speaker"], string> = {
   unknown: "Sin identificar",
 };
 
-const DECISION_DISPLAY_ORDER: Record<DecisionActionId, number> = {
-  brief_neutral: 0,
-  no_reply: 1,
-  clear_limit: 2,
-  reply_later: 3,
-  advisor_help: 4,
-};
-
 const RISK_LABELS: Record<string, string> = {
   custody_related: "Tema sensible detectado: custodia y coparentalidad",
   high_emotion: "Carga emocional elevada",
@@ -171,8 +162,8 @@ const OCR_ERROR_MESSAGES: Record<string, string> = {
   google_vision_request_failed: "No se pudo procesar la imagen en este momento.",
   ocr_unavailable: "OCR no esta disponible ahora. Intenta de nuevo mas tarde.",
   ocr_internal_error: "Error interno al leer la imagen.",
-  invalid_or_expired_session: "Tu sesion expiro. Inicia sesion nuevamente.",
-  missing_bearer_token: "Necesitas iniciar sesion para usar OCR.",
+  invalid_or_expired_session: "Tu sesión expiró. Inicia sesión nuevamente.",
+  missing_bearer_token: "Necesitas iniciar sesión para usar OCR.",
 };
 
 function resolveOcrErrorMessage(detail?: string, message?: string): string {
@@ -444,7 +435,7 @@ function getAnalysisStatus(analysisResult: AnalysisResponse): {
     return {
       kind: "risk",
       title: "Conversacion delicada",
-      description: "Detectamos senales que pueden escalar el conflicto.",
+      description: "Detectamos señales que pueden escalar el conflicto.",
       className: "border-[#fca5a5] bg-[#fef2f2] text-[#991b1b]",
     };
   }
@@ -461,21 +452,9 @@ function getAnalysisStatus(analysisResult: AnalysisResponse): {
   return {
     kind: "ok",
     title: "Conversacion estable",
-    description: "No detectamos senales relevantes de conflicto.",
+      description: "No detectamos señales relevantes de conflicto.",
     className: "border-[#86efac] bg-[#ecfdf5] text-[#166534]",
   };
-}
-
-function getRiskMeter(analysisResult: AnalysisResponse): {
-  level: "low" | "medium" | "high";
-  value: number;
-} {
-  const severities = analysisResult.risk_flags.map((flag) => flag.severity);
-  if (severities.includes("high")) return { level: "high", value: 88 };
-  if (severities.includes("medium")) return { level: "medium", value: 58 };
-  if (severities.includes("low")) return { level: "low", value: 32 };
-  if (analysisResult.ui_alerts.length > 0) return { level: "medium", value: 48 };
-  return { level: "low", value: 16 };
 }
 
 function getAnalysisQuickChips(analysisResult: AnalysisResponse) {
@@ -549,48 +528,6 @@ function getReplyTimingGuidance(analysisResult: AnalysisResponse) {
     title: "Puedes responder si mantienes el foco",
     description: status.description,
   };
-}
-
-function getIgnoreGuidance(analysisResult: AnalysisResponse) {
-  if (analysisResult.ui_alerts.length > 0) {
-    return analysisResult.ui_alerts
-      .slice(0, 2)
-      .map((alert) => alert.message)
-      .join(" ");
-  }
-  if (analysisResult.risk_flags.length > 0) {
-    return analysisResult.risk_flags
-      .slice(0, 2)
-      .map((flag) => humanizeFlag(flag))
-      .join(". ");
-  }
-  return "No hay alertas adicionales relevantes en este análisis; quédate con el pedido concreto.";
-}
-
-function resolveAdvisorResponseIndex(
-  advisorResult: AdvisorResponse | null,
-  actionId: Exclude<DecisionActionId, "no_reply" | "advisor_help">,
-) {
-  if (!advisorResult) return null;
-
-  const byEmotion = (labels: EmotionLabel[]) =>
-    advisorResult.responses.findIndex((response) => labels.includes(response.emotion_label));
-
-  if (actionId === "brief_neutral") {
-    const emotionIndex = byEmotion(["neutral", "calm", "friendly"]);
-    if (emotionIndex >= 0) return emotionIndex;
-    return advisorResult.responses[2] ? 2 : 0;
-  }
-
-  if (actionId === "clear_limit") {
-    const emotionIndex = byEmotion(["assertive"]);
-    if (emotionIndex >= 0) return emotionIndex;
-    return advisorResult.responses[1] ? 1 : 0;
-  }
-
-  const emotionIndex = byEmotion(["calm", "empathetic", "friendly"]);
-  if (emotionIndex >= 0) return emotionIndex;
-  return advisorResult.responses[0] ? 0 : null;
 }
 
 function matchesAny(text: string, patterns: RegExp[]) {
@@ -766,7 +703,7 @@ function buildSidebarConversationTitle(
     return "Consulta sobre documentacion";
   }
   if (/(vacaciones|viaje|viajes)/.test(source)) {
-    return "Coordinacion de vacaciones";
+    return "Coordinación de vacaciones";
   }
   return "Tema en revision";
 }
@@ -792,173 +729,6 @@ function getSafeTopicLabel(
     return "Límites";
   }
   return "Sin tema claro";
-}
-
-/**
- * Visual step indicator for intake, analysis and response stages.
- */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function Stepper({
-  currentStep,
-  labels,
-}: {
-  currentStep: 1 | 2 | 3;
-  labels: [string, string, string];
-}) {
-  const steps = [
-    { id: 1, label: labels[0] },
-    { id: 2, label: labels[1] },
-    { id: 3, label: labels[2] },
-  ] as const;
-
-  return (
-    <div className="flex items-center gap-2 overflow-hidden py-1 text-xs text-[#334155] sm:text-sm">
-      {steps.map((step, index) => {
-        const isCompleted = currentStep > step.id;
-        const isActive = currentStep === step.id;
-        const isPending = currentStep < step.id;
-
-        return (
-          <div key={step.label} className="flex min-w-0 flex-1 items-center gap-2">
-            <div className="flex min-w-0 items-center gap-2">
-              <span
-                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold sm:h-7 sm:w-7 ${
-                  isCompleted
-                    ? "border-emerald-300 bg-emerald-100 text-emerald-700"
-                    : isActive
-                      ? "border-[#334155] bg-[#334155] text-white"
-                      : "border-gray-300 bg-white text-gray-400"
-                }`}
-              >
-                {isCompleted ? "✓" : isActive ? String(step.id) : "○"}
-              </span>
-              <span
-                className={`min-w-0 truncate font-medium ${
-                  isPending ? "text-gray-400" : "text-[#1f2937]"
-                }`}
-              >
-                {step.label}
-              </span>
-            </div>
-            {index < steps.length - 1 ? (
-              (() => {
-                const nextStep = steps[index + 1];
-                const connectorClass =
-                  nextStep && nextStep.id < currentStep
-                    ? "bg-[#1a7a5e]"
-                    : "bg-[var(--color-border-tertiary)]";
-                return <span className={`h-px min-w-[12px] flex-1 ${connectorClass}`} />;
-              })()
-            ) : null}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-/**
- * Reusable wrapper for each wizard step content block.
- */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function StepSection({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <article className="rounded-2xl border border-[#e5e7eb] bg-[#f8fafc] p-3">
-      <h4 className="text-sm font-semibold text-[#1f2937]">{title}</h4>
-      <div className="mt-2 space-y-2 text-sm leading-6 text-[#334155]">{children}</div>
-    </article>
-  );
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function ShellStepper({
-  currentStep,
-  labels,
-}: {
-  currentStep: 1 | 2 | 3 | 4;
-  labels: [string, string, string, string];
-}) {
-  const steps = [
-    { id: 1, label: labels[0] },
-    { id: 2, label: labels[1] },
-    { id: 3, label: labels[2] },
-    { id: 4, label: labels[3] },
-  ] as const;
-
-  return (
-    <div className={styles.wizardStepper}>
-      {steps.map((step, index) => {
-        const isCompleted = currentStep > step.id;
-        const isActive = currentStep === step.id;
-        const isPending = currentStep < step.id;
-        const nextStep = steps[index + 1];
-        const connectorClass =
-          nextStep && nextStep.id < currentStep
-            ? `${styles.wizardStepConnector} ${styles.wizardStepConnectorComplete}`
-            : styles.wizardStepConnector;
-
-        return (
-          <div key={step.label} className={styles.wizardStepItem}>
-            <div className={styles.wizardStepLead}>
-              <span
-                className={`${styles.wizardStepCircle} ${
-                  isCompleted
-                    ? styles.wizardStepComplete
-                    : isActive
-                      ? styles.wizardStepActive
-                      : styles.wizardStepPending
-                }`}
-              >
-                {isCompleted ? (
-                  <svg aria-hidden="true" viewBox="0 0 16 16" className="h-3.5 w-3.5">
-                    <path
-                      d="M3.5 8.5 6.5 11.5 12.5 5.5"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                    />
-                  </svg>
-                ) : (
-                  String(step.id)
-                )}
-              </span>
-              <span
-                className={`${styles.wizardStepLabel} ${
-                  isPending ? styles.wizardStepLabelPending : ""
-                }`}
-              >
-                {step.label}
-              </span>
-            </div>
-            {index < steps.length - 1 ? <span className={connectorClass} /> : null}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function ShellStepSection({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <article className={styles.wizardSection}>
-      <h4 className={styles.wizardSectionTitle}>{title}</h4>
-      <div className={styles.wizardSectionBody}>{children}</div>
-    </article>
-  );
 }
 
 /**
@@ -1032,10 +802,7 @@ export function WizardScaffold({
     Array<{ id: string; role: "user" | "advisor"; text: string }>
   >([]);
   const [speakingResponseIndex, setSpeakingResponseIndex] = useState<number | null>(null);
-  const [analysisActionSaveState, setAnalysisActionSaveState] = useState<"idle" | "saving" | "saved" | "error">(
-    "idle",
-  );
-  const [draftedReply, setDraftedReply] = useState("");
+  const [, setAnalysisActionSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [entryAutostartPending, setEntryAutostartPending] = useState(false);
   const [analysisModalOpen, setAnalysisModalOpen] = useState(false);
   const selectedCaseId = activeCase?.id ?? null;
@@ -1374,12 +1141,6 @@ export function WizardScaffold({
     }
   }
 
-  function queueAnalysisActionPersistence(actionTitle: string) {
-    analysisActionRequestedTitleRef.current = actionTitle;
-    setAnalysisActionStatus("saving");
-    void flushQueuedAnalysisActionPersistence();
-  }
-
   function syncSidebarConversationSummary(sourceTextOverride?: string) {
     if (typeof window === "undefined") return;
     if (!sidebarConversationStartedAtRef.current) {
@@ -1464,7 +1225,7 @@ export function WizardScaffold({
   async function handleExtractTextFromImage(file: File) {
     if (ocrLoading) return;
     if (!hasStoredSession()) {
-      setOcrError("Tu sesion no esta activa. Inicia sesion para usar esta funcion.");
+      setOcrError("Tu sesión no está activa. Inicia sesión para usar esta función.");
       return;
     }
     if (ocrCapabilitiesLoading || ocrCapabilities?.available === false) {
@@ -1690,20 +1451,6 @@ export function WizardScaffold({
     }
   }
 
-  async function requestAdvisor(params: { quickMode: boolean; analysisId?: string | null }) {
-    const text = getConversationSubmissionText(conversationBlocks, messageText);
-    if (!text) return;
-    await requestAdvisorForText(text, {
-      ...params,
-      sourceType: ocrInfo ? "ocr" : "text",
-    });
-  }
-
-  async function handleQuickResponse() {
-    setAnalysisError(null);
-    await requestAdvisor({ quickMode: true });
-  }
-
   async function handleContinueFromStep1() {
     if (!messageText.trim() && conversationBlocks.length === 0) return;
     await flushPendingConversationInterpretation(messageText.trim(), ocrInfo ? "ocr" : "text");
@@ -1721,11 +1468,6 @@ export function WizardScaffold({
     setAnalysisError(null);
     setCurrentStep(3);
     await runAnalysis();
-  }
-
-  async function handleContinueToStep4() {
-    if (!analysisId) return;
-    await requestAdvisor({ quickMode: false, analysisId });
   }
 
   async function handleResumeAnalysisFromSavedText() {
@@ -1817,7 +1559,7 @@ export function WizardScaffold({
     setIncidentNotice(null);
     setIncidentType(suggestIncidentType());
     if (!incidentTitle.trim()) {
-      setIncidentTitle("Evento relevante en la conversacion");
+      setIncidentTitle("Evento relevante en la conversación");
     }
     if (!incidentDescription.trim()) {
       const preview = messageText.trim().slice(0, 280);
@@ -2063,7 +1805,6 @@ export function WizardScaffold({
   const topicLabel = getSafeTopicLabel(activeCase?.title, conversationBlocks, messageText);
   const resumeSourcePreview = getResumePreviewText(resumeState?.sourceText ?? null);
   const resumeActionPreview = getResumePreviewText(resumeState?.analysisAction ?? null, 120);
-  const resumeReplyPreview = getResumePreviewText(resumeState?.selectedReply ?? null);
   const showAnalysisResumePanel = Boolean(currentStep === 3 && resumeState?.sourceText && !analysisResult);
   const showAdvisorResumePanel = Boolean(resumeState?.targetStep === 4 && !advisorResult);
   const toneChipValue =
@@ -2071,21 +1812,6 @@ export function WizardScaffold({
   const urgencyChipValue =
     analysisQuickChips.find((chip) => chip.label === "Urgencia")?.value ??
     (analysisStatus?.kind === "risk" ? "Alta" : analysisStatus?.kind === "observation" ? "Media" : "Baja");
-  const decisionActions = getDecisionActions(getDecisionSignals(analysisResult, conversationBlocks, messageText));
-  const orderedDecisionActions = [...decisionActions].sort(
-    (left, right) => DECISION_DISPLAY_ORDER[left.id] - DECISION_DISPLAY_ORDER[right.id],
-  );
-  const primaryDecisionId = orderedDecisionActions.find((action) => action.id !== "advisor_help")?.id ?? null;
-  const recommendedAdvisorIndex = advisorResult?.responses.length
-    ? Math.max(
-        0,
-        preferredAdvisorId
-          ? ADVISOR_PROFILES.findIndex((advisor) => advisor.id === preferredAdvisorId)
-          : 0,
-      )
-    : 0;
-  const recommendedAdvisor = getAdvisorVisualByIndex(recommendedAdvisorIndex);
-  const recommendedResponseText = advisorResult?.responses[recommendedAdvisorIndex]?.text ?? "";
   const originalConversationPreview =
     getLatestExPartnerMessage(conversationBlocks) ??
     getConversationSubmissionText(conversationBlocks, messageText) ??
@@ -2116,11 +1842,6 @@ export function WizardScaffold({
       await runAnalysis();
     })();
   }, [currentStep, entryAutostartPending, messageText]);
-
-  useEffect(() => {
-    if (!recommendedResponseText) return;
-    setDraftedReply(recommendedResponseText);
-  }, [recommendedResponseText]);
 
   return (
     <Panel className={styles.wizardPanel}>
@@ -2228,8 +1949,8 @@ export function WizardScaffold({
                     <button
                       type="button"
                       onClick={handleStartNewConversation}
-                      title="Limpiar conversacion"
-                      aria-label="Limpiar conversacion"
+                      title="Limpiar conversación"
+                      aria-label="Limpiar conversación"
                       className={styles.wizardIconButton}
                     >
                       <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
@@ -2302,7 +2023,7 @@ export function WizardScaffold({
                 {hasCapturedDraft ? (
                   <div className={styles.wizardCaptureResultHeader}>
                     <span className={styles.wizardCaptureLoadedBadge}>Texto detectado</span>
-                    <p className={styles.wizardCaptureResultHint}>Revisa el OCR antes de pasar al analisis.</p>
+                    <p className={styles.wizardCaptureResultHint}>Revisa el OCR antes de pasar al análisis.</p>
                   </div>
                 ) : null}
                 <Textarea
@@ -2361,7 +2082,7 @@ export function WizardScaffold({
                       {contextVoice.listening ? "Escuchando..." : "Toca para dictar"}
                     </p>
                     <p className={styles.wizardVoiceCaptureCopy}>
-                      {contextMicrophoneStatusMessage || "Tu voz se agregar? al texto principal."}
+                      {contextMicrophoneStatusMessage || "Tu voz se agregará al texto principal."}
                     </p>
                   </div>
                 </div>
@@ -2576,7 +2297,7 @@ export function WizardScaffold({
         <div className={`${styles.wizardStepBody} ${styles.wizardStepBodyScroll}`}>
           <div className={styles.wizardStepHeader}>
             <p className={styles.wizardStepKicker}>Resultado</p>
-            <h3 className={styles.wizardStepIntroTitle}>Analisis y advisors</h3>
+            <h3 className={styles.wizardStepIntroTitle}>Análisis y advisors</h3>
             <p className={styles.wizardStepIntroCopy}>
               Lo esencial para decidir con claridad y comparar las tres respuestas en una sola pantalla.
             </p>
@@ -2588,7 +2309,7 @@ export function WizardScaffold({
                 <div>
                   <p className={styles.wizardAnalysisBlockLabel}>Conversacion guardada</p>
                   <p className={styles.wizardResumeTitle}>
-                    {showAdvisorResumePanel ? "Volvimos directo al resultado completo" : "Retoma el analisis desde lo guardado"}
+                    {showAdvisorResumePanel ? "Volvimos directo al resultado completo" : "Retoma el análisis desde lo guardado"}
                   </p>
                 </div>
                 <span className={styles.wizardResumeBadge}>Resultado</span>
@@ -2596,7 +2317,7 @@ export function WizardScaffold({
               <p className={styles.wizardResumeCopy}>
                 {showAdvisorResumePanel
                   ? "Puedes regenerar advisors desde el texto guardado sin rehacer todo el flujo."
-                  : "Entraste desde una conversacion guardada y puedes regenerar la lectura completa desde aca."}
+                  : "Entraste desde una conversación guardada y puedes regenerar la lectura completa desde acá."}
               </p>
               {resumeActionPreview ? (
                 <div className={styles.wizardResumeBlock}>
@@ -2650,9 +2371,29 @@ export function WizardScaffold({
           {analysisResult ? (
             <>
               <div className={styles.wizardResultMainStack}>
+                <div className={styles.wizardResultTopActionRow}>
+                  <Button
+                    type="button"
+                    onClick={() => setAnalysisModalOpen(true)}
+                    variant="secondary"
+                    className={`${styles.wizardAnalysisModalButton} ${styles.wizardAnalysisModalButtonProminent} h-11 text-[13px]`}
+                  >
+                    <svg aria-hidden="true" viewBox="0 0 20 20" className="h-5 w-5" fill="none">
+                      <path
+                        d="M10 3.75a6.25 6.25 0 1 0 0 12.5 6.25 6.25 0 0 0 0-12.5Zm0 3v3.25m0 2.5h.01"
+                        stroke="currentColor"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="1.7"
+                      />
+                    </svg>
+                    Ver análisis
+                  </Button>
+                </div>
+
                 <section className={`${styles.wizardMobileCard} ${styles.wizardAnalysisCompactCard} ${styles.wizardRecommendationCard}`}>
                   <div className={styles.wizardAnalysisCardHeader}>
-                    <div className={styles.wizardAnalysisBlockLabel}>Recomendacion principal</div>
+                    <div className={styles.wizardAnalysisBlockLabel}>Recomendación principal</div>
                     <span
                       className={`${styles.wizardAnalysisDecisionBadge} ${
                         analysisStatus?.kind === "risk"
@@ -2678,7 +2419,7 @@ export function WizardScaffold({
                 <section className={styles.wizardUnifiedSection}>
                   <div className={styles.wizardUnifiedSectionHeader}>
                     <div>
-                      <p className={styles.wizardAnalysisBlockLabel}>Que dicen los advisors</p>
+                      <p className={styles.wizardAnalysisBlockLabel}>Qué dicen los advisors</p>
                       <p className={styles.wizardUnifiedSectionCopy}>
                         Leelas completas, comparalas con aire y elige desde la misma pantalla.
                       </p>
@@ -2781,7 +2522,6 @@ export function WizardScaffold({
                               type="button"
                               onClick={(event) => {
                                 event.stopPropagation();
-                                setDraftedReply(responseText);
                                 void handleCopy(responseText, index);
                               }}
                               disabled={!responseText}
@@ -2805,7 +2545,13 @@ export function WizardScaffold({
               <div className={styles.wizardFooterRow}>
                 <Button
                   type="button"
-                  onClick={() => setCurrentStep(conversationBlocks.length > 0 ? 2 : 1)}
+                  onClick={() => {
+                    if (conversationBlocks.length > 0) {
+                      setCurrentStep(2);
+                      return;
+                    }
+                    onExitToEntry?.();
+                  }}
                   variant="secondary"
                   className={`${styles.wizardSecondaryButton} h-10 text-[13px] hover:bg-[rgba(255,255,255,0.12)]`}
                 >
@@ -2814,28 +2560,11 @@ export function WizardScaffold({
                 <div className={styles.wizardFooterSpacer} />
                 <Button
                   type="button"
-                  onClick={() => setAnalysisModalOpen(true)}
-                  variant="secondary"
-                  className={`${styles.wizardAnalysisModalButton} h-10 text-[13px]`}
-                >
-                  <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
-                    <path
-                      d="M10 3.75a6.25 6.25 0 1 0 0 12.5 6.25 6.25 0 0 0 0-12.5Zm0 3v3.25m0 2.5h.01"
-                      stroke="currentColor"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="1.7"
-                    />
-                  </svg>
-                  Ver analisis
-                </Button>
-                <Button
-                  type="button"
                   onClick={() => onSaveSession?.()}
                   variant="primary"
                   className={`${styles.wizardPrimaryButton} h-10 text-[13px] hover:bg-[#265cc7]`}
                 >
-                  Guardar sesion
+                  Guardar sesión
                 </Button>
               </div>
             </>
@@ -2854,25 +2583,25 @@ export function WizardScaffold({
           >
             <div className={styles.wizardAnalysisModalHeader}>
               <div>
-                <p className={styles.wizardAnalysisBlockLabel}>Analisis completo</p>
-                <h4 id="wizard-analysis-modal-title" className={styles.wizardAnalysisModalTitle}>Que vimos en esta conversacion</h4>
+                <p className={styles.wizardAnalysisBlockLabel}>Análisis completo</p>
+                <h4 id="wizard-analysis-modal-title" className={styles.wizardAnalysisModalTitle}>Qué vimos en esta conversación</h4>
                 <p className={styles.wizardAnalysisModalCopy}>
-                  Todo el contexto secundario queda aca para no cargar la pantalla principal.
+                  Todo el contexto secundario queda acá para no cargar la pantalla principal.
                 </p>
               </div>
               <button
                 type="button"
                 className={styles.wizardAnalysisModalClose}
-                aria-label="Cerrar analisis"
+                aria-label="Cerrar análisis"
                 onClick={() => setAnalysisModalOpen(false)}
               >
-                ?
+                ×
               </button>
             </div>
 
             <div className={styles.wizardAnalysisModalGrid}>
               <section className={`${styles.wizardMobileCard} ${styles.wizardAnalysisModalCard}`}>
-                <div className={styles.wizardResultPanelTitle}>Que esta pasando</div>
+                <div className={styles.wizardResultPanelTitle}>Qué está pasando</div>
                 <p className={styles.wizardAnalysisLongform}>{analysisResult.summary}</p>
               </section>
 
@@ -2895,9 +2624,9 @@ export function WizardScaffold({
               </section>
 
               <section className={`${styles.wizardMobileCard} ${styles.wizardAnalysisModalCard}`}>
-                <div className={styles.wizardResultPanelTitle}>Conversacion analizada</div>
+                <div className={styles.wizardResultPanelTitle}>Conversación analizada</div>
                 <div className={styles.wizardResultOriginalMessage}>
-                  {originalConversationPreview || "Todavia no tenemos un mensaje para mostrar."}
+                  {originalConversationPreview || "Todavía no tenemos un mensaje para mostrar."}
                 </div>
               </section>
 
@@ -2910,7 +2639,7 @@ export function WizardScaffold({
 
               {analysisQuickChips.length > 0 ? (
                 <section className={`${styles.wizardMobileCard} ${styles.wizardAnalysisModalCard}`}>
-                  <div className={styles.wizardResultPanelTitle}>Senales rapidas</div>
+                  <div className={styles.wizardResultPanelTitle}>Señales rápidas</div>
                   <div className={styles.wizardAnalysisQuickChips}>
                     {analysisQuickChips.map((chip) => (
                       <span key={chip.label} className={styles.wizardAnalysisChip}>
@@ -2965,7 +2694,7 @@ export function WizardScaffold({
         draft={advisorChatInput}
         sending={advisorChatSending}
         entryMode="advisor_refine_response"
-        helperCopy="Que te parecio mi sugerencia? Puedes darme mas contexto y la ajustamos juntos."
+        helperCopy="¿Qué te pareció mi sugerencia? Puedes darme más contexto y la ajustamos juntos."
         debugPayload={advisorChatDebugPayload}
         voiceConversationContext={advisorChatVoiceContext}
         voiceBaseReply={advisorChatVoiceBaseReply}

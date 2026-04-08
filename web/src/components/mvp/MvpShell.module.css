@@ -3017,7 +3017,12 @@
 
 .wizardResultMainStack {
   display: grid;
-  gap: 16px;
+  gap: 18px;
+}
+
+.wizardResultTopActionRow {
+  display: flex;
+  justify-content: flex-start;
 }
 
 .wizardAnalysisColumn {
@@ -3028,7 +3033,7 @@
 
 .wizardUnifiedSection {
   display: grid;
-  gap: 12px;
+  gap: 16px;
 }
 
 .wizardUnifiedSectionHeader {
@@ -3040,8 +3045,9 @@
 
 .wizardUnifiedSectionCopy {
   margin-top: 5px;
-  font-size: 12px;
-  line-height: 1.55;
+  max-width: 62ch;
+  font-size: 13px;
+  line-height: 1.6;
   color: rgba(229, 239, 248, 0.7);
 }
 
@@ -3585,21 +3591,24 @@
 }
 
 .wizardAdvisorCards {
-  grid-template-columns: minmax(0, 1fr);
-  gap: 14px;
+  width: 100%;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  align-items: stretch;
 }
 
 .wizardAdvisorCard {
   position: relative;
   display: flex;
   min-width: 0;
+  min-height: 100%;
   flex-direction: column;
   border-radius: 24px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background:
     radial-gradient(circle at top left, rgba(244, 201, 93, 0.08) 0%, transparent 22%),
     linear-gradient(180deg, rgba(13, 24, 37, 0.94) 0%, rgba(10, 21, 32, 0.99) 100%);
-  padding: 18px;
+  padding: 18px 18px 16px;
   transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
   box-shadow: 0 18px 34px rgba(0, 0, 0, 0.16);
 }
@@ -3709,23 +3718,23 @@
 }
 
 .wizardAdvisorResponse {
-  margin-top: 12px;
+  margin-top: 14px;
   flex: 1;
   white-space: pre-wrap;
   word-break: break-word;
   color: rgba(255, 255, 255, 0.84);
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.72;
 }
 
 .wizardAdvisorActions {
-  margin-top: 14px;
+  margin-top: 16px;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-start;
   gap: 8px;
-  padding-top: 2px;
+  padding-top: 4px;
 }
 
 .wizardAnalysisModalButton {
@@ -3746,6 +3755,13 @@
   animation: wizardAnalysisGlow 2.8s ease-in-out infinite;
 }
 
+.wizardAnalysisModalButtonProminent {
+  min-height: 46px;
+  padding: 0 18px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
 .wizardAnalysisModalBackdrop {
   position: fixed;
   inset: 56px 0 0 0;
@@ -3760,7 +3776,7 @@
 
 .wizardAnalysisModal {
   width: min(1080px, 100%);
-  max-height: calc(100vh - 110px);
+  max-height: calc(100vh - 104px);
   display: grid;
   gap: 18px;
   overflow: auto;
@@ -3812,8 +3828,9 @@
 
 .wizardAnalysisModalGrid {
   display: grid;
-  gap: 14px;
+  gap: 16px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
 }
 
 .wizardAnalysisModalCard {

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ChangeEvent, ClipboardEvent, CSSProperties, ReactNode } from "react";
+import type { ChangeEvent, ClipboardEvent, CSSProperties } from "react";
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -136,19 +136,6 @@ function resolveOcrErrorMessage(detail?: string, message?: string): string {
   return "No se pudo leer el texto de la imagen.";
 }
 
-function getGreetingLabel() {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Buen día";
-  if (hour < 20) return "Buenas tardes";
-  return "Buenas noches";
-}
-
-function getFirstName(displayName: string) {
-  const trimmed = displayName.trim();
-  if (!trimmed) return "Usuario";
-  return trimmed.split(" ")[0] || "Usuario";
-}
-
 function formatLastSession(startedAt: string) {
   const parsed = new Date(startedAt);
   if (Number.isNaN(parsed.getTime())) return null;
@@ -187,14 +174,6 @@ function getConfidenceSummaryLabel(level: number | null | undefined) {
   return DAILY_CONFIDENCE_OPTIONS.find((option) => option.value === level)?.label ?? null;
 }
 
-function getRelationshipSummaryLabel(level: number | null | undefined) {
-  return EX_RELATIONSHIP_OPTIONS.find((option) => option.value === level)?.label ?? null;
-}
-
-function getChildrenInteractionSummaryLabel(level: number | null | undefined) {
-  return CHILDREN_INTERACTION_OPTIONS.find((option) => option.value === level)?.label ?? null;
-}
-
 function getMessageTypeLabel(messageType: MessageSummary["message_type"]) {
   if (messageType === "analysis_action") return "Acción elegida";
   if (messageType === "selected_reply") return "Respuesta seleccionada";
@@ -210,41 +189,6 @@ function getMessagePreview(content: string) {
 function getSavedItemsLabel(count: number) {
   if (count === 1) return "1 elemento guardado";
   return `${count} elementos guardados`;
-}
-
-function getSavedProcessMomentsTitle(count: number) {
-  if (count <= 0) return "Tu proceso puede empezar a guardarse desde hoy";
-  if (count === 1) return "Tu proceso ya tiene 1 momento util guardado";
-  return `Tu proceso ya tiene ${count} momentos utiles guardados`;
-}
-
-function getSavedProcessMomentsCopy(count: number) {
-  if (count <= 0) {
-    return "Lo que trabajes aqui queda resumido para que no tengas que empezar de cero.";
-  }
-  if (count === 1) {
-    return "Lo guardamos para que puedas volver a esto con mas claridad cuando lo necesites.";
-  }
-  return "Lo guardamos resumido para que puedas volver a esto sin cargar con todos los mensajes.";
-}
-
-function getTodayStartingPointCopy(checkin: EmotionalCheckinSummary | null) {
-  if (!checkin) return null;
-  const { mood_level: moodLevel, confidence_level: confidenceLevel, recent_contact: recentContact } = checkin;
-
-  if (recentContact && (moodLevel <= 1 || confidenceLevel <= 1)) {
-    return "Conviene darte un poco de aire antes de decidir que hacer.";
-  }
-  if (moodLevel >= 3 && confidenceLevel >= 3) {
-    return "Eso puede ayudarte a decidir con mas calma.";
-  }
-  if (!recentContact && confidenceLevel >= 2) {
-    return "Es un buen punto de partida para mirar la situacion con mas perspectiva.";
-  }
-  if (moodLevel <= 1 || confidenceLevel <= 1) {
-    return "Quizas hoy te convenga responder sin apuro y volver a esto con mas claridad.";
-  }
-  return "Puede servirte para elegir el siguiente paso con mas claridad.";
 }
 
 function getLatestMessageContent(
@@ -324,69 +268,6 @@ function buildHistoryEntries(messages: MessageSummary[]): HistoryEntry[] {
       content: message.content.trim(),
       timestamp: formatMessageTimestamp(message.created_at),
     }));
-}
-
-function getCheckinPercent(level: number | null | undefined) {
-  if (level === null || level === undefined) return 0;
-  return ((level + 1) / DAILY_MOOD_OPTIONS.length) * 100;
-}
-
-function getCheckinTone(level: number | null | undefined) {
-  if (level === null || level === undefined) return "steady";
-  if (level <= 1) return "low";
-  if (level >= 3) return "high";
-  return "steady";
-}
-
-function getRecentContactSummary(value: boolean | null | undefined) {
-  if (value === true) return "Hubo contacto reciente";
-  if (value === false) return "Sin contacto reciente";
-  return "Sin registrar";
-}
-
-function TodayStateMetric({
-  label,
-  value,
-  percent,
-  tone,
-  icon,
-}: {
-  label: string;
-  value: string;
-  percent: number;
-  tone: "low" | "steady" | "high";
-  icon: ReactNode;
-}) {
-  const toneClassName =
-    tone === "low"
-      ? styles.todayStateLow
-      : tone === "high"
-        ? styles.todayStateHigh
-        : styles.todayStateSteady;
-
-  return (
-    <div className={styles.todayStateMetric}>
-      <div className={styles.todayStateMetricHeader}>
-        <span className={`${styles.todayStateMetricIcon} ${toneClassName}`} aria-hidden="true">
-          {icon}
-        </span>
-        <div className={styles.todayStateMetricCopy}>
-          <span className={styles.todayStateMetricLabel}>{label}</span>
-          <span className={styles.todayStateMetricValue}>{value}</span>
-        </div>
-      </div>
-      <div className={styles.todayStateBarTrack} aria-hidden="true">
-        <span
-          className={`${styles.todayStateBarFill} ${toneClassName}`}
-          style={
-            {
-              "--today-state-fill": `${percent}%`,
-            } as CSSProperties
-          }
-        />
-      </div>
-    </div>
-  );
 }
 
 function CheckinSliderQuestion({
@@ -482,12 +363,10 @@ function getAdvisorCardVariantClass(variant: SelectorCardVariant) {
 
 export function MvpEntryFlow() {
   const {
-    displayName,
     sidebarConversation,
     activeConversation,
     activeConversationMessages,
     activeConversationMessagesLoading,
-    savedProcessMomentsCount,
     openAdvisorConversation,
   } = useMvpShell();
   const [view, setView] = useState<FlowView>("entry");
@@ -651,11 +530,6 @@ export function MvpEntryFlow() {
     };
   }, []);
 
-  const greeting = useMemo(
-    () => `${getGreetingLabel()}, ${getFirstName(displayName)}`.toLocaleUpperCase("es-UY"),
-    [displayName],
-  );
-
   const lastSessionMeta = useMemo(
     () => (sidebarConversation ? formatLastSession(sidebarConversation.startedAt) : null),
     [sidebarConversation],
@@ -669,18 +543,8 @@ export function MvpEntryFlow() {
     const moodLabel = getMoodSummaryLabel(todayCheckin.mood_level);
     const confidenceLabel = getConfidenceSummaryLabel(todayCheckin.confidence_level);
     if (!moodLabel || !confidenceLabel) return null;
-    return `?nimo ${moodLabel.toLowerCase()} · confianza ${confidenceLabel.toLowerCase()}`;
+    return `Ánimo ${moodLabel.toLowerCase()} · confianza ${confidenceLabel.toLowerCase()}`;
   }, [todayCheckin]);
-  const processValueTitle = useMemo(
-    () => getSavedProcessMomentsTitle(savedProcessMomentsCount),
-    [savedProcessMomentsCount],
-  );
-  const processValueCopy = useMemo(
-    () => getSavedProcessMomentsCopy(savedProcessMomentsCount),
-    [savedProcessMomentsCount],
-  );
-  const todayStartingPointCopy = useMemo(() => getTodayStartingPointCopy(todayCheckin), [todayCheckin]);
-
   const sessionTitleLabel =
     sidebarConversation?.title.trim() &&
     sidebarConversation.title.trim().toLowerCase() !== "nueva conversacion"
@@ -751,15 +615,15 @@ export function MvpEntryFlow() {
 
   async function processEntryImageFile(file: File) {
     if (!file.type.startsWith("image/")) {
-      setEntryOcrError("Selecciona una imagen válida (PNG, JPG o WebP).");
+      setEntryOcrError("Selecciona una imagen v?lida (PNG, JPG o WebP).");
       return;
     }
     if (!hasStoredSession()) {
-      setEntryOcrError("Tu sesión no está activa. Inicia sesión para usar esta función.");
+      setEntryOcrError("Tu sesi?n no est? activa. Inicia sesi?n para usar esta funci?n.");
       return;
     }
     if (entryOcrCapabilitiesLoading || entryOcrCapabilities?.available === false) {
-      setEntryOcrError("La carga por captura no está disponible en este entorno.");
+      setEntryOcrError("La carga por captura no est? disponible en este entorno.");
       return;
     }
 
@@ -783,7 +647,7 @@ export function MvpEntryFlow() {
       const payload = (await response.json()) as OcrExtractResponse;
       setEntryMessageText(payload.extracted_text);
       setEntryOcrInfo(payload);
-      setEntryOcrStatus("Texto extraído y listo para revisar.");
+      setEntryOcrStatus("Texto extra?do y listo para revisar.");
     } catch (error) {
       setEntryOcrError(toUiErrorMessage(error, "No se pudo leer el texto de la imagen."));
       setEntryOcrStatus(null);
@@ -890,11 +754,6 @@ export function MvpEntryFlow() {
     setCheckinModalOpen(true);
   }
 
-  function handleOpenHistoryPanel() {
-    if (activeConversationHistory.length === 0) return;
-    setHistoryPanelOpen(true);
-  }
-
   async function handleSaveDailyCheckin() {
     if (!canSubmitCheckin) return;
     setCheckinSubmitting(true);
@@ -938,7 +797,7 @@ export function MvpEntryFlow() {
       ? "Analizar esta captura"
       : entryInputMode === "voice"
         ? "Analizar este dictado"
-        : "Ver recomendacion y advisors";
+        : "Ver recomendación y advisors";
 
   return (
     <>
@@ -947,10 +806,10 @@ export function MvpEntryFlow() {
           <div className={styles.entryShell}>
             <section className={styles.homePanel}>
               <div className={styles.homeHero}>
-                <p className={styles.homeEyebrow}>ExReply - claridad antes de responder</p>
-                <h1 className={styles.homeTitle}>Que paso con tu ex hoy?</h1>
+                <p className={styles.homeEyebrow}>ExReply · claridad antes de responder</p>
+                <h1 className={styles.homeTitle}>¿Qué pasó con tu ex hoy?</h1>
                 <p className={styles.homeSubcopy}>
-                  Pega el mensaje, sube una captura o dicta la situacion. Entras directo a una recomendacion clara y a las tres respuestas de advisors.
+                  Pegá el mensaje, subí una captura o dictá la situación. Entrás directo a una recomendación clara y a las tres respuestas de advisors.
                 </p>
               </div>
 
@@ -985,7 +844,7 @@ export function MvpEntryFlow() {
                       value={entryMessageText}
                       onChange={(event) => setEntryMessageText(event.target.value)}
                       className={styles.homeTextarea}
-                      placeholder='Pega el mensaje o conta que paso. Ej: "Me mando un audio diciendo que quiere cambiar el regimen de visitas..."'
+                      placeholder='Pegá el mensaje o contá qué pasó. Ej: "Me mandó un audio diciendo que quiere cambiar el régimen de visitas..."'
                     />
                   ) : null}
 
@@ -1008,7 +867,7 @@ export function MvpEntryFlow() {
                           Subir captura
                         </button>
                         <div className={styles.homeCaptureHintBlock}>
-                          <p className={styles.homeAssistTitle}>Pega o sube la imagen aca mismo</p>
+                          <p className={styles.homeAssistTitle}>Pegá o subí la imagen acá mismo</p>
                           <p className={styles.homeAssistCopy}>
                             Reutilizamos el OCR real del producto para extraer el texto sin sacar al usuario de la home.
                           </p>
@@ -1018,7 +877,7 @@ export function MvpEntryFlow() {
                         value={entryMessageText}
                         onChange={(event) => setEntryMessageText(event.target.value)}
                         className={styles.homeTextarea}
-                        placeholder="Cuando leas una captura, el texto va a aparecer aca para que lo revises antes del analisis."
+                        placeholder="Cuando leas una captura, el texto va a aparecer acá para que lo revises antes del análisis."
                       />
                       <div className={styles.homeStatusStack}>
                         {entryOcrCapabilities?.available === false ? (
@@ -1056,10 +915,10 @@ export function MvpEntryFlow() {
                         </button>
                         <div className={styles.homeCaptureHintBlock}>
                           <p className={styles.homeAssistTitle}>
-                            {entryVoice.listening ? "Te estamos escuchando" : "Dicta desde aca mismo"}
+                            {entryVoice.listening ? "Te estamos escuchando" : "Dictá desde acá mismo"}
                           </p>
                           <p className={styles.homeAssistCopy}>
-                            {entryVoiceStatusMessage || "Tu voz se agrega al texto principal para revisar antes del an?lisis."}
+                            {entryVoiceStatusMessage || "Tu voz se agrega al texto principal para revisar antes del análisis."}
                           </p>
                         </div>
                       </div>
@@ -1067,7 +926,7 @@ export function MvpEntryFlow() {
                         value={entryMessageText}
                         onChange={(event) => setEntryMessageText(event.target.value)}
                         className={styles.homeTextarea}
-                        placeholder="Lo que dictes aparece ac? para que lo ordenes antes de analizar."
+                        placeholder="Lo que dictes aparece acá para que lo ordenes antes de analizar."
                       />
                       {entryVoice.error ? (
                         <p className={styles.homeStatusWarning}>{getSpeechToTextErrorMessage(entryVoice.error)}</p>
@@ -1076,7 +935,7 @@ export function MvpEntryFlow() {
                   ) : null}
 
                   <div className={styles.homeInputFooter}>
-                    <span className={styles.homeInputHint}>Tu conversacion no se comparte con nadie.</span>
+                    <span className={styles.homeInputHint}>Tu conversación no se comparte con nadie.</span>
                     <button
                       type="button"
                       className={styles.homePrimaryButton}
@@ -1092,11 +951,11 @@ export function MvpEntryFlow() {
               <div className={styles.quickActions}>
                 <button type="button" className={styles.quickActionCard} onClick={() => openSelector("vent")}>
                   <span className={styles.quickActionTitle}>Solo quiero desahogarme</span>
-                  <span className={styles.quickActionCopy}>Entra directo a hablar con un advisor sin analizar nada concreto.</span>
+                  <span className={styles.quickActionCopy}>Entrá directo a hablar con un advisor sin analizar nada concreto.</span>
                 </button>
                 <button type="button" className={styles.quickActionCard} onClick={() => openSelector("write_to_ex")}>
                   <span className={styles.quickActionTitle}>Quiero escribirle a mi ex</span>
-                  <span className={styles.quickActionCopy}>Elige un advisor y sigue con el flujo real de redaccion.</span>
+                  <span className={styles.quickActionCopy}>Elegí un advisor y seguí con el flujo real de redacción.</span>
                 </button>
               </div>
 
@@ -1110,8 +969,8 @@ export function MvpEntryFlow() {
                   ) : null}
                   {sidebarConversation && lastSessionMeta ? (
                     <div className={styles.homeContextCard}>
-                      <span className={styles.homeContextLabel}>Ultima sesion</span>
-                      <span className={styles.homeContextValue}>{sessionTitleLabel} ? {lastSessionMeta}</span>
+                      <span className={styles.homeContextLabel}>Última sesión</span>
+                      <span className={styles.homeContextValue}>{sessionTitleLabel} · {lastSessionMeta}</span>
                     </div>
                   ) : null}
                   {activeConversationSummary ? (
@@ -1125,337 +984,6 @@ export function MvpEntryFlow() {
                 </section>
               ) : null}
             </section>
-            {false ? (
-            <section className={styles.entryPanel}>
-              <div className={styles.entryBody}>
-                <div>
-                  <p className={styles.eyebrow}>{greeting}</p>
-                  <h1 className={styles.headline}>¿Cómo quieres avanzar hoy?</h1>
-                  <p className={styles.subcopy}>
-                    Puedes descargar, analizar una conversación o preparar tu próximo mensaje.
-                  </p>
-                </div>
-
-                <section className={styles.valueSignalCard}>
-                  <span className={styles.valueSignalIcon} aria-hidden="true">
-                    <svg viewBox="0 0 20 20" className={styles.valueSignalIconSvg} fill="none">
-                      <path
-                        d="M4.75 10.25 8 13.5l7.25-7.25"
-                        stroke="currentColor"
-                        strokeWidth="1.7"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </span>
-                  <div className={styles.valueSignalTextBlock}>
-                    <p className={styles.valueSignalTitle}>{processValueTitle}</p>
-                    <p className={styles.valueSignalCopy}>{processValueCopy}</p>
-                  </div>
-                </section>
-
-                {checkinSummaryLine || (sidebarConversation && lastSessionMeta) || activeConversationSummary ? (
-                  <div className={styles.contextSummaryGrid}>
-                    {checkinSummaryLine ? (
-                      <div className={styles.daySummaryCard}>
-                        <span className={styles.daySummaryDot} aria-hidden="true" />
-                        <div className={styles.contextSummaryTextBlock}>
-                          <div className={styles.summaryCardHeaderRow}>
-                            <p className={styles.contextSummaryLabel}>Resumen de hoy</p>
-                            <button
-                              type="button"
-                              className={styles.summaryInlineButton}
-                              onClick={handleOpenCheckinEditor}
-                            >
-                              Editar
-                            </button>
-                          </div>
-                          <p className={styles.daySummaryText}>{checkinSummaryLine}</p>
-                        </div>
-                      </div>
-                    ) : null}
-
-                    {sidebarConversation && lastSessionMeta ? (
-                      <div className={styles.sessionCard}>
-                        <span className={styles.sessionDot} aria-hidden="true" />
-                        <div className={styles.contextSummaryTextBlock}>
-                          <p className={styles.contextSummaryLabel}>Última sesión</p>
-                          <p className={styles.sessionText}>
-                            {sessionTitleLabel} · {lastSessionMeta}
-                          </p>
-                        </div>
-                      </div>
-                    ) : null}
-
-                    {activeConversation ? (
-                      <div className={styles.historySummaryCard}>
-                        <span className={styles.historySummaryDot} aria-hidden="true" />
-                        <div className={styles.contextSummaryTextBlock}>
-                          <p className={styles.contextSummaryLabel}>Conversación seleccionada</p>
-                          {activeConversationMessagesLoading ? (
-                            <p className={styles.historySummaryText}>Cargando conversación...</p>
-                          ) : activeConversationSummary ? (
-                            <>
-                              <p className={styles.historySummaryText}>
-                                {getSavedItemsLabel(activeConversationSummary!.count)} · {activeConversationSummary!.lastTypeLabel}
-                              </p>
-                              <p className={styles.historySummaryPreview}>{activeConversationSummary!.preview}</p>
-                              {activeConversationResume ? (
-                                <div className={styles.historySummaryActions}>
-                                  <p className={styles.historySummaryHint}>{activeConversationResume!.helperText}</p>
-                                  {activeConversationResume!.previewText ? (
-                                    <p className={styles.historySummaryResumePreview}>
-                                      {activeConversationResume!.previewText}
-                                    </p>
-                                  ) : null}
-                                  <div className={styles.historySummaryButtonRow}>
-                                    <button
-                                      type="button"
-                                      className={styles.historySummaryButton}
-                                      onClick={handleResumeConversation}
-                                    >
-                                      {activeConversationResume!.ctaLabel}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className={styles.historySummarySecondaryButton}
-                                      onClick={handleOpenHistoryPanel}
-                                    >
-                                      Ver historial
-                                    </button>
-                                  </div>
-                                </div>
-                              ) : null}
-                            </>
-                          ) : (
-                            <p className={styles.historySummaryText}>Todavía no guardaste contenido en esta conversación.</p>
-                          )}
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
-
-                <div className={styles.actionsHeader}>
-                  <p className={styles.actionsKicker}>Elige cómo quieres usar ExReply hoy</p>
-                </div>
-
-                <div className={styles.actions}>
-                  <button type="button" className={styles.primaryAction} onClick={() => openSelector("vent")}>
-                    <span className={styles.buttonIconBadge} aria-hidden="true">
-                      <svg viewBox="0 0 20 20" className={styles.buttonIcon} fill="none">
-                        <path
-                          d="M4.75 5.75h10.5a1.5 1.5 0 0 1 1.5 1.5v5a1.5 1.5 0 0 1-1.5 1.5H9.8L6.2 16.6a.75.75 0 0 1-1.2-.6v-2.25H4.75a1.5 1.5 0 0 1-1.5-1.5v-5a1.5 1.5 0 0 1 1.5-1.5Z"
-                          stroke="currentColor"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="1.55"
-                        />
-                      </svg>
-                    </span>
-                    <span className={styles.actionTextBlock}>
-                      <span className={styles.actionTitle}>Solo quiero desahogarme</span>
-                      <span className={styles.actionCopy}>
-                        Habla con un consejero para ordenar lo que sientes y decidir con mas calma.
-                      </span>
-                    </span>
-                  </button>
-                  <button type="button" className={styles.secondaryAction} onClick={handleAnalyzeConversation}>
-                    <span className={styles.buttonIconBadge} aria-hidden="true">
-                      <svg viewBox="0 0 20 20" className={styles.buttonIcon} fill="none">
-                        <path
-                          d="M6 4.5h8a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 14 16.5H6A1.5 1.5 0 0 1 4.5 15V6A1.5 1.5 0 0 1 6 4.5Z"
-                          stroke="currentColor"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="1.55"
-                        />
-                        <path
-                          d="M7.5 8h5M7.5 10.75h5M7.5 13.5H11"
-                          stroke="currentColor"
-                          strokeLinecap="round"
-                          strokeWidth="1.55"
-                        />
-                      </svg>
-                    </span>
-                    <span className={styles.actionTextBlock}>
-                      <span className={styles.actionTitle}>Tengo una conversación para analizar</span>
-                      <span className={styles.actionCopy}>Trae el contexto, mira que paso y decide con mas claridad.</span>
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.tertiaryAction}
-                    onClick={() => openSelector("write_to_ex")}
-                  >
-                    <span className={styles.buttonIconBadge} aria-hidden="true">
-                      <svg viewBox="0 0 20 20" className={styles.buttonIcon} fill="none">
-                        <path
-                          d="M4.75 15.25V17h1.75l7.5-7.5-1.75-1.75-7.5 7.5ZM13 6.25l1.3-1.3a1.06 1.06 0 0 1 1.5 0l.25.25a1.06 1.06 0 0 1 0 1.5l-1.3 1.3L13 6.25Z"
-                          stroke="currentColor"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="1.55"
-                        />
-                      </svg>
-                    </span>
-                    <span className={styles.actionTextBlock}>
-                      <span className={styles.actionTitle}>Quiero escribirle a mi ex</span>
-                      <span className={styles.actionCopy}>Prepara tu mensaje con apoyo y menos desgaste.</span>
-                    </span>
-                  </button>
-                </div>
-
-                {todayCheckin || (sidebarConversation && lastSessionMeta) || activeConversationSummary ? (
-                  <section className={styles.contextSummarySection}>
-                    <div className={styles.contextSummarySectionHeader}>
-                      <div>
-                        <p className={styles.contextSummarySectionEyebrow}>Tu proceso hoy</p>
-                        <p className={styles.contextSummarySectionTitle}>
-                          Un punto de partida simple para decidir con mas claridad.
-                        </p>
-                      </div>
-                      {todayCheckin ? (
-                        <button type="button" className={styles.summaryInlineButton} onClick={handleOpenCheckinEditor}>
-                          Ajustar check-in
-                        </button>
-                      ) : null}
-                    </div>
-
-                    <div className={styles.contextSummaryCards}>
-                      {todayCheckin ? (
-                        <section className={`${styles.daySummaryCard} ${styles.todayStateCard}`}>
-                          <div className={styles.summaryCardHeaderRow}>
-                            <div>
-                              <p className={styles.contextSummaryLabel}>Resumen de hoy</p>
-                              <p className={styles.todayStateTitle}>Tu punto de partida hoy</p>
-                            </div>
-                            <span className={styles.todayStateChip}>{checkinSummaryLine ?? "Check-in listo"}</span>
-                          </div>
-                          {todayStartingPointCopy ? (
-                            <p className={styles.todayStateSupport}>{todayStartingPointCopy}</p>
-                          ) : null}
-                          <div className={styles.todayStateMetrics}>
-                            <TodayStateMetric
-                              label="?nimo"
-                              value={getMoodSummaryLabel(todayCheckin!.mood_level) ?? "Sin registrar"}
-                              percent={getCheckinPercent(todayCheckin!.mood_level)}
-                              tone={getCheckinTone(todayCheckin!.mood_level)}
-                              icon={
-                                <svg viewBox="0 0 20 20" className={styles.todayStateMetricSvg} fill="none">
-                                  <path
-                                    d="M10 16.25s-4.75-2.95-4.75-7.05A2.7 2.7 0 0 1 8 6.5c.84 0 1.63.39 2 .99.37-.6 1.16-.99 2-.99a2.7 2.7 0 0 1 2.75 2.7c0 4.1-4.75 7.05-4.75 7.05Z"
-                                    stroke="currentColor"
-                                    strokeWidth="1.6"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                  />
-                                </svg>
-                              }
-                            />
-                            <TodayStateMetric
-                              label="Confianza"
-                              value={getConfidenceSummaryLabel(todayCheckin!.confidence_level) ?? "Sin registrar"}
-                              percent={getCheckinPercent(todayCheckin!.confidence_level)}
-                              tone={getCheckinTone(todayCheckin!.confidence_level)}
-                              icon={
-                                <svg viewBox="0 0 20 20" className={styles.todayStateMetricSvg} fill="none">
-                                  <path
-                                    d="M10 3.75 14.75 5.5v3.7c0 2.93-1.86 5.47-4.75 6.8-2.89-1.33-4.75-3.87-4.75-6.8V5.5L10 3.75Z"
-                                    stroke="currentColor"
-                                    strokeWidth="1.6"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                  />
-                                </svg>
-                              }
-                            />
-                          </div>
-                          <div className={styles.todayStateFooter}>
-                            <span className={styles.todayStateFooterLabel}>Contacto reciente</span>
-                            <span
-                              className={`${styles.todayStateContactChip} ${
-                                todayCheckin!.recent_contact ? styles.todayStateContactChipAlert : styles.todayStateContactChipCalm
-                              }`}
-                            >
-                              {getRecentContactSummary(todayCheckin!.recent_contact)}
-                            </span>
-                          </div>
-                        </section>
-                      ) : null}
-
-                      <div className={styles.contextSummaryGrid}>
-                        {sidebarConversation && lastSessionMeta ? (
-                          <div className={styles.sessionCard}>
-                            <span className={styles.sessionDot} aria-hidden="true" />
-                            <div className={styles.contextSummaryTextBlock}>
-                              <p className={styles.contextSummaryLabel}>Última sesión</p>
-                              <p className={styles.sessionText}>
-                                {sessionTitleLabel} · {lastSessionMeta}
-                              </p>
-                            </div>
-                          </div>
-                        ) : null}
-
-                        {activeConversation ? (
-                          <div className={styles.historySummaryCard}>
-                            <span className={styles.historySummaryDot} aria-hidden="true" />
-                            <div className={styles.contextSummaryTextBlock}>
-                              <p className={styles.contextSummaryLabel}>Conversación seleccionada</p>
-                              {activeConversationMessagesLoading ? (
-                                <p className={styles.historySummaryText}>Cargando conversación...</p>
-                              ) : activeConversationSummary ? (
-                                <>
-                                  <p className={styles.historySummaryText}>
-                                    {getSavedItemsLabel(activeConversationSummary!.count)} · {activeConversationSummary!.lastTypeLabel}
-                                  </p>
-                                  <p className={styles.historySummaryPreview}>{activeConversationSummary!.preview}</p>
-                                  {activeConversationResume ? (
-                                    <div className={styles.historySummaryActions}>
-                                      <p className={styles.historySummaryHint}>{activeConversationResume!.helperText}</p>
-                                      {activeConversationResume!.previewText ? (
-                                        <p className={styles.historySummaryResumePreview}>
-                                          {activeConversationResume!.previewText}
-                                        </p>
-                                      ) : null}
-                                      <div className={styles.historySummaryButtonRow}>
-                                        <button
-                                          type="button"
-                                          className={styles.historySummaryButton}
-                                          onClick={handleResumeConversation}
-                                        >
-                                          {activeConversationResume!.ctaLabel}
-                                        </button>
-                                        <button
-                                          type="button"
-                                          className={styles.historySummarySecondaryButton}
-                                          onClick={handleOpenHistoryPanel}
-                                        >
-                                          Ver historial
-                                        </button>
-                                      </div>
-                                    </div>
-                                  ) : null}
-                                </>
-                              ) : (
-                                <p className={styles.historySummaryText}>Todavía no guardaste contenido en esta conversación.</p>
-                              )}
-                            </div>
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-                  </section>
-                ) : null}
-
-                <p className={styles.disclaimer}>
-                  Guardamos el contexto mínimo para que puedas retomar tu proceso. La IA puede equivocarse.
-                  <br />
-                  No reemplaza apoyo <a href="#" className={styles.disclaimerLink}>psicológico</a>, legal ni atención de emergencia.
-                </p>
-              </div>
-            </section>
-            ) : null}
           </div>
         </div>
       ) : (
@@ -1505,10 +1033,12 @@ export function MvpEntryFlow() {
                 {checkinFlow === "post_session" ? "Cierre de sesión" : "Check-in diario"}
               </p>
               <h2 id="daily-checkin-title" className={styles.checkinTitle}>
-                Antes de empezar, ¿cómo estás hoy?
+                {checkinFlow === "post_session" ? "Antes de cerrar, ¿cómo te vas hoy?" : "Antes de empezar, ¿cómo estás hoy?"}
               </h2>
               <p className={styles.checkinSubtitle}>
-                Esto nos ayuda a acompañarte mejor y a sugerirte cuándo conviene responder y cuándo no.
+                {checkinFlow === "post_session"
+                  ? "Esto nos ayuda a cerrar la sesión con mejor contexto y a sugerirte cómo seguir después."
+                  : "Esto nos ayuda a acompañarte mejor y a sugerirte cuándo conviene responder y cuándo no."}
               </p>
             </div>
 
@@ -1529,7 +1059,7 @@ export function MvpEntryFlow() {
                 className={styles.checkinQuestionSpanTwo}
               />
               <CheckinSliderQuestion
-                title="C?mo est? el v?nculo con tu expareja actualmente?"
+                title="¿Cómo está el vínculo con tu expareja actualmente?"
                 options={EX_RELATIONSHIP_OPTIONS}
                 value={draftRelationshipLevel}
                 onChange={setDraftRelationshipLevel}
@@ -1537,7 +1067,7 @@ export function MvpEntryFlow() {
               />
               {checkinFlow === "post_session" ? (
                 <CheckinSliderQuestion
-                  title="Como te fuiste de esta sesion?"
+                  title="¿Cómo te fuiste de esta sesión?"
                   options={SESSION_OUTCOME_OPTIONS}
                   value={draftSessionOutcomeLevel}
                   onChange={setDraftSessionOutcomeLevel}
@@ -1565,7 +1095,7 @@ export function MvpEntryFlow() {
                         : styles.checkinSliderValuePending
                     }`}
                   >
-                    {draftRecentContact === null ? "Falta elegir" : draftRecentContact ? "Si" : "No"}
+                    {draftRecentContact === null ? "Falta elegir" : draftRecentContact ? "Sí" : "No"}
                   </span>
                 </div>
                 <div className={styles.binaryOptionRow}>
@@ -1589,7 +1119,7 @@ export function MvpEntryFlow() {
               </section>
               {shouldShowChildrenInteractionQuestion ? (
                 <CheckinSliderQuestion
-                  title="Si esto aplica en tu caso, c?mo sentiste la interacci?n reciente alrededor de tus hijos?"
+                  title="Si esto aplica en tu caso, ¿cómo sentiste la interacción reciente alrededor de tus hijos?"
                   helperText="Opcional. Puedes dejarlo sin responder si hoy no aplica para ti."
                   options={CHILDREN_INTERACTION_OPTIONS}
                   value={draftChildrenInteractionLevel}
