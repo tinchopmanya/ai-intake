@@ -1630,7 +1630,7 @@
   justify-content: center;
   align-items: stretch;
   overflow: hidden;
-  padding: 24px;
+  padding: 18px 20px;
 }
 
 .historyReportBackdrop {
@@ -1958,11 +1958,11 @@
 .wizardPanel {
   height: 100%;
   min-height: 0;
-  width: min(100%, 860px);
+  width: min(100%, 980px);
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   overflow: hidden;
   border: 1px solid var(--panel-border);
   border-radius: 26px;
@@ -1971,7 +1971,7 @@
     radial-gradient(circle at 84% 14%, rgba(34, 197, 139, 0.1) 0%, transparent 22%),
     radial-gradient(circle at 50% 100%, rgba(45, 107, 228, 0.1) 0%, transparent 38%),
     linear-gradient(180deg, rgba(13, 24, 37, 0.98) 0%, rgba(10, 21, 32, 0.98) 100%);
-  padding: 20px;
+  padding: 16px 18px;
   box-shadow:
     0 28px 72px rgba(0, 0, 0, 0.28),
     inset 0 1px 0 rgba(255, 255, 255, 0.03);
@@ -2109,7 +2109,7 @@
   min-height: 0;
   flex: 1;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   overflow: hidden;
 }
 
@@ -2148,18 +2148,18 @@
 
 .wizardMobileCard {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   border-radius: 24px;
   border: 1px solid rgba(255, 255, 255, 0.09);
   background: linear-gradient(180deg, rgba(17, 32, 51, 0.9) 0%, rgba(10, 21, 32, 0.96) 100%);
-  padding: 16px;
+  padding: 14px 16px;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.03),
     0 20px 36px rgba(2, 8, 16, 0.18);
 }
 
 .wizardStepOneCard {
-  gap: 14px;
+  gap: 12px;
   background:
     radial-gradient(circle at top left, rgba(244, 201, 93, 0.09) 0%, transparent 18%),
     radial-gradient(circle at 88% 12%, rgba(34, 197, 139, 0.08) 0%, transparent 20%),
@@ -2998,7 +2998,7 @@
 
 .wizardAnalysisStack {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .wizardAnalysisLayout {
@@ -3010,19 +3010,14 @@
 
 .wizardUnifiedLayout {
   display: grid;
-  gap: 16px;
+  gap: 12px;
   grid-template-columns: minmax(0, 1.18fr) minmax(320px, 0.82fr);
   align-items: start;
 }
 
 .wizardResultMainStack {
   display: grid;
-  gap: 18px;
-}
-
-.wizardResultTopActionRow {
-  display: flex;
-  justify-content: flex-start;
+  gap: 12px;
 }
 
 .wizardAnalysisColumn {
@@ -3033,7 +3028,7 @@
 
 .wizardUnifiedSection {
   display: grid;
-  gap: 16px;
+  gap: 12px;
 }
 
 .wizardUnifiedSectionHeader {
@@ -3112,11 +3107,25 @@
 }
 
 .wizardRecommendationCard {
-  padding: 18px 20px;
+  padding: 16px 18px;
   border-color: rgba(244, 201, 93, 0.18);
   background:
     radial-gradient(circle at top left, rgba(244, 201, 93, 0.14) 0%, transparent 24%),
     linear-gradient(180deg, rgba(17, 32, 51, 0.98) 0%, rgba(10, 21, 32, 0.99) 100%);
+}
+
+.wizardRecommendationGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.wizardRecommendationActions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
 }
 
 .wizardAnalysisMetaCard {
@@ -3228,13 +3237,6 @@
   gap: 10px;
   padding-top: 2px;
   padding-bottom: max(4px, env(safe-area-inset-bottom));
-}
-
-.wizardAnalysisCardHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
 }
 
 .wizardAnalysisSummaryStack {
@@ -3981,6 +3983,14 @@
   .wizardAnalysisMetaGrid,
   .wizardAnalysisModalGrid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .wizardRecommendationGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .wizardRecommendationActions {
+    align-items: flex-start;
   }
 
   .wizardAnalysisModalBackdrop {

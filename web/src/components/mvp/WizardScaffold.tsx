@@ -2295,14 +2295,6 @@ export function WizardScaffold({
 
       {isUnifiedResultStep ? (
         <div className={`${styles.wizardStepBody} ${styles.wizardStepBodyScroll}`}>
-          <div className={styles.wizardStepHeader}>
-            <p className={styles.wizardStepKicker}>Resultado</p>
-            <h3 className={styles.wizardStepIntroTitle}>Análisis y advisors</h3>
-            <p className={styles.wizardStepIntroCopy}>
-              Lo esencial para decidir con claridad y comparar las tres respuestas en una sola pantalla.
-            </p>
-          </div>
-
           {showAnalysisResumePanel || showAdvisorResumePanel ? (
             <section className={`${styles.wizardMobileCard} ${styles.wizardResumeCard}`}>
               <div className={styles.wizardResumeHeader}>
@@ -2371,48 +2363,47 @@ export function WizardScaffold({
           {analysisResult ? (
             <>
               <div className={styles.wizardResultMainStack}>
-                <div className={styles.wizardResultTopActionRow}>
-                  <Button
-                    type="button"
-                    onClick={() => setAnalysisModalOpen(true)}
-                    variant="secondary"
-                    className={`${styles.wizardAnalysisModalButton} ${styles.wizardAnalysisModalButtonProminent} h-11 text-[13px]`}
-                  >
-                    <svg aria-hidden="true" viewBox="0 0 20 20" className="h-5 w-5" fill="none">
-                      <path
-                        d="M10 3.75a6.25 6.25 0 1 0 0 12.5 6.25 6.25 0 0 0 0-12.5Zm0 3v3.25m0 2.5h.01"
-                        stroke="currentColor"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="1.7"
-                      />
-                    </svg>
-                    Ver análisis
-                  </Button>
-                </div>
-
                 <section className={`${styles.wizardMobileCard} ${styles.wizardAnalysisCompactCard} ${styles.wizardRecommendationCard}`}>
-                  <div className={styles.wizardAnalysisCardHeader}>
-                    <div className={styles.wizardAnalysisBlockLabel}>Recomendación principal</div>
-                    <span
-                      className={`${styles.wizardAnalysisDecisionBadge} ${
-                        analysisStatus?.kind === "risk"
-                          ? styles.wizardAnalysisDecisionBadgeRisk
+                  <div className={styles.wizardRecommendationGrid}>
+                    <div className={styles.wizardAnalysisSummaryStack}>
+                      <div className={styles.wizardAnalysisBlockLabel}>Recomendación principal</div>
+                      <p className={styles.wizardAnalysisDecisionTitle}>{replyTiming?.title}</p>
+                      <p className={styles.wizardAnalysisDecisionText}>{replyTiming?.description}</p>
+                    </div>
+                    <div className={styles.wizardRecommendationActions}>
+                      <span
+                        className={`${styles.wizardAnalysisDecisionBadge} ${
+                          analysisStatus?.kind === "risk"
+                            ? styles.wizardAnalysisDecisionBadgeRisk
+                            : analysisStatus?.kind === "observation"
+                              ? styles.wizardAnalysisDecisionBadgeWarn
+                              : styles.wizardAnalysisDecisionBadgeOk
+                        }`}
+                      >
+                        {analysisStatus?.kind === "risk"
+                          ? "Pausa"
                           : analysisStatus?.kind === "observation"
-                            ? styles.wizardAnalysisDecisionBadgeWarn
-                            : styles.wizardAnalysisDecisionBadgeOk
-                      }`}
-                    >
-                      {analysisStatus?.kind === "risk"
-                        ? "Pausa"
-                        : analysisStatus?.kind === "observation"
-                          ? "Cautela"
-                          : "Estable"}
-                    </span>
-                  </div>
-                  <div className={styles.wizardAnalysisSummaryStack}>
-                    <p className={styles.wizardAnalysisDecisionTitle}>{replyTiming?.title}</p>
-                    <p className={styles.wizardAnalysisDecisionText}>{replyTiming?.description}</p>
+                            ? "Cautela"
+                            : "Estable"}
+                      </span>
+                      <Button
+                        type="button"
+                        onClick={() => setAnalysisModalOpen(true)}
+                        variant="secondary"
+                        className={`${styles.wizardAnalysisModalButton} ${styles.wizardAnalysisModalButtonProminent} h-11 text-[13px]`}
+                      >
+                        <svg aria-hidden="true" viewBox="0 0 20 20" className="h-5 w-5" fill="none">
+                          <path
+                            d="M10 3.75a6.25 6.25 0 1 0 0 12.5 6.25 6.25 0 0 0 0-12.5Zm0 3v3.25m0 2.5h.01"
+                            stroke="currentColor"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="1.7"
+                          />
+                        </svg>
+                        Ver análisis
+                      </Button>
+                    </div>
                   </div>
                 </section>
 
