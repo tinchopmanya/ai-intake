@@ -1,17 +1,23 @@
 "use client";
 
-import type { CSSProperties, ReactNode } from "react";
+import type { ChangeEvent, ClipboardEvent, CSSProperties, ReactNode } from "react";
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import styles from "@/components/mvp/MvpEntryFlow.module.css";
 import { useMvpShell } from "@/components/mvp/MvpShellContext";
 import { WizardScaffold, type ConversationResumeState } from "@/components/mvp/WizardScaffold";
 import { ADVISOR_PROFILES } from "@/data/advisors";
+import { authFetch, hasStoredSession } from "@/lib/auth/client";
 import { getEmotionalCheckinToday, postEmotionalCheckin } from "@/lib/api/client";
 import { toUiErrorMessage } from "@/lib/api/errors";
-import type { MessageSummary } from "@/lib/api/types";
-import type { EmotionalCheckinSummary } from "@/lib/api/types";
+import type { EmotionalCheckinSummary, MessageSummary, OcrCapabilitiesResponse, OcrExtractResponse } from "@/lib/api/types";
+import { API_URL } from "@/lib/config";
+import {
+  getMicrophoneStatusMessage,
+  getSpeechToTextErrorMessage,
+  useSpeechToText,
+} from "@/hooks/useSpeechToText";
 
 type FlowView = "entry" | "wizard";
 type SelectorIntent = "vent" | "write_to_ex";
@@ -36,6 +42,8 @@ type CheckinOption = {
 };
 
 const DEFAULT_ADVISOR_STORAGE_KEY = "exreply-default-advisor-id";
+const OCR_EXTRACT_URL = `${API_URL}/v1/ocr/extract`;
+const OCR_CAPABILITIES_URL = `${API_URL}/v1/ocr/capabilities`;
 const DAILY_MOOD_OPTIONS: CheckinOption[] = [
   { value: 0, label: "Muy agotado/a" },
   { value: 1, label: "Con poco" },
@@ -93,6 +101,40 @@ const ADVISOR_CARD_VARIANT: Record<string, SelectorCardVariant> = {
   robert: "structured",
   lidia: "direct",
 };
+
+const OCR_ERROR_MESSAGES: Record<string, string> = {
+  missing_image_file: "Selecciona una imagen para continuar.",
+  unsupported_image_mime_type: "Formato no compatible. Usa PNG, JPG o WebP.",
+  empty_file: "La imagen seleccionada está vacía.",
+  file_too_large: "La imagen es demasiado grande.",
+  python_multipart_not_installed: "OCR no disponible en este entorno.",
+  ocr_no_text_detected: "No detectamos texto legible. Prueba otra captura más nítida.",
+  invalid_image_file: "No pudimos leer la imagen. Prueba con otro archivo.",
+  pillow_not_installed: "OCR no disponible por configuración del servidor.",
+  pytesseract_not_installed: "OCR no disponible por configuración del servidor.",
+  tesseract_not_installed: "OCR no disponible: falta Tesseract en el servidor.",
+  tesseract_not_available: "OCR no disponible en este servidor.",
+  tesseract_binary_not_found: "OCR no disponible: Tesseract no fue encontrado.",
+  tesseract_language_not_available: "OCR no disponible para el idioma configurado.",
+  tesseract_execution_failed: "No se pudo procesar la imagen con OCR.",
+  google_vision_dependency_missing: "OCR no disponible por configuración del servidor.",
+  google_vision_not_configured: "OCR no disponible: Google Vision no está configurado.",
+  google_vision_request_failed: "No se pudo procesar la imagen en este momento.",
+  ocr_unavailable: "OCR no está disponible ahora. Intenta de nuevo más tarde.",
+  ocr_internal_error: "Error interno al leer la imagen.",
+  invalid_or_expired_session: "Tu sesión expiró. Inicia sesión nuevamente.",
+  missing_bearer_token: "Necesitas iniciar sesión para usar OCR.",
+};
+
+function resolveOcrErrorMessage(detail?: string, message?: string): string {
+  if (detail && OCR_ERROR_MESSAGES[detail]) {
+    return OCR_ERROR_MESSAGES[detail];
+  }
+  if (message && message.trim()) {
+    return message;
+  }
+  return "No se pudo leer el texto de la imagen.";
+}
 
 function getGreetingLabel() {
   const hour = new Date().getHours();
@@ -457,6 +499,12 @@ export function MvpEntryFlow() {
   const [resumeState, setResumeState] = useState<ConversationResumeState | null>(null);
   const [entryInputMode, setEntryInputMode] = useState<HomeInputMode>("write");
   const [entryMessageText, setEntryMessageText] = useState("");
+  const [entryOcrLoading, setEntryOcrLoading] = useState(false);
+  const [entryOcrError, setEntryOcrError] = useState<string | null>(null);
+  const [entryOcrInfo, setEntryOcrInfo] = useState<OcrExtractResponse | null>(null);
+  const [entryOcrStatus, setEntryOcrStatus] = useState<string | null>(null);
+  const [entryOcrCapabilities, setEntryOcrCapabilities] = useState<OcrCapabilitiesResponse | null>(null);
+  const [entryOcrCapabilitiesLoading, setEntryOcrCapabilitiesLoading] = useState(true);
   const [wizardInitialInput, setWizardInitialInput] = useState<string | null>(null);
   const [wizardInitialMode, setWizardInitialMode] = useState<HomeInputMode>("write");
   const [wizardAutoSubmit, setWizardAutoSubmit] = useState(false);
@@ -473,6 +521,16 @@ export function MvpEntryFlow() {
   const [draftRelationshipLevel, setDraftRelationshipLevel] = useState<number | null>(null);
   const [draftChildrenInteractionLevel, setDraftChildrenInteractionLevel] = useState<number | null>(null);
   const [draftSessionOutcomeLevel, setDraftSessionOutcomeLevel] = useState<number | null>(4);
+  const entryFileInputRef = useRef<HTMLInputElement | null>(null);
+  const entryVoice = useSpeechToText({
+    lang: "es-ES",
+    continuous: false,
+    interimResults: false,
+  });
+  const entryVoiceStatusMessage = getMicrophoneStatusMessage(
+    entryVoice.microphoneStatus,
+    entryVoice.speechSupported,
+  );
 
   function syncCheckinDrafts(checkin: EmotionalCheckinSummary | null) {
     setDraftMoodLevel(checkin?.mood_level ?? null);
@@ -510,6 +568,45 @@ export function MvpEntryFlow() {
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadEntryOcrCapabilities() {
+      setEntryOcrCapabilitiesLoading(true);
+      try {
+        const response = await authFetch(OCR_CAPABILITIES_URL, {
+          method: "GET",
+          cache: "no-store",
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = (await response.json()) as OcrCapabilitiesResponse;
+        if (!mounted) return;
+        setEntryOcrCapabilities(payload);
+      } catch {
+        if (!mounted) return;
+        setEntryOcrCapabilities({
+          available: false,
+          selected_provider: "auto",
+          providers_checked: [],
+          reason_codes: ["ocr_unavailable"],
+        });
+      } finally {
+        if (mounted) setEntryOcrCapabilitiesLoading(false);
+      }
+    }
+    void loadEntryOcrCapabilities();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const transcript = entryVoice.transcript.trim();
+    if (!transcript) return;
+    setEntryInputMode("voice");
+    setEntryMessageText((previous) => (previous.trim() ? `${previous.trim()}\n${transcript}` : transcript));
+    entryVoice.resetTranscript();
+  }, [entryVoice.transcript]);
 
   useEffect(() => {
     function handleNewConversation() {
@@ -572,7 +669,7 @@ export function MvpEntryFlow() {
     const moodLabel = getMoodSummaryLabel(todayCheckin.mood_level);
     const confidenceLabel = getConfidenceSummaryLabel(todayCheckin.confidence_level);
     if (!moodLabel || !confidenceLabel) return null;
-    return `Animo ${moodLabel.toLowerCase()} · confianza ${confidenceLabel.toLowerCase()}`;
+    return `?nimo ${moodLabel.toLowerCase()} · confianza ${confidenceLabel.toLowerCase()}`;
   }, [todayCheckin]);
   const processValueTitle = useMemo(
     () => getSavedProcessMomentsTitle(savedProcessMomentsCount),
@@ -652,6 +749,66 @@ export function MvpEntryFlow() {
     window.localStorage.removeItem(DEFAULT_ADVISOR_STORAGE_KEY);
   }
 
+  async function processEntryImageFile(file: File) {
+    if (!file.type.startsWith("image/")) {
+      setEntryOcrError("Selecciona una imagen válida (PNG, JPG o WebP).");
+      return;
+    }
+    if (!hasStoredSession()) {
+      setEntryOcrError("Tu sesión no está activa. Inicia sesión para usar esta función.");
+      return;
+    }
+    if (entryOcrCapabilitiesLoading || entryOcrCapabilities?.available === false) {
+      setEntryOcrError("La carga por captura no está disponible en este entorno.");
+      return;
+    }
+
+    setEntryOcrLoading(true);
+    setEntryOcrError(null);
+    setEntryOcrInfo(null);
+    setEntryOcrStatus("Procesando captura...");
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await authFetch(OCR_EXTRACT_URL, {
+        method: "POST",
+        body: formData,
+      });
+      if (!response.ok) {
+        const errorPayload = (await response.json().catch(() => null)) as
+          | { detail?: string; message?: string }
+          | null;
+        throw new Error(resolveOcrErrorMessage(errorPayload?.detail, errorPayload?.message));
+      }
+      const payload = (await response.json()) as OcrExtractResponse;
+      setEntryMessageText(payload.extracted_text);
+      setEntryOcrInfo(payload);
+      setEntryOcrStatus("Texto extraído y listo para revisar.");
+    } catch (error) {
+      setEntryOcrError(toUiErrorMessage(error, "No se pudo leer el texto de la imagen."));
+      setEntryOcrStatus(null);
+    } finally {
+      setEntryOcrLoading(false);
+    }
+  }
+
+  function handleEntryImageSelection(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    if (!file) return;
+    void processEntryImageFile(file);
+    event.target.value = "";
+  }
+
+  function handleEntryPaste(event: ClipboardEvent<HTMLElement>) {
+    const clipboardItems = Array.from(event.clipboardData?.items ?? []);
+    const imageItem = clipboardItems.find((item) => item.type.startsWith("image/"));
+    if (!imageItem) return;
+    const file = imageItem.getAsFile();
+    if (!file) return;
+    event.preventDefault();
+    void processEntryImageFile(file);
+  }
+
   function enterWizard(
     nextPreferredAdvisorId: string | null,
     options?: {
@@ -695,7 +852,7 @@ export function MvpEntryFlow() {
     if (!normalizedMessage) return;
     enterWizard(null, {
       initialInput: normalizedMessage,
-      initialStepInputMode: "write",
+      initialStepInputMode: entryInputMode,
       autoSubmit: true,
     });
   }
@@ -775,6 +932,14 @@ export function MvpEntryFlow() {
     }
   }
 
+  const canSubmitEntry = entryMessageText.trim().length > 0 && !entryOcrLoading;
+  const entryPrimaryLabel =
+    entryInputMode === "capture"
+      ? "Analizar esta captura"
+      : entryInputMode === "voice"
+        ? "Analizar este dictado"
+        : "Ver recomendacion y advisors";
+
   return (
     <>
       {view === "entry" ? (
@@ -782,14 +947,14 @@ export function MvpEntryFlow() {
           <div className={styles.entryShell}>
             <section className={styles.homePanel}>
               <div className={styles.homeHero}>
-                <p className={styles.homeEyebrow}>ExReply â€” tu espacio para pensar antes de responder</p>
-                <h1 className={styles.homeTitle}>Â¿QuÃ© pasÃ³ con tu ex hoy?</h1>
+                <p className={styles.homeEyebrow}>ExReply - claridad antes de responder</p>
+                <h1 className={styles.homeTitle}>Que paso con tu ex hoy?</h1>
                 <p className={styles.homeSubcopy}>
-                  PegÃ¡ el mensaje, contanos la situaciÃ³n o subÃ­ una captura. Tres consejeros te ayudan a responder con claridad.
+                  Pega el mensaje, sube una captura o dicta la situacion. Entras directo a una recomendacion clara y a las tres respuestas de advisors.
                 </p>
               </div>
 
-              <section className={styles.homeInputCard}>
+              <section className={styles.homeInputCard} onPaste={entryInputMode === "capture" ? handleEntryPaste : undefined}>
                 <div className={styles.homeInputTabs}>
                   <button
                     type="button"
@@ -820,42 +985,105 @@ export function MvpEntryFlow() {
                       value={entryMessageText}
                       onChange={(event) => setEntryMessageText(event.target.value)}
                       className={styles.homeTextarea}
-                      placeholder='PegÃ¡ el mensaje o contanos con tus palabras quÃ© pasÃ³. Ej: "Me mandÃ³ un audio diciendo que quiere cambiar el rÃ©gimen de visitas..."'
+                      placeholder='Pega el mensaje o conta que paso. Ej: "Me mando un audio diciendo que quiere cambiar el regimen de visitas..."'
                     />
-                  ) : (
-                    <div className={styles.homeAssistCard}>
-                      <p className={styles.homeAssistTitle}>
-                        {entryInputMode === "capture"
-                          ? "La carga por captura sigue usando el flujo real de OCR."
-                          : "El dictado sigue usando el flujo real de voz."}
-                      </p>
-                      <p className={styles.homeAssistCopy}>
-                        {entryInputMode === "capture"
-                          ? "Abrimos el paso real de captura para que subas la imagen y revises el texto antes del anÃ¡lisis."
-                          : "Abrimos el paso real de voz para que dictes y revises el texto antes del anÃ¡lisis."}
-                      </p>
+                  ) : null}
+
+                  {entryInputMode === "capture" ? (
+                    <div className={styles.homeCapturePanel}>
+                      <div className={styles.homeCaptureActions}>
+                        <input
+                          ref={entryFileInputRef}
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          className={styles.homeHiddenInput}
+                          onChange={handleEntryImageSelection}
+                        />
+                        <button
+                          type="button"
+                          className={styles.homeCaptureButton}
+                          onClick={() => entryFileInputRef.current?.click()}
+                          disabled={entryOcrLoading || entryOcrCapabilities?.available === false || entryOcrCapabilitiesLoading}
+                        >
+                          Subir captura
+                        </button>
+                        <div className={styles.homeCaptureHintBlock}>
+                          <p className={styles.homeAssistTitle}>Pega o sube la imagen aca mismo</p>
+                          <p className={styles.homeAssistCopy}>
+                            Reutilizamos el OCR real del producto para extraer el texto sin sacar al usuario de la home.
+                          </p>
+                        </div>
+                      </div>
+                      <textarea
+                        value={entryMessageText}
+                        onChange={(event) => setEntryMessageText(event.target.value)}
+                        className={styles.homeTextarea}
+                        placeholder="Cuando leas una captura, el texto va a aparecer aca para que lo revises antes del analisis."
+                      />
+                      <div className={styles.homeStatusStack}>
+                        {entryOcrCapabilities?.available === false ? (
+                          <p className={styles.homeStatusWarning}>
+                            OCR no disponible: {resolveOcrErrorMessage(entryOcrCapabilities.reason_codes[0])}
+                          </p>
+                        ) : null}
+                        {entryOcrLoading ? <p className={styles.homeStatusInfo}>Procesando captura...</p> : null}
+                        {entryOcrStatus ? <p className={styles.homeStatusInfo}>{entryOcrStatus}</p> : null}
+                        {entryOcrInfo?.provider ? (
+                          <p className={styles.homeStatusSubtle}>Proveedor detectado: {entryOcrInfo.provider}</p>
+                        ) : null}
+                        {entryOcrError ? <p className={styles.homeStatusError}>{entryOcrError}</p> : null}
+                      </div>
                     </div>
-                  )}
+                  ) : null}
+
+                  {entryInputMode === "voice" ? (
+                    <div className={styles.homeVoicePanel}>
+                      <div className={styles.homeVoiceRow}>
+                        <button
+                          type="button"
+                          className={`${styles.homeVoiceButton} ${entryVoice.listening ? styles.homeVoiceButtonActive : ""}`}
+                          onClick={() => {
+                            if (entryVoice.listening) {
+                              entryVoice.stopListening();
+                            } else {
+                              entryVoice.startListening();
+                            }
+                          }}
+                          disabled={entryVoice.microphoneStatus === "requesting"}
+                          aria-label={entryVoice.listening ? "Detener dictado" : "Empezar dictado"}
+                        >
+                          {entryVoice.listening ? "Detener" : "Dictar"}
+                        </button>
+                        <div className={styles.homeCaptureHintBlock}>
+                          <p className={styles.homeAssistTitle}>
+                            {entryVoice.listening ? "Te estamos escuchando" : "Dicta desde aca mismo"}
+                          </p>
+                          <p className={styles.homeAssistCopy}>
+                            {entryVoiceStatusMessage || "Tu voz se agrega al texto principal para revisar antes del an?lisis."}
+                          </p>
+                        </div>
+                      </div>
+                      <textarea
+                        value={entryMessageText}
+                        onChange={(event) => setEntryMessageText(event.target.value)}
+                        className={styles.homeTextarea}
+                        placeholder="Lo que dictes aparece ac? para que lo ordenes antes de analizar."
+                      />
+                      {entryVoice.error ? (
+                        <p className={styles.homeStatusWarning}>{getSpeechToTextErrorMessage(entryVoice.error)}</p>
+                      ) : null}
+                    </div>
+                  ) : null}
 
                   <div className={styles.homeInputFooter}>
-                    <span className={styles.homeInputHint}>Tu conversaciÃ³n no se comparte con nadie.</span>
+                    <span className={styles.homeInputHint}>Tu conversacion no se comparte con nadie.</span>
                     <button
                       type="button"
                       className={styles.homePrimaryButton}
-                      onClick={() => {
-                        if (entryInputMode === "write") {
-                          handleAnalyzeConversation();
-                          return;
-                        }
-                        enterWizard(null, {
-                          initialInput: entryMessageText.trim() || null,
-                          initialStepInputMode: entryInputMode,
-                          autoSubmit: false,
-                        });
-                      }}
-                      disabled={entryInputMode === "write" && !entryMessageText.trim()}
+                      onClick={handleAnalyzeConversation}
+                      disabled={!canSubmitEntry}
                     >
-                      {entryInputMode === "write" ? "Ver quÃ© dicen los consejeros" : "Continuar con este modo"}
+                      {entryPrimaryLabel}
                     </button>
                   </div>
                 </div>
@@ -864,11 +1092,11 @@ export function MvpEntryFlow() {
               <div className={styles.quickActions}>
                 <button type="button" className={styles.quickActionCard} onClick={() => openSelector("vent")}>
                   <span className={styles.quickActionTitle}>Solo quiero desahogarme</span>
-                  <span className={styles.quickActionCopy}>EntrÃ¡ directo a hablar con un advisor sin analizar nada concreto.</span>
+                  <span className={styles.quickActionCopy}>Entra directo a hablar con un advisor sin analizar nada concreto.</span>
                 </button>
                 <button type="button" className={styles.quickActionCard} onClick={() => openSelector("write_to_ex")}>
                   <span className={styles.quickActionTitle}>Quiero escribirle a mi ex</span>
-                  <span className={styles.quickActionCopy}>ElegÃ­ un advisor y seguÃ­ con el flujo real de redacciÃ³n.</span>
+                  <span className={styles.quickActionCopy}>Elige un advisor y sigue con el flujo real de redaccion.</span>
                 </button>
               </div>
 
@@ -882,8 +1110,8 @@ export function MvpEntryFlow() {
                   ) : null}
                   {sidebarConversation && lastSessionMeta ? (
                     <div className={styles.homeContextCard}>
-                      <span className={styles.homeContextLabel}>Ãšltima sesiÃ³n</span>
-                      <span className={styles.homeContextValue}>{sessionTitleLabel} Â· {lastSessionMeta}</span>
+                      <span className={styles.homeContextLabel}>Ultima sesion</span>
+                      <span className={styles.homeContextValue}>{sessionTitleLabel} ? {lastSessionMeta}</span>
                     </div>
                   ) : null}
                   {activeConversationSummary ? (
@@ -897,7 +1125,6 @@ export function MvpEntryFlow() {
                 </section>
               ) : null}
             </section>
-
             {false ? (
             <section className={styles.entryPanel}>
               <div className={styles.entryBody}>
@@ -1110,7 +1337,7 @@ export function MvpEntryFlow() {
                           ) : null}
                           <div className={styles.todayStateMetrics}>
                             <TodayStateMetric
-                              label="Animo"
+                              label="?nimo"
                               value={getMoodSummaryLabel(todayCheckin!.mood_level) ?? "Sin registrar"}
                               percent={getCheckinPercent(todayCheckin!.mood_level)}
                               tone={getCheckinTone(todayCheckin!.mood_level)}
@@ -1233,20 +1460,6 @@ export function MvpEntryFlow() {
         </div>
       ) : (
         <div className={styles.wizardViewport}>
-          {preferredAdvisorId ? (
-            <section className={styles.intentNotice}>
-              <p className={styles.intentLabel}>Escritura guiada</p>
-              <p className={styles.intentTitle}>
-                Entrarás al flujo actual de análisis y después podrás afinar con{" "}
-                {ADVISOR_PROFILES.find((advisor) => advisor.id === preferredAdvisorId)?.name ?? "tu consejero"}.
-              </p>
-              <p className={styles.intentText}>
-                No creamos un flujo nuevo: reutilizamos el wizard actual y dejamos marcado tu consejero
-                elegido para la parte de respuesta.
-              </p>
-            </section>
-          ) : null}
-
           <div className={styles.wizardPanelWrap}>
             <WizardScaffold
               key={wizardKey}
@@ -1316,7 +1529,7 @@ export function MvpEntryFlow() {
                 className={styles.checkinQuestionSpanTwo}
               />
               <CheckinSliderQuestion
-                title="Como esta el vinculo con tu expareja actualmente?"
+                title="C?mo est? el v?nculo con tu expareja actualmente?"
                 options={EX_RELATIONSHIP_OPTIONS}
                 value={draftRelationshipLevel}
                 onChange={setDraftRelationshipLevel}
@@ -1324,7 +1537,7 @@ export function MvpEntryFlow() {
               />
               {checkinFlow === "post_session" ? (
                 <CheckinSliderQuestion
-                  title="?C?mo te fuiste de esta sesi?n?"
+                  title="Como te fuiste de esta sesion?"
                   options={SESSION_OUTCOME_OPTIONS}
                   value={draftSessionOutcomeLevel}
                   onChange={setDraftSessionOutcomeLevel}
@@ -1376,7 +1589,7 @@ export function MvpEntryFlow() {
               </section>
               {shouldShowChildrenInteractionQuestion ? (
                 <CheckinSliderQuestion
-                  title="Si esto aplica en tu caso, como sentiste la interaccion reciente alrededor de tus hijos?"
+                  title="Si esto aplica en tu caso, c?mo sentiste la interacci?n reciente alrededor de tus hijos?"
                   helperText="Opcional. Puedes dejarlo sin responder si hoy no aplica para ti."
                   options={CHILDREN_INTERACTION_OPTIONS}
                   value={draftChildrenInteractionLevel}

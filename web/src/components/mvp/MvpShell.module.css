@@ -3015,6 +3015,11 @@
   align-items: start;
 }
 
+.wizardResultMainStack {
+  display: grid;
+  gap: 16px;
+}
+
 .wizardAnalysisColumn {
   display: grid;
   gap: 10px;
@@ -3098,6 +3103,14 @@
   background:
     linear-gradient(180deg, rgba(15, 27, 39, 0.98) 0%, rgba(10, 21, 32, 0.98) 100%);
   box-shadow: none;
+}
+
+.wizardRecommendationCard {
+  padding: 18px 20px;
+  border-color: rgba(244, 201, 93, 0.18);
+  background:
+    radial-gradient(circle at top left, rgba(244, 201, 93, 0.14) 0%, transparent 24%),
+    linear-gradient(180deg, rgba(17, 32, 51, 0.98) 0%, rgba(10, 21, 32, 0.99) 100%);
 }
 
 .wizardAnalysisMetaCard {
@@ -3572,9 +3585,8 @@
 }
 
 .wizardAdvisorCards {
-  margin-top: -8px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
 }
 
 .wizardAdvisorCard {
@@ -3582,12 +3594,12 @@
   display: flex;
   min-width: 0;
   flex-direction: column;
-  border-radius: 22px;
+  border-radius: 24px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background:
     radial-gradient(circle at top left, rgba(244, 201, 93, 0.08) 0%, transparent 22%),
     linear-gradient(180deg, rgba(13, 24, 37, 0.94) 0%, rgba(10, 21, 32, 0.99) 100%);
-  padding: 13px;
+  padding: 18px;
   transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
   box-shadow: 0 18px 34px rgba(0, 0, 0, 0.16);
 }
@@ -3697,23 +3709,151 @@
 }
 
 .wizardAdvisorResponse {
-  margin-top: 8px;
+  margin-top: 12px;
   flex: 1;
   white-space: pre-wrap;
   word-break: break-word;
   color: rgba(255, 255, 255, 0.84);
-  font-size: 12px;
-  line-height: 1.55;
+  font-size: 14px;
+  line-height: 1.72;
 }
 
 .wizardAdvisorActions {
-  margin-top: 8px;
+  margin-top: 14px;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-start;
   gap: 8px;
   padding-top: 2px;
+}
+
+.wizardAnalysisModalButton {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(244, 201, 93, 0.24);
+  background:
+    radial-gradient(circle at center, rgba(244, 201, 93, 0.18) 0%, transparent 62%),
+    linear-gradient(180deg, rgba(31, 48, 68, 0.98) 0%, rgba(14, 24, 36, 0.98) 100%);
+  color: rgba(255, 239, 206, 0.94);
+  box-shadow:
+    0 0 0 1px rgba(244, 201, 93, 0.05),
+    0 0 24px rgba(244, 201, 93, 0.12);
+  animation: wizardAnalysisGlow 2.8s ease-in-out infinite;
+}
+
+.wizardAnalysisModalBackdrop {
+  position: fixed;
+  inset: 56px 0 0 0;
+  z-index: 32;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 22px;
+  background: rgba(8, 14, 22, 0.66);
+  backdrop-filter: blur(12px);
+}
+
+.wizardAnalysisModal {
+  width: min(1080px, 100%);
+  max-height: calc(100vh - 110px);
+  display: grid;
+  gap: 18px;
+  overflow: auto;
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background:
+    radial-gradient(circle at top left, rgba(244, 201, 93, 0.12) 0%, transparent 22%),
+    radial-gradient(circle at top right, rgba(45, 107, 228, 0.14) 0%, transparent 20%),
+    linear-gradient(180deg, rgba(13, 24, 37, 0.99) 0%, rgba(9, 18, 29, 0.99) 100%);
+  padding: 22px;
+  box-shadow: 0 34px 80px rgba(0, 0, 0, 0.34);
+}
+
+.wizardAnalysisModalHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.wizardAnalysisModalTitle {
+  margin-top: 4px;
+  font-size: 26px;
+  line-height: 1.1;
+  font-weight: 600;
+  color: rgba(248, 251, 255, 0.96);
+}
+
+.wizardAnalysisModalCopy {
+  margin-top: 8px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: rgba(226, 238, 252, 0.68);
+}
+
+.wizardAnalysisModalClose {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.wizardAnalysisModalGrid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.wizardAnalysisModalCard {
+  gap: 10px;
+  min-height: 0;
+}
+
+.wizardAnalysisModalCardWide {
+  grid-column: 1 / -1;
+}
+
+.wizardAnalysisModalList {
+  display: grid;
+  gap: 10px;
+}
+
+.wizardAnalysisModalListItem {
+  display: grid;
+  gap: 5px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 12px 13px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: rgba(240, 247, 255, 0.86);
+}
+
+@keyframes wizardAnalysisGlow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(244, 201, 93, 0.05),
+      0 0 18px rgba(244, 201, 93, 0.1);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(244, 201, 93, 0.12),
+      0 0 30px rgba(244, 201, 93, 0.18);
+  }
 }
 
 .wizardTertiaryButton {
@@ -3821,24 +3961,24 @@
 
   .wizardAnalysisLayout,
   .wizardUnifiedLayout,
-  .wizardAnalysisMetaGrid {
+  .wizardAnalysisMetaGrid,
+  .wizardAnalysisModalGrid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .wizardAnalysisModalBackdrop {
+    padding: 14px;
+  }
+
+  .wizardAnalysisModal {
+    max-height: calc(100vh - 84px);
+    padding: 18px 16px;
   }
 
   .wizardAnalysisDecisionRow,
   .wizardSubsectionHeader {
     flex-direction: column;
     align-items: flex-start;
-  }
-}
-
-@media (min-width: 1024px) and (max-width: 1399px) {
-  .wizardAdvisorCards {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .wizardAdvisorCards > :last-child:nth-child(odd) {
-    grid-column: 1 / -1;
   }
 }
 

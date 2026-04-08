@@ -1037,6 +1037,7 @@ export function WizardScaffold({
   );
   const [draftedReply, setDraftedReply] = useState("");
   const [entryAutostartPending, setEntryAutostartPending] = useState(false);
+  const [analysisModalOpen, setAnalysisModalOpen] = useState(false);
   const selectedCaseId = activeCase?.id ?? null;
   const manualInterpretTimerRef = useRef<number | null>(null);
   const conversationListRef = useRef<HTMLDivElement | null>(null);
@@ -1761,6 +1762,7 @@ export function WizardScaffold({
 
   function handleStartNewConversation() {
     clearManualInterpretTimer();
+    setAnalysisModalOpen(false);
     setCurrentStep(1);
     setStepOneInputMode("write");
     setSelectedDecision("no_reply");
@@ -2103,7 +2105,16 @@ export function WizardScaffold({
   useEffect(() => {
     if (!entryAutostartPending || currentStep !== 1 || !messageText.trim()) return;
     setEntryAutostartPending(false);
-    void handleContinueFromStep1();
+    void (async () => {
+      await flushPendingConversationInterpretation(messageText.trim(), ocrInfo ? "ocr" : "text");
+      setAnalysisResult(null);
+      setAnalysisId(null);
+      setAnalysisError(null);
+      setAdvisorResult(null);
+      setAdvisorError(null);
+      setCurrentStep(3);
+      await runAnalysis();
+    })();
   }, [currentStep, entryAutostartPending, messageText]);
 
   useEffect(() => {
@@ -2350,7 +2361,7 @@ export function WizardScaffold({
                       {contextVoice.listening ? "Escuchando..." : "Toca para dictar"}
                     </p>
                     <p className={styles.wizardVoiceCaptureCopy}>
-                      {contextMicrophoneStatusMessage || "Tu voz se agregara al texto principal."}
+                      {contextMicrophoneStatusMessage || "Tu voz se agregar? al texto principal."}
                     </p>
                   </div>
                 </div>
@@ -2565,9 +2576,9 @@ export function WizardScaffold({
         <div className={`${styles.wizardStepBody} ${styles.wizardStepBodyScroll}`}>
           <div className={styles.wizardStepHeader}>
             <p className={styles.wizardStepKicker}>Resultado</p>
-            <h3 className={styles.wizardStepIntroTitle}>Análisis y consejeros</h3>
+            <h3 className={styles.wizardStepIntroTitle}>Analisis y advisors</h3>
             <p className={styles.wizardStepIntroCopy}>
-              Lo esencial para decidir con claridad y ver qué te propone cada advisor en la misma pantalla.
+              Lo esencial para decidir con claridad y comparar las tres respuestas en una sola pantalla.
             </p>
           </div>
 
@@ -2575,27 +2586,21 @@ export function WizardScaffold({
             <section className={`${styles.wizardMobileCard} ${styles.wizardResumeCard}`}>
               <div className={styles.wizardResumeHeader}>
                 <div>
-                  <p className={styles.wizardAnalysisBlockLabel}>Conversación guardada</p>
+                  <p className={styles.wizardAnalysisBlockLabel}>Conversacion guardada</p>
                   <p className={styles.wizardResumeTitle}>
-                    {showAdvisorResumePanel
-                      ? "Vuelve al resultado con consejeros desde lo guardado"
-                      : "Retoma el resultado desde lo persistido"}
+                    {showAdvisorResumePanel ? "Volvimos directo al resultado completo" : "Retoma el analisis desde lo guardado"}
                   </p>
                 </div>
                 <span className={styles.wizardResumeBadge}>Resultado</span>
               </div>
               <p className={styles.wizardResumeCopy}>
-                Abrimos el resultado usando lo guardado sin reconstruir todo el wizard.
+                {showAdvisorResumePanel
+                  ? "Puedes regenerar advisors desde el texto guardado sin rehacer todo el flujo."
+                  : "Entraste desde una conversacion guardada y puedes regenerar la lectura completa desde aca."}
               </p>
-              {resumeReplyPreview ? (
-                <div className={styles.wizardResumeBlock}>
-                  <p className={styles.wizardResumeLabel}>Respuesta guardada</p>
-                  <p className={styles.wizardResumeValue}>{resumeReplyPreview}</p>
-                </div>
-              ) : null}
               {resumeActionPreview ? (
                 <div className={styles.wizardResumeBlock}>
-                  <p className={styles.wizardResumeLabel}>Última acción guardada</p>
+                  <p className={styles.wizardResumeLabel}>Ultima accion guardada</p>
                   <p className={styles.wizardResumeValue}>{resumeActionPreview}</p>
                 </div>
               ) : null}
@@ -2638,274 +2643,163 @@ export function WizardScaffold({
             {!loadingAnalysis && loadingAdvisor ? (
               <p className={styles.wizardStepStatus}>Generando respuestas de advisors...</p>
             ) : null}
-            {analysisActionSaveState === "saving" ? (
-              <p className={styles.wizardStepStatus}>Guardando accion elegida...</p>
-            ) : null}
-            {analysisActionSaveState === "saved" ? (
-              <p className={styles.wizardStepStatus}>Accion guardada correctamente.</p>
-            ) : null}
-            {analysisActionSaveState === "error" ? (
-              <p className="text-sm text-red-700">No pudimos guardar la accion elegida.</p>
-            ) : null}
             {analysisError ? <p className="text-sm text-red-700">{analysisError}</p> : null}
             {advisorError ? <p className="text-sm text-red-700">{advisorError}</p> : null}
           </div>
 
           {analysisResult ? (
             <>
-              <div className={styles.wizardUnifiedLayout}>
-                <div className={styles.wizardAnalysisColumn}>
-                  <section className={`${styles.wizardMobileCard} ${styles.wizardAnalysisCompactCard}`}>
-                    <div className={styles.wizardAnalysisCardHeader}>
-                      <div className={styles.wizardAnalysisBlockLabel}>Recomendación principal</div>
-                      <span
-                        className={`${styles.wizardAnalysisDecisionBadge} ${
-                          analysisStatus?.kind === "risk"
-                            ? styles.wizardAnalysisDecisionBadgeRisk
-                            : analysisStatus?.kind === "observation"
-                              ? styles.wizardAnalysisDecisionBadgeWarn
-                              : styles.wizardAnalysisDecisionBadgeOk
-                        }`}
-                      >
-                        {analysisStatus?.kind === "risk"
-                          ? "Pausa"
+              <div className={styles.wizardResultMainStack}>
+                <section className={`${styles.wizardMobileCard} ${styles.wizardAnalysisCompactCard} ${styles.wizardRecommendationCard}`}>
+                  <div className={styles.wizardAnalysisCardHeader}>
+                    <div className={styles.wizardAnalysisBlockLabel}>Recomendacion principal</div>
+                    <span
+                      className={`${styles.wizardAnalysisDecisionBadge} ${
+                        analysisStatus?.kind === "risk"
+                          ? styles.wizardAnalysisDecisionBadgeRisk
                           : analysisStatus?.kind === "observation"
-                            ? "Cautela"
-                            : "Estable"}
-                      </span>
-                    </div>
-                    <div className={styles.wizardAnalysisSummaryStack}>
-                      <p className={styles.wizardAnalysisDecisionTitle}>{replyTiming?.title}</p>
-                      <p className={styles.wizardAnalysisDecisionText}>{replyTiming?.description}</p>
-                    </div>
-                  </section>
+                            ? styles.wizardAnalysisDecisionBadgeWarn
+                            : styles.wizardAnalysisDecisionBadgeOk
+                      }`}
+                    >
+                      {analysisStatus?.kind === "risk"
+                        ? "Pausa"
+                        : analysisStatus?.kind === "observation"
+                          ? "Cautela"
+                          : "Estable"}
+                    </span>
+                  </div>
+                  <div className={styles.wizardAnalysisSummaryStack}>
+                    <p className={styles.wizardAnalysisDecisionTitle}>{replyTiming?.title}</p>
+                    <p className={styles.wizardAnalysisDecisionText}>{replyTiming?.description}</p>
+                  </div>
+                </section>
 
-                  <section className={`${styles.wizardMobileCard} ${styles.wizardAnalysisCompactCard}`}>
-                    <div className={styles.wizardAnalysisBlockLabel}>Qué está pasando</div>
-                    <p className={styles.wizardAnalysisLongform}>{analysisResult!.summary}</p>
-                    {analysisResult!.emotional_context.intent_guess ? (
-                      <div className={styles.wizardInsightRow}>
-                        <span className={styles.wizardInsightIcon}>
-                          <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
-                            <path
-                              d="M10 3.75a6.25 6.25 0 1 0 0 12.5 6.25 6.25 0 0 0 0-12.5Zm0 4v.25m0 1.75v3.5"
-                              stroke="currentColor"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth="1.7"
-                            />
-                          </svg>
-                        </span>
-                        <p>
-                          Objetivo sugerido: <strong>{analysisResult!.emotional_context.intent_guess}</strong>
-                        </p>
-                      </div>
-                    ) : null}
-                  </section>
-
-                  <section className={`${styles.wizardMobileCard} ${styles.wizardAnalysisMetaCard}`}>
-                    <div className={styles.wizardAnalysisBlockLabel}>Metadata</div>
-                    <div className={styles.wizardAnalysisMetaGrid}>
-                      <span className={`${styles.wizardAnalysisMetaItem} ${styles.wizardAnalysisMetaItemTone}`}>
-                        <span className={styles.wizardAnalysisMetaLabel}>Tono</span>
-                        <span className={styles.wizardAnalysisMetaValue}>{toneChipValue}</span>
-                      </span>
-                      <span className={`${styles.wizardAnalysisMetaItem} ${styles.wizardAnalysisMetaItemUrgency}`}>
-                        <span className={styles.wizardAnalysisMetaLabel}>Urgencia</span>
-                        <span className={styles.wizardAnalysisMetaValue}>{urgencyChipValue}</span>
-                      </span>
-                      <span className={`${styles.wizardAnalysisMetaItem} ${styles.wizardAnalysisMetaItemTopic}`}>
-                        <span className={styles.wizardAnalysisMetaLabel}>Tema</span>
-                        <span className={styles.wizardAnalysisMetaValue}>{topicLabel}</span>
-                      </span>
+                <section className={styles.wizardUnifiedSection}>
+                  <div className={styles.wizardUnifiedSectionHeader}>
+                    <div>
+                      <p className={styles.wizardAnalysisBlockLabel}>Que dicen los advisors</p>
+                      <p className={styles.wizardUnifiedSectionCopy}>
+                        Leelas completas, comparalas con aire y elige desde la misma pantalla.
+                      </p>
                     </div>
-                  </section>
+                  </div>
+                  <div className={`${styles.wizardCardsGrid} ${styles.wizardAdvisorCards}`}>
+                    {Array.from({ length: 3 }).map((_, index) => {
+                      const advisorVisual = getAdvisorVisualByIndex(index);
+                      const advisorAvatar64 = getAdvisorAvatar(advisorVisual, "64");
+                      const response = advisorResult?.responses[index];
+                      const responseText = response?.text ?? "";
+                      const isRecommended = preferredAdvisorId ? advisorVisual.id === preferredAdvisorId : index === 0;
+                      const advisorInitials = advisorVisual.name
+                        .split(" ")
+                        .filter((part) => part.trim().length > 0)
+                        .slice(0, 2)
+                        .map((part) => part[0]?.toUpperCase() ?? "")
+                        .join("");
 
-                  <section className={styles.wizardUnifiedSection}>
-                    <div className={styles.wizardUnifiedSectionHeader}>
-                      <div>
-                        <p className={styles.wizardAnalysisBlockLabel}>Qué dicen los consejeros</p>
-                        <p className={styles.wizardUnifiedSectionCopy}>
-                          La recomendación aparece inline para que elijas sin salir del resultado.
-                        </p>
-                      </div>
-                    </div>
-                    <div className={`${styles.wizardCardsGrid} ${styles.wizardAdvisorCards}`}>
-                      {Array.from({ length: 3 }).map((_, index) => {
-                        const advisorVisual = getAdvisorVisualByIndex(index);
-                        const advisorAvatar64 = getAdvisorAvatar(advisorVisual, "64");
-                        const response = advisorResult?.responses[index];
-                        const responseText = response?.text ?? "";
-                        const advisorPreview = getResumePreviewText(responseText, 220) ?? "Sin respuesta disponible.";
-                        const isRecommended = preferredAdvisorId ? advisorVisual.id === preferredAdvisorId : index === 0;
-                        const advisorInitials = advisorVisual.name
-                          .split(" ")
-                          .filter((part) => part.trim().length > 0)
-                          .slice(0, 2)
-                          .map((part) => part[0]?.toUpperCase() ?? "")
-                          .join("");
-
-                        return (
-                          <article
-                            key={`${advisorVisual.id}-${index}`}
-                            onClick={() => openAdvisorChat(index)}
-                            className={`${styles.wizardAdvisorCard} ${isRecommended ? styles.wizardAdvisorCardRecommended : ""}`}
+                      return (
+                        <article
+                          key={`${advisorVisual.id}-${index}`}
+                          onClick={() => openAdvisorChat(index)}
+                          className={`${styles.wizardAdvisorCard} ${isRecommended ? styles.wizardAdvisorCardRecommended : ""}`}
+                        >
+                          <header
+                            className={`${styles.wizardAdvisorHeader} ${isRecommended ? styles.wizardAdvisorHeaderRecommended : ""}`}
                           >
-                            <header
-                              className={`${styles.wizardAdvisorHeader} ${isRecommended ? styles.wizardAdvisorHeaderRecommended : ""}`}
-                            >
-                              {isRecommended ? (
-                                <span className={styles.wizardAdvisorRecommendedTag}>
-                                  <svg aria-hidden="true" viewBox="0 0 16 16" className="h-3 w-3" fill="none">
-                                    <path
-                                      d="m8 2 1.55 3.49L13 6l-2.6 2.28.73 3.22L8 9.9l-3.13 1.6.73-3.22L3 6l3.45-.51L8 2Z"
-                                      stroke="currentColor"
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth="1.3"
-                                    />
-                                  </svg>
-                                  {preferredAdvisorId ? "Tu consejero" : "Recomendada"}
-                                </span>
-                              ) : null}
-                              <span className={styles.wizardAdvisorBadge}>
-                                {getResponseBadgeLabel(response?.emotion_label)}
+                            {isRecommended ? (
+                              <span className={styles.wizardAdvisorRecommendedTag}>
+                                {preferredAdvisorId ? "Tu consejero" : "Recomendada"}
                               </span>
-                              <div className={styles.wizardAdvisorHeaderRow}>
-                                <div className="flex min-w-0 items-center gap-3">
-                                  <button
-                                    type="button"
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      openAdvisorProfileById(advisorVisual.id);
-                                    }}
-                                    className={styles.wizardAdvisorAvatarButton}
-                                    aria-label={`Abrir perfil de ${advisorVisual.name}`}
-                                  >
-                                    {advisorAvatar64 ? (
-                                      <Image
-                                        src={advisorAvatar64}
-                                        alt={advisorVisual.name}
-                                        width={46}
-                                        height={46}
-                                        className={styles.wizardAdvisorAvatar}
-                                      />
-                                    ) : (
-                                      <span className={styles.wizardAdvisorAvatarFallback}>
-                                        {advisorInitials || "AD"}
-                                      </span>
-                                    )}
-                                  </button>
-                                  <div className="min-w-0">
-                                    <p className={`${styles.wizardAdvisorName} truncate`}>{advisorVisual.name}</p>
-                                    <p className={`${styles.wizardAdvisorRole} truncate`}>{advisorVisual.role}</p>
-                                  </div>
-                                </div>
-                              </div>
-                            </header>
-
-                            <p className={styles.wizardAdvisorResponse}>{advisorPreview}</p>
-
-                            <div className={styles.wizardAdvisorActions}>
-                              {speechSynthesis.supported ? (
-                                <Button
+                            ) : null}
+                            <span className={styles.wizardAdvisorBadge}>
+                              {getResponseBadgeLabel(response?.emotion_label)}
+                            </span>
+                            <div className={styles.wizardAdvisorHeaderRow}>
+                              <div className="flex min-w-0 items-center gap-3">
+                                <button
                                   type="button"
                                   onClick={(event) => {
                                     event.stopPropagation();
-                                    handleToggleSpeakResponse(index, responseText);
+                                    openAdvisorProfileById(advisorVisual.id);
                                   }}
-                                  disabled={!responseText}
-                                  variant="secondary"
-                                  className={`${styles.wizardTertiaryButton} h-9 text-[13px] hover:bg-[rgba(255,255,255,0.1)]`}
+                                  className={styles.wizardAdvisorAvatarButton}
+                                  aria-label={`Abrir perfil de ${advisorVisual.name}`}
                                 >
-                                  {speechSynthesis.speaking && speakingResponseIndex === index ? "Detener" : "Escuchar"}
-                                </Button>
-                              ) : null}
+                                  {advisorAvatar64 ? (
+                                    <Image
+                                      src={advisorAvatar64}
+                                      alt={advisorVisual.name}
+                                      width={46}
+                                      height={46}
+                                      className={styles.wizardAdvisorAvatar}
+                                    />
+                                  ) : (
+                                    <span className={styles.wizardAdvisorAvatarFallback}>{advisorInitials || "AD"}</span>
+                                  )}
+                                </button>
+                                <div className="min-w-0">
+                                  <p className={`${styles.wizardAdvisorName} truncate`}>{advisorVisual.name}</p>
+                                  <p className={`${styles.wizardAdvisorRole} truncate`}>{advisorVisual.role}</p>
+                                </div>
+                              </div>
+                            </div>
+                          </header>
+
+                          <p className={styles.wizardAdvisorResponse}>
+                            {responseText || "Sin respuesta disponible."}
+                          </p>
+
+                          <div className={styles.wizardAdvisorActions}>
+                            {speechSynthesis.supported ? (
                               <Button
                                 type="button"
                                 onClick={(event) => {
                                   event.stopPropagation();
-                                  openAdvisorChat(index);
+                                  handleToggleSpeakResponse(index, responseText);
                                 }}
                                 disabled={!responseText}
                                 variant="secondary"
-                                className={`${styles.wizardSecondaryButton} h-9 text-[13px] hover:bg-[rgba(255,255,255,0.12)]`}
+                                className={`${styles.wizardTertiaryButton} h-9 text-[13px] hover:bg-[rgba(255,255,255,0.1)]`}
                               >
-                                Conversar
+                                {speechSynthesis.speaking && speakingResponseIndex === index ? "Detener" : "Escuchar"}
                               </Button>
-                              <Button
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  setDraftedReply(responseText);
-                                  void handleCopy(responseText, index);
-                                }}
-                                disabled={!responseText}
-                                variant="primary"
-                                className={`h-9 rounded-[12px] px-4 text-[13px] ${
-                                  copiedIndex === index
-                                    ? "bg-[#16A34A] text-white hover:bg-[#15803d]"
-                                    : `${styles.wizardPrimaryButton} hover:bg-[#265cc7]`
-                                }`}
-                              >
-                                {copiedIndex === index ? "Respuesta copiada" : "Usar esta respuesta"}
-                              </Button>
-                            </div>
-                          </article>
-                        );
-                      })}
-                    </div>
-                  </section>
-                </div>
-
-                <aside className={styles.wizardResultAside}>
-                  <section className={`${styles.wizardMobileCard} ${styles.wizardResultAsideCard}`}>
-                    <div className={styles.wizardResultPanelTitle}>Conversación analizada</div>
-                    <div className={styles.wizardResultOriginalMessage}>
-                      {originalConversationPreview || "Todavía no tenemos un mensaje para mostrar."}
-                    </div>
-                  </section>
-
-                  <section className={`${styles.wizardMobileCard} ${styles.wizardResultAsideCard}`}>
-                    <div className={styles.wizardResultPanelTitle}>Borrador sugerido · {recommendedAdvisor.name}</div>
-                    <Textarea
-                      value={draftedReply}
-                      onChange={(event) => setDraftedReply(event.target.value)}
-                      rows={8}
-                      spellCheck={false}
-                      className={styles.wizardResultDraftTextarea}
-                    />
-                    <div className={styles.wizardResultAsideActions}>
-                      <Button
-                        type="button"
-                        onClick={() => void handleCopy(draftedReply, recommendedAdvisorIndex)}
-                        disabled={!draftedReply.trim()}
-                        variant="secondary"
-                        className={`${styles.wizardSecondaryButton} h-10 text-[13px] hover:bg-[rgba(255,255,255,0.12)]`}
-                      >
-                        Copiar borrador
-                      </Button>
-                    </div>
-                  </section>
-
-                  {analysisResult.emotional_context.intent_guess ? (
-                    <section className={`${styles.wizardMobileCard} ${styles.wizardResultAsideCard}`}>
-                      <div className={styles.wizardResultPanelTitle}>Objetivo sugerido</div>
-                      <p className={styles.wizardResultObjectiveCopy}>{analysisResult.emotional_context.intent_guess}</p>
-                    </section>
-                  ) : null}
-
-                  <div className={styles.wizardResultAsideActions}>
-                    <Button
-                      type="button"
-                      onClick={() => onSaveSession?.()}
-                      variant="primary"
-                      className={`${styles.wizardPrimaryButton} h-11 w-full text-[14px] hover:bg-[#265cc7]`}
-                    >
-                      Guardar sesión
-                    </Button>
+                            ) : null}
+                            <Button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                openAdvisorChat(index);
+                              }}
+                              disabled={!responseText}
+                              variant="secondary"
+                              className={`${styles.wizardSecondaryButton} h-9 text-[13px] hover:bg-[rgba(255,255,255,0.12)]`}
+                            >
+                              Conversar
+                            </Button>
+                            <Button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setDraftedReply(responseText);
+                                void handleCopy(responseText, index);
+                              }}
+                              disabled={!responseText}
+                              variant="primary"
+                              className={`h-9 rounded-[12px] px-4 text-[13px] ${
+                                copiedIndex === index
+                                  ? "bg-[#16A34A] text-white hover:bg-[#15803d]"
+                                  : `${styles.wizardPrimaryButton} hover:bg-[#265cc7]`
+                              }`}
+                            >
+                              {copiedIndex === index ? "Respuesta copiada" : "Usar esta respuesta"}
+                            </Button>
+                          </div>
+                        </article>
+                      );
+                    })}
                   </div>
-                </aside>
+                </section>
               </div>
 
               <div className={styles.wizardFooterRow}>
@@ -2915,20 +2809,140 @@ export function WizardScaffold({
                   variant="secondary"
                   className={`${styles.wizardSecondaryButton} h-10 text-[13px] hover:bg-[rgba(255,255,255,0.12)]`}
                 >
+                  Volver
+                </Button>
+                <div className={styles.wizardFooterSpacer} />
+                <Button
+                  type="button"
+                  onClick={() => setAnalysisModalOpen(true)}
+                  variant="secondary"
+                  className={`${styles.wizardAnalysisModalButton} h-10 text-[13px]`}
+                >
                   <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
                     <path
-                      d="M16 10H4m6 6-6-6 6-6"
+                      d="M10 3.75a6.25 6.25 0 1 0 0 12.5 6.25 6.25 0 0 0 0-12.5Zm0 3v3.25m0 2.5h.01"
                       stroke="currentColor"
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      strokeWidth="1.8"
+                      strokeWidth="1.7"
                     />
                   </svg>
-                  Volver
+                  Ver analisis
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => onSaveSession?.()}
+                  variant="primary"
+                  className={`${styles.wizardPrimaryButton} h-10 text-[13px] hover:bg-[#265cc7]`}
+                >
+                  Guardar sesion
                 </Button>
               </div>
             </>
           ) : null}
+        </div>
+      ) : null}
+
+      {analysisModalOpen && analysisResult ? (
+        <div className={styles.wizardAnalysisModalBackdrop} role="presentation" onClick={() => setAnalysisModalOpen(false)}>
+          <section
+            className={styles.wizardAnalysisModal}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="wizard-analysis-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className={styles.wizardAnalysisModalHeader}>
+              <div>
+                <p className={styles.wizardAnalysisBlockLabel}>Analisis completo</p>
+                <h4 id="wizard-analysis-modal-title" className={styles.wizardAnalysisModalTitle}>Que vimos en esta conversacion</h4>
+                <p className={styles.wizardAnalysisModalCopy}>
+                  Todo el contexto secundario queda aca para no cargar la pantalla principal.
+                </p>
+              </div>
+              <button
+                type="button"
+                className={styles.wizardAnalysisModalClose}
+                aria-label="Cerrar analisis"
+                onClick={() => setAnalysisModalOpen(false)}
+              >
+                ?
+              </button>
+            </div>
+
+            <div className={styles.wizardAnalysisModalGrid}>
+              <section className={`${styles.wizardMobileCard} ${styles.wizardAnalysisModalCard}`}>
+                <div className={styles.wizardResultPanelTitle}>Que esta pasando</div>
+                <p className={styles.wizardAnalysisLongform}>{analysisResult.summary}</p>
+              </section>
+
+              <section className={`${styles.wizardMobileCard} ${styles.wizardAnalysisModalCard}`}>
+                <div className={styles.wizardResultPanelTitle}>Metadata</div>
+                <div className={styles.wizardAnalysisMetaGrid}>
+                  <span className={`${styles.wizardAnalysisMetaItem} ${styles.wizardAnalysisMetaItemTone}`}>
+                    <span className={styles.wizardAnalysisMetaLabel}>Tono</span>
+                    <span className={styles.wizardAnalysisMetaValue}>{toneChipValue}</span>
+                  </span>
+                  <span className={`${styles.wizardAnalysisMetaItem} ${styles.wizardAnalysisMetaItemUrgency}`}>
+                    <span className={styles.wizardAnalysisMetaLabel}>Urgencia</span>
+                    <span className={styles.wizardAnalysisMetaValue}>{urgencyChipValue}</span>
+                  </span>
+                  <span className={`${styles.wizardAnalysisMetaItem} ${styles.wizardAnalysisMetaItemTopic}`}>
+                    <span className={styles.wizardAnalysisMetaLabel}>Tema</span>
+                    <span className={styles.wizardAnalysisMetaValue}>{topicLabel}</span>
+                  </span>
+                </div>
+              </section>
+
+              <section className={`${styles.wizardMobileCard} ${styles.wizardAnalysisModalCard}`}>
+                <div className={styles.wizardResultPanelTitle}>Conversacion analizada</div>
+                <div className={styles.wizardResultOriginalMessage}>
+                  {originalConversationPreview || "Todavia no tenemos un mensaje para mostrar."}
+                </div>
+              </section>
+
+              {analysisResult.emotional_context.intent_guess ? (
+                <section className={`${styles.wizardMobileCard} ${styles.wizardAnalysisModalCard}`}>
+                  <div className={styles.wizardResultPanelTitle}>Objetivo sugerido</div>
+                  <p className={styles.wizardResultObjectiveCopy}>{analysisResult.emotional_context.intent_guess}</p>
+                </section>
+              ) : null}
+
+              {analysisQuickChips.length > 0 ? (
+                <section className={`${styles.wizardMobileCard} ${styles.wizardAnalysisModalCard}`}>
+                  <div className={styles.wizardResultPanelTitle}>Senales rapidas</div>
+                  <div className={styles.wizardAnalysisQuickChips}>
+                    {analysisQuickChips.map((chip) => (
+                      <span key={chip.label} className={styles.wizardAnalysisChip}>
+                        <span className={styles.wizardAnalysisChipLabel}>{chip.label}:</span>
+                        <span>{chip.value}</span>
+                      </span>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
+              {analysisResult.ui_alerts.length > 0 || analysisResult.risk_flags.length > 0 ? (
+                <section className={`${styles.wizardMobileCard} ${styles.wizardAnalysisModalCard} ${styles.wizardAnalysisModalCardWide}`}>
+                  <div className={styles.wizardResultPanelTitle}>Alertas y riesgos</div>
+                  <div className={styles.wizardAnalysisModalList}>
+                    {analysisResult.ui_alerts.map((alert, index) => (
+                      <div key={`alert-${index}`} className={styles.wizardAnalysisModalListItem}>
+                        <strong>{alert.level.toUpperCase()}</strong>
+                        <span>{alert.message}</span>
+                      </div>
+                    ))}
+                    {analysisResult.risk_flags.map((flag) => (
+                      <div key={flag.code} className={styles.wizardAnalysisModalListItem}>
+                        <strong>{flag.severity.toUpperCase()}</strong>
+                        <span>{RISK_LABELS[flag.code] ?? flag.code}</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+            </div>
+          </section>
         </div>
       ) : null}
 
