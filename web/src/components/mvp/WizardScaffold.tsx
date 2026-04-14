@@ -1838,10 +1838,14 @@ export function WizardScaffold({
       setAnalysisError(null);
       setAdvisorResult(null);
       setAdvisorError(null);
+      if (stepOneInputMode === "capture") {
+        setCurrentStep(2);
+        return;
+      }
       setCurrentStep(3);
       await runAnalysis();
     })();
-  }, [currentStep, entryAutostartPending, messageText]);
+  }, [currentStep, entryAutostartPending, messageText, ocrInfo, stepOneInputMode]);
 
   return (
     <Panel className={styles.wizardPanel}>
