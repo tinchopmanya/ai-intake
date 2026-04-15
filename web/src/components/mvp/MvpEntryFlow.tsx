@@ -406,6 +406,8 @@ export function MvpEntryFlow() {
     continuous: false,
     interimResults: false,
   });
+  const entryVoiceTranscript = entryVoice.transcript;
+  const resetEntryVoiceTranscript = entryVoice.resetTranscript;
   const entryVoiceStatusMessage = getMicrophoneStatusMessage(
     entryVoice.microphoneStatus,
     entryVoice.speechSupported,
@@ -480,12 +482,12 @@ export function MvpEntryFlow() {
   }, []);
 
   useEffect(() => {
-    const transcript = entryVoice.transcript.trim();
+    const transcript = entryVoiceTranscript.trim();
     if (!transcript) return;
     setEntryInputMode("voice");
     setEntryMessageText((previous) => (previous.trim() ? `${previous.trim()}\n${transcript}` : transcript));
-    entryVoice.resetTranscript();
-  }, [entryVoice.transcript]);
+    resetEntryVoiceTranscript();
+  }, [entryVoiceTranscript, resetEntryVoiceTranscript]);
 
   useEffect(() => {
     function handleNewConversation() {
