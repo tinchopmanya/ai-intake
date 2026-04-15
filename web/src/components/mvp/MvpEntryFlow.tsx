@@ -136,30 +136,6 @@ function resolveOcrErrorMessage(detail?: string, message?: string): string {
   return "No se pudo leer el texto de la imagen.";
 }
 
-function formatLastSession(startedAt: string) {
-  const parsed = new Date(startedAt);
-  if (Number.isNaN(parsed.getTime())) return null;
-  const now = new Date();
-  const isSameDay =
-    parsed.getFullYear() === now.getFullYear() &&
-    parsed.getMonth() === now.getMonth() &&
-    parsed.getDate() === now.getDate();
-  if (isSameDay) return "hoy";
-
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  const isYesterday =
-    parsed.getFullYear() === yesterday.getFullYear() &&
-    parsed.getMonth() === yesterday.getMonth() &&
-    parsed.getDate() === yesterday.getDate();
-  if (isYesterday) return "ayer";
-
-  return new Intl.DateTimeFormat("es-UY", {
-    day: "2-digit",
-    month: "2-digit",
-  }).format(parsed);
-}
-
 function readStoredAdvisorId() {
   if (typeof window === "undefined") return null;
   const stored = window.localStorage.getItem(DEFAULT_ADVISOR_STORAGE_KEY);
@@ -363,7 +339,6 @@ function getAdvisorCardVariantClass(variant: SelectorCardVariant) {
 
 export function MvpEntryFlow() {
   const {
-    sidebarConversation,
     activeConversation,
     activeConversationMessages,
     activeConversationMessagesLoading,
@@ -532,11 +507,6 @@ export function MvpEntryFlow() {
     };
   }, []);
 
-  const lastSessionMeta = useMemo(
-    () => (sidebarConversation ? formatLastSession(sidebarConversation.startedAt) : null),
-    [sidebarConversation],
-  );
-
   const selectedAdvisor =
     ADVISOR_PROFILES.find((advisor) => advisor.id === selectedAdvisorId) ?? ADVISOR_PROFILES[0];
 
@@ -547,12 +517,6 @@ export function MvpEntryFlow() {
     if (!moodLabel || !confidenceLabel) return null;
     return `Ánimo ${moodLabel.toLowerCase()} · confianza ${confidenceLabel.toLowerCase()}`;
   }, [todayCheckin]);
-  const sessionTitleLabel =
-    sidebarConversation?.title.trim() &&
-    sidebarConversation.title.trim().toLowerCase() !== "nueva conversacion"
-      ? sidebarConversation.title
-      : "Borrador reciente";
-
   const activeConversationSummary = useMemo(() => {
     if (!activeConversation || activeConversationMessages.length === 0) return null;
     const latestMessage = activeConversationMessages[activeConversationMessages.length - 1] ?? null;
@@ -810,6 +774,7 @@ export function MvpEntryFlow() {
               <span className={styles.homeLighthouseSourceGlow} />
               <span className={`${styles.homeLighthouseBeam} ${styles.homeLighthouseBeamWhite}`} />
               <span className={`${styles.homeLighthouseBeam} ${styles.homeLighthouseBeamAmber}`} />
+              <span className={styles.homeRiverLight} />
               <span className={styles.homeCompassCore} />
               <span className={styles.homeCompassSpark} />
             </div>
@@ -968,19 +933,13 @@ export function MvpEntryFlow() {
                 </button>
               </div>
 
-              {(activeConversationSummary || sidebarConversation || todayCheckin) ? (
+              {(activeConversationSummary || todayCheckin) ? (
                 <section className={styles.homeContextStrip}>
                   {todayCheckin ? (
                     <button type="button" className={styles.homeContextCard} onClick={handleOpenCheckinEditor}>
                       <span className={styles.homeContextLabel}>Estado de hoy</span>
                       <span className={styles.homeContextValue}>{checkinSummaryLine ?? "Check-in disponible"}</span>
                     </button>
-                  ) : null}
-                  {sidebarConversation && lastSessionMeta ? (
-                    <div className={styles.homeContextCard}>
-                      <span className={styles.homeContextLabel}>Última sesión</span>
-                      <span className={styles.homeContextValue}>{sessionTitleLabel} · {lastSessionMeta}</span>
-                    </div>
                   ) : null}
                   {activeConversationSummary ? (
                     <button type="button" className={styles.homeContextCard} onClick={handleResumeConversation}>
