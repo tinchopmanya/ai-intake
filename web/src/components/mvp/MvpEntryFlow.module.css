@@ -66,12 +66,12 @@
   isolation: isolate;
   z-index: 1;
   width: 100%;
-  max-width: 520px;
+  max-width: 496px;
   display: flex;
   align-items: center;
   flex-direction: column;
-  gap: 8px;
-  padding: 8px 14px 12px;
+  gap: 7px;
+  padding: 8px 12px 10px;
 }
 
 .homeSceneFx {
@@ -100,15 +100,15 @@
 
 .homeLighthouseBeam {
   position: absolute;
-  left: calc(50% - 324px);
-  top: clamp(442px, 36vw, 504px);
-  width: clamp(390px, 46vw, 590px);
-  height: clamp(60px, 6.4vw, 88px);
+  left: calc(50% - 328px);
+  top: clamp(444px, 36vw, 506px);
+  width: clamp(320px, 40vw, 500px);
+  height: clamp(88px, 9vw, 132px);
   transform-origin: left center;
-  transform: rotate(-1.8deg);
-  clip-path: polygon(0 50%, 4% 34%, 18% 18%, 100% 0, 100% 100%, 18% 82%, 4% 66%, 0 50%);
+  transform: rotate(8deg);
+  clip-path: polygon(0 50%, 5% 37%, 18% 18%, 100% 0, 100% 100%, 18% 82%, 5% 63%, 0 50%);
   mix-blend-mode: screen;
-  filter: blur(14px);
+  filter: blur(18px);
   opacity: 0;
 }
 
@@ -116,15 +116,15 @@
   background:
     linear-gradient(
       90deg,
-      rgba(255, 255, 255, 0.42) 0%,
-      rgba(244, 249, 255, 0.24) 16%,
-      rgba(222, 235, 255, 0.12) 40%,
-      rgba(208, 224, 255, 0.05) 68%,
+      rgba(255, 255, 255, 0.5) 0%,
+      rgba(246, 250, 255, 0.28) 18%,
+      rgba(225, 237, 255, 0.16) 42%,
+      rgba(208, 224, 255, 0.06) 70%,
       transparent 100%
     );
   box-shadow:
-    0 0 14px rgba(238, 246, 255, 0.08),
-    0 0 40px rgba(210, 230, 255, 0.05);
+    0 0 16px rgba(238, 246, 255, 0.1),
+    0 0 46px rgba(210, 230, 255, 0.06);
   animation: lighthouse-beam-white 8.2s ease-in-out infinite;
 }
 
@@ -132,31 +132,31 @@
   background:
     linear-gradient(
       90deg,
-      rgba(255, 245, 214, 0.3) 0%,
-      rgba(245, 212, 135, 0.18) 18%,
-      rgba(233, 192, 99, 0.08) 44%,
-      rgba(226, 186, 96, 0.03) 70%,
+      rgba(235, 244, 255, 0.2) 0%,
+      rgba(220, 233, 255, 0.14) 20%,
+      rgba(192, 216, 255, 0.08) 46%,
+      rgba(170, 202, 255, 0.03) 72%,
       transparent 100%
     );
   box-shadow:
-    0 0 12px rgba(244, 210, 127, 0.06),
-    0 0 32px rgba(233, 188, 85, 0.04);
+    0 0 14px rgba(222, 235, 255, 0.06),
+    0 0 34px rgba(182, 209, 255, 0.04);
   animation: lighthouse-beam-amber 8.2s ease-in-out infinite;
 }
 
 .homeRiverLight {
   position: absolute;
-  left: calc(50% - 40px);
-  top: clamp(618px, 52vw, 754px);
-  width: clamp(280px, 34vw, 460px);
-  height: clamp(110px, 12vw, 156px);
+  left: calc(50% - 18px);
+  top: clamp(644px, 56vw, 792px);
+  width: clamp(220px, 30vw, 380px);
+  height: clamp(104px, 11vw, 146px);
   background:
-    radial-gradient(ellipse at 18% 50%, rgba(255, 245, 212, 0.18) 0%, rgba(237, 241, 255, 0.08) 30%, rgba(188, 208, 255, 0.03) 56%, transparent 78%),
-    linear-gradient(90deg, rgba(255, 245, 212, 0.02) 0%, rgba(223, 235, 255, 0.1) 22%, rgba(162, 191, 255, 0.03) 58%, transparent 100%);
-  filter: blur(26px);
+    radial-gradient(ellipse at 24% 48%, rgba(249, 252, 255, 0.22) 0%, rgba(230, 238, 255, 0.12) 28%, rgba(188, 208, 255, 0.04) 54%, transparent 76%),
+    linear-gradient(105deg, rgba(255, 255, 255, 0.02) 0%, rgba(225, 237, 255, 0.12) 20%, rgba(176, 203, 255, 0.04) 54%, transparent 100%);
+  filter: blur(24px);
   mix-blend-mode: screen;
-  opacity: 0.12;
-  transform: rotate(-4deg);
+  opacity: 0.14;
+  transform: rotate(9deg);
   animation: river-light-shimmer 9.4s ease-in-out infinite;
 }
 
@@ -1812,21 +1812,22 @@
   position: relative;
   z-index: 1;
   display: grid;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
-  max-width: 468px;
+  max-width: 430px;
   margin: 0 auto;
-  padding: 0 0 8px;
+  padding: 0 0 6px;
 }
 
 .homeHero {
   display: grid;
-  gap: 4px;
+  gap: 0;
   justify-items: center;
   text-align: center;
-  max-width: 468px;
+  max-width: 490px;
   margin: 0 auto;
-  padding-top: clamp(72px, 8.8vh, 104px);
+  padding-top: clamp(10px, 1.8vh, 18px);
+  padding-bottom: clamp(64px, 6vw, 82px);
 }
 
 .homeEyebrow {
@@ -1838,9 +1839,9 @@
 }
 
 .homeTitle {
-  max-width: 430px;
-  font-size: clamp(24px, 3.05vw, 34px);
-  line-height: 1.03;
+  max-width: 480px;
+  font-size: clamp(21px, 2.65vw, 30px);
+  line-height: 1.06;
   font-weight: 650;
   letter-spacing: -0.04em;
   color: rgba(248, 251, 255, 0.98);
@@ -1857,29 +1858,29 @@
 
 .homeInputCard {
   width: 100%;
-  max-width: 468px;
+  max-width: 430px;
   margin: 0 auto;
-  border-radius: 22px;
+  border-radius: 20px;
   border: 1px solid rgba(225, 236, 255, 0.12);
-  background: linear-gradient(180deg, rgba(10, 21, 37, 0.46) 0%, rgba(9, 18, 31, 0.66) 100%);
-  box-shadow: 0 18px 36px rgba(4, 10, 18, 0.22);
-  backdrop-filter: blur(14px) saturate(130%);
+  background: linear-gradient(180deg, rgba(12, 23, 40, 0.8) 0%, rgba(10, 19, 33, 0.82) 100%);
+  box-shadow: 0 16px 30px rgba(4, 10, 18, 0.22);
+  backdrop-filter: blur(12px) saturate(125%);
 }
 
 .homeInputTabs {
   display: flex;
-  gap: 4px;
-  padding: 5px 6px 0;
+  gap: 3px;
+  padding: 4px 5px 0;
 }
 
 .homeInputTab {
-  min-height: 32px;
+  min-height: 30px;
   border-radius: 16px 16px 0 0;
   border: 0;
   background: transparent;
   color: rgba(220, 231, 245, 0.58);
-  padding: 0 11px;
-  font-size: 11.5px;
+  padding: 0 10px;
+  font-size: 11px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -1891,23 +1892,23 @@
 
 .homeInputBody {
   display: grid;
-  gap: 6px;
-  padding: 8px 10px 10px;
+  gap: 5px;
+  padding: 7px 9px 9px;
 }
 
 .homeTextarea {
   width: 100%;
-  min-height: 92px;
+  min-height: 84px;
   resize: none;
-  border-radius: 15px;
+  border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(7, 15, 27, 0.5);
+  background: rgba(7, 15, 27, 0.74);
   color: rgba(248, 251, 255, 0.94);
-  padding: 9px 11px;
-  font-size: 12.5px;
+  padding: 8px 10px;
+  font-size: 12px;
   line-height: 1.45;
   outline: none;
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(8px);
 }
 
 .homeTextarea::placeholder {
@@ -1927,19 +1928,19 @@
 .homeCapturePanel,
 .homeVoicePanel {
   display: grid;
-  gap: 8px;
+  gap: 7px;
 }
 
 .homeCaptureActions,
 .homeVoiceRow {
   display: flex;
   align-items: center;
-  gap: 8px;
-  border-radius: 15px;
+  gap: 7px;
+  border-radius: 14px;
   border: 1px dashed rgba(126, 184, 247, 0.26);
-  background: rgba(7, 15, 27, 0.3);
-  padding: 9px 10px;
-  backdrop-filter: blur(10px);
+  background: rgba(7, 15, 27, 0.34);
+  padding: 8px 9px;
+  backdrop-filter: blur(8px);
 }
 
 .homeHiddenInput {
@@ -1948,13 +1949,13 @@
 
 .homeCaptureButton,
 .homeVoiceButton {
-  min-height: 36px;
+  min-height: 34px;
   border: 0;
   border-radius: 999px;
   background: rgba(244, 201, 93, 0.12);
   color: rgba(255, 236, 194, 0.94);
-  padding: 0 13px;
-  font-size: 11.5px;
+  padding: 0 12px;
+  font-size: 11px;
   font-weight: 700;
   cursor: pointer;
 }
@@ -2023,13 +2024,13 @@
 }
 
 .homePrimaryButton {
-  min-height: 36px;
+  min-height: 34px;
   border: 0;
   border-radius: 999px;
   background: linear-gradient(180deg, #f4c95d 0%, #e9b83d 100%);
   color: #1d1400;
-  padding: 0 15px;
-  font-size: 11.5px;
+  padding: 0 14px;
+  font-size: 11px;
   font-weight: 700;
   cursor: pointer;
 }
@@ -2044,19 +2045,19 @@
   z-index: 1;
   display: grid;
   width: 100%;
-  max-width: 468px;
+  max-width: 430px;
   margin: 0 auto;
-  gap: 6px;
+  gap: 5px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .quickActionCard {
   display: grid;
   gap: 3px;
-  border-radius: 18px;
+  border-radius: 17px;
   border: 1px solid rgba(221, 234, 255, 0.12);
   background: linear-gradient(180deg, rgba(10, 21, 37, 0.36) 0%, rgba(8, 16, 29, 0.52) 100%);
-  padding: 10px 12px;
+  padding: 9px 11px;
   text-align: left;
   cursor: pointer;
   transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
@@ -2086,7 +2087,7 @@
   z-index: 1;
   display: grid;
   width: 100%;
-  max-width: 468px;
+  max-width: 430px;
   margin: 0 auto;
   gap: 6px;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -2126,23 +2127,23 @@
   }
 
   .homeLighthouseBeam {
-    left: calc(50% - 260px);
-    top: clamp(434px, 43vw, 508px);
-    width: clamp(280px, 50vw, 420px);
-    height: 60px;
-    filter: blur(12px);
+    left: calc(50% - 264px);
+    top: clamp(436px, 43vw, 510px);
+    width: clamp(226px, 40vw, 360px);
+    height: 78px;
+    filter: blur(14px);
   }
 
   .homeRiverLight {
-    left: calc(50% - 24px);
-    top: clamp(602px, 66vw, 768px);
-    width: clamp(210px, 34vw, 340px);
-    height: clamp(92px, 10vw, 132px);
+    left: calc(50% - 8px);
+    top: clamp(620px, 68vw, 778px);
+    width: clamp(170px, 28vw, 260px);
+    height: clamp(84px, 9vw, 114px);
   }
 
   .entryShell {
     max-width: none;
-    padding: 8px 10px 12px;
+    padding: 7px 10px 10px;
   }
 
   .entryViewport {
@@ -2167,17 +2168,18 @@
   }
 
   .homePanel {
-    padding-bottom: 8px;
+    padding-bottom: 5px;
   }
 
   .homeHero {
-    padding-top: clamp(70px, 9vw, 96px);
+    padding-top: clamp(10px, 1.8vh, 16px);
+    padding-bottom: clamp(58px, 8vw, 74px);
   }
 
   .homeInputCard,
   .quickActions,
   .homeContextStrip {
-    max-width: 450px;
+    max-width: 414px;
   }
 
   .homeCaptureActions,
@@ -2252,19 +2254,19 @@
   }
 
   .homeLighthouseBeam {
-    left: calc(50% - 188px);
-    top: 434px;
-    width: min(290px, 68vw);
-    height: 48px;
-    transform: rotate(-1.2deg);
-    filter: blur(10px);
+    left: calc(50% - 192px);
+    top: 436px;
+    width: min(214px, 56vw);
+    height: 70px;
+    transform: rotate(10deg);
+    filter: blur(12px);
   }
 
   .homeRiverLight {
-    left: calc(50% - 18px);
-    top: 620px;
-    width: min(220px, 58vw);
-    height: 86px;
+    left: calc(50% - 6px);
+    top: 634px;
+    width: min(170px, 42vw);
+    height: 72px;
   }
 
   .homeCompassCore {
@@ -2308,20 +2310,21 @@
   }
 
   .homeHero {
-    padding-top: clamp(72px, 15vw, 88px);
+    padding-top: 10px;
+    padding-bottom: 56px;
     padding-inline: 16px;
   }
 
   .homeInputCard,
   .quickActions,
   .homeContextStrip {
-    width: min(100%, 356px);
-    max-width: 356px;
+    width: min(100%, 334px);
+    max-width: 334px;
   }
 
   .homeInputBody {
-    gap: 6px;
-    padding: 8px 10px 10px;
+    gap: 5px;
+    padding: 7px 8px 8px;
   }
 
   .homeInputFooter {
@@ -2330,8 +2333,8 @@
   }
 
   .homeTitle {
-    max-width: 304px;
-    font-size: clamp(22px, 7.2vw, 30px);
+    max-width: 316px;
+    font-size: clamp(19px, 5.8vw, 24px);
   }
 
   .homeSubcopy {
@@ -2340,7 +2343,7 @@
   }
 
   .homeTextarea {
-    min-height: 88px;
+    min-height: 80px;
   }
 
   .homePrimaryButton {
@@ -2483,53 +2486,64 @@
 
 @keyframes lighthouse-beam-white {
   0%,
-  18%,
+  16%,
   100% {
     opacity: 0;
-    transform: rotate(-2.8deg) scaleX(0.96);
+    transform: rotate(4deg) scaleX(0.94) scaleY(0.92);
   }
 
-  28% {
+  26% {
     opacity: 0.08;
   }
 
   34%,
-  44% {
-    opacity: 0.18;
-    transform: rotate(-1.2deg) scaleX(1);
+  48% {
+    opacity: 0.2;
+    transform: rotate(9deg) scaleX(1) scaleY(1);
   }
 
-  56% {
-    opacity: 0.04;
-    transform: rotate(-2.2deg) scaleX(0.985);
+  60% {
+    opacity: 0.12;
+    transform: rotate(13deg) scaleX(0.985) scaleY(1.02);
+  }
+
+  72%,
+  84% {
+    opacity: 0.24;
+    transform: rotate(17deg) scaleX(1.01) scaleY(1.03);
+  }
+
+  92% {
+    opacity: 0.05;
+    transform: rotate(7deg) scaleX(0.96) scaleY(0.94);
   }
 }
 
 @keyframes lighthouse-beam-amber {
   0%,
-  54% {
+  48% {
     opacity: 0;
-    transform: rotate(-2.2deg) scaleX(0.95);
+    transform: rotate(5deg) scaleX(0.94) scaleY(0.9);
   }
 
-  66% {
+  58% {
     opacity: 0.06;
   }
 
-  72%,
-  84% {
+  66%,
+  80% {
     opacity: 0.14;
-    transform: rotate(-0.9deg) scaleX(1);
+    transform: rotate(11deg) scaleX(1) scaleY(1.02);
   }
 
-  92% {
+  90% {
     opacity: 0.03;
-    transform: rotate(-1.7deg) scaleX(0.985);
+    transform: rotate(15deg) scaleX(0.98) scaleY(1.03);
   }
 
   100% {
     opacity: 0;
-    transform: rotate(-2.2deg) scaleX(0.96);
+    transform: rotate(7deg) scaleX(0.95) scaleY(0.94);
   }
 }
 
@@ -2538,23 +2552,23 @@
   18%,
   100% {
     opacity: 0.08;
-    transform: rotate(-4deg) scaleX(0.96);
+    transform: rotate(8deg) scaleX(0.94);
   }
 
   32%,
   46% {
     opacity: 0.16;
-    transform: rotate(-3deg) scaleX(1);
+    transform: rotate(10deg) scaleX(1);
   }
 
   62% {
     opacity: 0.1;
-    transform: rotate(-3.6deg) scaleX(0.98);
+    transform: rotate(12deg) scaleX(0.98);
   }
 
   78% {
-    opacity: 0.14;
-    transform: rotate(-2.8deg) scaleX(1.02);
+    opacity: 0.18;
+    transform: rotate(14deg) scaleX(1.02);
   }
 }
 

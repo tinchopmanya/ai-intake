@@ -780,11 +780,7 @@ export function MvpEntryFlow() {
             </div>
             <section className={styles.homePanel}>
               <div className={styles.homeHero}>
-                <p className={styles.homeEyebrow}>ExReply · claridad antes de responder</p>
                 <h1 className={styles.homeTitle}>¿Qué pasó con tu ex hoy?</h1>
-                <p className={styles.homeSubcopy}>
-                  Pegá el mensaje, subí una captura o dictá la situación. Entrás directo a una recomendación clara y a las tres respuestas de advisors.
-                </p>
               </div>
 
               <section className={styles.homeInputCard} onPaste={entryInputMode === "capture" ? handleEntryPaste : undefined}>
