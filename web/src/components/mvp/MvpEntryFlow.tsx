@@ -805,6 +805,7 @@ export function MvpEntryFlow() {
         <div className={`${styles.viewport} ${styles.entryViewport}`}>
           <div className={styles.entryShell}>
             <div className={styles.homeSceneFx} aria-hidden="true">
+              <span className={styles.homeLighthouseSourceGlow} />
               <span className={`${styles.homeLighthouseBeam} ${styles.homeLighthouseBeamWhite}`} />
               <span className={`${styles.homeLighthouseBeam} ${styles.homeLighthouseBeamAmber}`} />
               <span className={styles.homeCompassCore} />
