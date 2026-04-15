@@ -804,6 +804,12 @@ export function MvpEntryFlow() {
       {view === "entry" ? (
         <div className={`${styles.viewport} ${styles.entryViewport}`}>
           <div className={styles.entryShell}>
+            <div className={styles.homeSceneFx} aria-hidden="true">
+              <span className={`${styles.homeLighthouseBeam} ${styles.homeLighthouseBeamWhite}`} />
+              <span className={`${styles.homeLighthouseBeam} ${styles.homeLighthouseBeamAmber}`} />
+              <span className={styles.homeCompassCore} />
+              <span className={styles.homeCompassSpark} />
+            </div>
             <section className={styles.homePanel}>
               <div className={styles.homeHero}>
                 <p className={styles.homeEyebrow}>ExReply · claridad antes de responder</p>
